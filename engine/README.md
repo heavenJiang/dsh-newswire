@@ -146,6 +146,10 @@ Only values the source actually gives; missing values are NULL (not 0). Per sour
 `adapters/<id>.mjs` exports `{ id, browseMode: "html", waitFor, parse(html, { url, max }) }`. The browse channel reads the rendered page in `html` mode (waiting up to 15 seconds for the `waitFor` selector); the http channel passes the response body to the same `parse`.
 To add one: write the module → register it in `adapters/index.mjs` → save a snapshot as `tests/fixtures/<id>.html.gz` → add assertions to `tests/unit/adapters.test.mjs`.
 
+## Parsing rules (learned by the model, run by the program)
+A source can carry `extract`: `{ item, link?, title?, time?, summary?, wait_for? }`, all CSS selectors. `item` selects each entry on the page and the rest are looked up inside it; entries without a separate headline (social posts) use the first line of their text. Sources with `extract` use browse's `select` mode (wait for `wait_for`, scroll three screens, then read).
+The rules are usually not hand-written: when the generic parser can't read a page, the plugin takes a page outline with `--mode outline --url <url>` (tags, a few classes, data-* attributes, link and time attributes, short text, at most three repeated siblings), has the model write selectors, and verifies them with a test fetch (at least 3 entries with distinct links and titles); if they fail, the model gets the results and tries once more. See `host/recipe.mjs`.
+
 ## CLI
 ```bash
 # One round (external command paths are detected when not given)

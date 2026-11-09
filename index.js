@@ -25,6 +25,7 @@ import z from "@deepseek-ai/schemastery";
 import { openIfExists, sinceIso, latestRun, recentRuns, countsByCategory, keywords, failureRows, attemptRows, sourceHealth, itemRows, signalTrail, continuityRows, continuitySummary, recentGaps, recentPushes, eventRows, eventDetail, labelCounts, dayRange, timelineDay, timelineRun } from "./engine/query.mjs";
 import { readLock } from "./engine/lock.mjs";
 import { createModel, analyzeEvents } from "./host/model.mjs";
+import { cleanExtract, learnRecipe, judgeRecipe } from "./host/recipe.mjs";
 import { loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, storyDetail, sinceSeen, reassemble, scrubStory, qualityRows, editionById, editionList, tickerBoard, updateEditionContent, bodiesFor } from "./host/edition.mjs";
 import { buildDaily, saveDaily, latestDaily, dailyDates, composeDailyMessage, todayBj } from "./host/daily.mjs";
 import { recordPushes, DEFAULT_RULES } from "./engine/pipeline/select.mjs";
@@ -403,6 +404,12 @@ function engineJson(stdout) {
 
 function hhmmShanghai() { return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()); }
 
+/** 页面结构概要（给模型学解析规则）：用试抓的 browse 会话打开页面，返回骨架。 */
+async function pageOutline(ctx, cfg, p, url) {
+  const res = await runEngine(ctx, cfg, p, ["--mode", "outline", "--config", p.cfgFile, "--url", url, ...binFlags(cfg, "newswire-test")], 150000);
+  return engineJson(res.stdout) || { ok: false, error: "engine_" + res.stage };
+}
+
 /** 试抓：只抓不入库，用独立 browse 会话，避免和正在跑的一轮抢同一个标签页。 */
 async function testSource(ctx, cfg, p, args) {
   await mkdir(p.tmp, { recursive: true });
@@ -480,6 +487,7 @@ function validateOne(s, at, problems) {
   if (s.backfill !== undefined && typeof s.backfill !== "boolean") problems.push(at + " backfill 需为布尔");
   if (s.body !== undefined && s.body !== null && ["fetch", "list", "none"].indexOf(s.body) < 0) problems.push(at + " body 只能是 fetch / list / none");
   if (s.enabled !== undefined && typeof s.enabled !== "boolean") problems.push(at + " enabled 需为布尔");
+  if (s.extract !== undefined && s.extract !== null && !cleanExtract(s.extract)) problems.push(at + " extract 需为 { item, link?, title?, time?, summary?, wait_for? } 形式的 CSS 选择器");
 }
 
 function validateSources(body, opts) {
@@ -522,6 +530,8 @@ function normalizeSource(s) {
   if (s.weight !== undefined && s.weight !== null && s.weight !== "") out.weight = Math.round(Math.min(1, Math.max(0, Number(s.weight))) * 100) / 100;
   if (s.paywall === true) out.paywall = true;
   if (s.trial === true) out.trial = true;
+  const ex = cleanExtract(s.extract);
+  if (ex) out.extract = ex;
   return out;
 }
 
@@ -592,6 +602,8 @@ export function draftSource(input, existing) {
     type: input.type === "rss" || input.type === "html_index" ? input.type : feed ? "rss" : "html_index",
     category: String(input.category || (pack === "study_abroad" ? "留学与签证" : cnLike ? "国内财经与公告" : "国际宏观")).slice(0, 40),
     region, pack, channels: ["browse", "http", "agent_reach"], max_items: 20, enabled: true, trial: true,
+    // 模型学会的解析规则：只有真实浏览器里才能照着选择器取，通道只留 browse
+    ...(cleanExtract(input.extract) ? { extract: cleanExtract(input.extract), type: "html_index", channels: ["browse"] } : {}),
   };
 }
 
@@ -944,7 +956,42 @@ export function apply(ctx, config) {
         modelState.busy = "track:" + id;
         try { await runSynthesis(id); } catch { /* 下一份版面再试 */ } finally { modelState.busy = null; }
       }
+      try { await repairRecipes(); } catch { /* 下一份版面再试 */ }
     }, 0);
+  }
+
+  /**
+   * 解析失灵的源：最近两次抓取都解析出 0 条（多半是网站改版），均衡 / 深度档下让模型重新学解析规则，
+   * 试抓验证过才写回配置。只管没有专用适配器的列表页源；一个源一天最多试一次，每次最多修一个。
+   */
+  async function repairRecipes() {
+    if (!llmReady() || depthOf(prefs()) === "lean" || modelState.busy || busyWith()) return;
+    const conf = await readConfigSources(p);
+    const sources = (conf.data.sources || []).filter((x) => x.enabled !== false && !x.removed_at && !x.adapter && (x.type || "html_index") === "html_index" && (!x.channels || x.channels.includes("browse")));
+    if (!sources.length) return;
+    const broken = withDb(p, (db) => {
+      if (!db) return [];
+      const out = [];
+      const q = db.prepare("SELECT run_id, MAX(ok) ok, MAX(CASE WHEN error LIKE '0 items parsed%' THEN 1 ELSE 0 END) zero FROM fetch_attempts WHERE source_id = ? GROUP BY run_id ORDER BY MAX(attempted_at) DESC LIMIT 2");
+      for (const x of sources) { const rs = q.all(x.id); if (rs.length === 2 && rs.every((r) => !r.ok && r.zero)) out.push(x); }
+      return out;
+    }) || [];
+    for (const src of broken) {
+      const key = "recipe:" + src.id;
+      const last = withDb(p, (db) => (db ? db.prepare("SELECT value FROM kv WHERE key = ?").get(key) : null));
+      if (last && Date.now() - Date.parse(last.value) < 86400000) continue;
+      const now = new Date().toISOString();
+      withDb(p, (db) => { if (db) db.prepare("INSERT INTO kv (key, value, updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").run(key, now, now.replace("T", " ").slice(0, 19)); });
+      modelState.busy = "recipe:" + src.id;
+      try {
+        const r = await learnRecipe({ outline: (u) => pageOutline(ctx, cfg, p, u), test: (s2) => testSource(ctx, cfg, p, { source: s2, max_items: 8 }), model }, src, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
+        if (r.ok) {
+          await upsertSourceInConfig(p, { id: src.id, extract: r.extract, type: "html_index", channels: ["browse"], note: "解析规则由模型于 " + now.slice(0, 10) + " 自动更新（原来的解析连续两轮抓不到内容）" });
+          ctx.logger?.info?.("dsh-newswire: 已为 " + src.id + " 重新学会解析规则");
+        }
+      } catch { /* 明天再试 */ } finally { modelState.busy = null; }
+      return;
+    }
   }
 
   async function runSynthesis(id) {
@@ -1231,14 +1278,24 @@ export function apply(ctx, config) {
         let src = draftSource(body, list);
         const problems = validateSources({ sources: [src] }, { allowSingle: true });
         if (problems.length) return jsonResponse({ ok: false, error: "invalid_source", problems }, 400);
+        // 通用解析认不出来时：让模型读页面结构、写出解析规则，程序试抓验证（不过关再改一次）
+        if (body.learn === true) {
+          if (!llmReady()) return jsonResponse({ ok: false, error: "no_model" }, 409);
+          const learned = await learnRecipe({ outline: (u) => pageOutline(ctx, cfg, p, u), test: (s2) => testSource(ctx, cfg, p, { source: s2, max_items: 8 }), model }, src, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
+          const source = learned.extract ? draftSource(Object.assign({}, body, { extract: learned.extract }), list) : src;
+          return jsonResponse({ ok: Boolean(learned.ok), source, test: learned.test || null, learned: { tries: learned.tries || 0, note: learned.note || "", why: learned.why || "", error: learned.error || null, detail: learned.detail || null } }, 200);
+        }
         if (body.test === true) {
+          // 抓到不等于抓对：登录页、导航之类的一两条不算，和学规则用同一个标准
           let res = await testSource(ctx, cfg, p, { source: src, max_items: 8 });
-          if (!body.type && !(res && res.kept)) {
+          let verdict = judgeRecipe(res);
+          if (!body.type && !verdict.ok) {
             const other = Object.assign({}, src, { type: src.type === "rss" ? "html_index" : "rss" });
             const res2 = await testSource(ctx, cfg, p, { source: other, max_items: 8 });
-            if (res2 && res2.kept) { src = other; res = res2; }
+            const v2 = judgeRecipe(res2);
+            if (v2.ok || (res2 && res2.kept) > ((res && res.kept) || 0)) { src = other; res = res2; verdict = v2; }
           }
-          return jsonResponse({ ok: Boolean(res && res.kept), source: src, test: res }, 200);
+          return jsonResponse({ ok: verdict.ok, why: verdict.why, source: src, test: res }, 200);
         }
         const out = await upsertSourceInConfig(p, src);
         if (!out.ok) return jsonResponse(out, 400);

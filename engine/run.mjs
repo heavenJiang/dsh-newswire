@@ -26,7 +26,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { openDb, upsertSource, startRun, finishRun } from "./store/db.mjs";
-import { configureBrowse, browseStatus, ensureSession } from "./channels/browse.mjs";
+import { configureBrowse, browseStatus, ensureSession, browseFetch } from "./channels/browse.mjs";
 import { configureAgentReach } from "./channels/agent_reach.mjs";
 import { fetchSource, DEFAULT_CHAIN } from "./pipeline/fetch.mjs";
 import { toRecord } from "./pipeline/normalize.mjs";
@@ -99,6 +99,19 @@ async function preflight(sources) {
   const pre = await browseStatus();
   if (pre.ok) await ensureSession();
   return pre;
+}
+
+// ------------------------------------------------------------------ 页面结构概要（给模型学解析规则用）
+if (MODE === "outline") {
+  const url = str(A.url);
+  if (!url) { console.log("NEWSWIRE_JSON " + JSON.stringify({ ok: false, error: "url_required" })); process.exit(2); }
+  const pre = await preflight([Object.assign({}, DEF, { id: "outline", url, channels: ["browse"] })]);
+  if (!pre.ok) { console.log("NEWSWIRE_JSON " + JSON.stringify({ ok: false, error: "browse_unavailable", reason: pre.reason || null })); process.exit(2); }
+  const res = await browseFetch("outline", url, 1, { timeoutMs: 90000 });
+  const d = (res && res.data) || {};
+  const v = (res && res.value) || {};
+  console.log("NEWSWIRE_JSON " + JSON.stringify({ ok: Boolean(res.ok && d.outline), url, page_url: v.page_url || null, title: v.doc_title || null, outline: d.outline || "", truncated: Boolean(d.truncated), error: res.ok ? null : res.error }));
+  process.exit(res.ok ? 0 : 2);
 }
 
 // ------------------------------------------------------------------ 试抓

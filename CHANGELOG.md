@@ -2,6 +2,15 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.1 (2026-11-09)
+
+- **Let the model learn a page**:
+  - For pages the generic parser can't read (an X feed, say), click "Let the model learn this page" under Add a source.
+  - The model reads the page structure and writes parsing rules (CSS selectors). A test fetch verifies them, and if they fail the model gets the results and tries once more.
+  - Once learned, the program follows the rules every round with no model calls.
+  - On Balanced and Deep, a source that parses nothing two rounds in a row is relearned automatically, at most once a day per source.
+- **Stricter test fetch**: one or two items such as a login page or navigation no longer count as success; the panel says they look wrong and offers to let the model learn the page.
+
 ## 1.1.0 (2026-11-09)
 
 - **Scheduled pushes no longer time out**:

@@ -17,6 +17,7 @@ export { CHANNELS, DEFAULT_CHAIN };
 
 function browseModeOf(src, adapter) {
   if (adapter) return adapter.browseMode || "html";
+  if (src.extract && typeof src.extract === "object" && src.extract.item) return "select";
   return src.type === "rss" ? "rss" : src.type === "cls_api" ? "cls_api" : "html_index";
 }
 
@@ -74,7 +75,7 @@ export async function fetchSource(src, env) {
           record({ channel: ch, ok: false, error: reason, error_kind: "browser_unavailable", hint: reason === "browse_not_found" ? "未找到 browse：运行 curl -fsSL https://raw.githubusercontent.com/heavenJiang/dsh-newswire/main/scripts/setup.sh | bash 一键安装，或在插件设置里填 browseBin" : "browse 扩展没连上：在终端运行 browse install 完成配对，或在 Chrome 工具栏点 browse 按钮重连", latency_ms: 0 });
           break;
         }
-        const res = await browseFetch(browseModeOf(src, adapter), src.url, max, { timeoutMs, sinceHours: src.since_hours || env.windowHours || 24, until: src.until || null, pages: Number(src.pages || Math.ceil(max / 20) + 2), category: src.category_src || "", waitFor: (adapter && adapter.waitFor) || src.wait_for || "" });
+        const res = await browseFetch(browseModeOf(src, adapter), src.url, max, { timeoutMs, sinceHours: src.since_hours || env.windowHours || 24, until: src.until || null, pages: Number(src.pages || Math.ceil(max / 20) + 2), category: src.category_src || "", waitFor: (adapter && adapter.waitFor) || src.wait_for || "", extract: src.extract || null });
         if (res.ok) {
           const v = res.value || {};
           const payload = res.data || {};

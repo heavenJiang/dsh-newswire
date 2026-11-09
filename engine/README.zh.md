@@ -146,6 +146,10 @@ engine/
 `adapters/<id>.mjs` 导出 `{ id, browseMode: "html", waitFor, parse(html, { url, max }) }`。browse 通道用 `html` 模式取渲染后的整页（等 `waitFor` 选择器出现，最多 15 秒），http 通道把响应体交给同一个 `parse`。
 新增适配器：写模块 → 在 `adapters/index.mjs` 登记 → 存一份快照 `tests/fixtures/<id>.html.gz` → 在 `tests/unit/adapters.test.mjs` 加断言。
 
+## 解析规则（模型学会、程序执行）
+源上可以带 `extract`：`{ item, link?, title?, time?, summary?, wait_for? }`，都是 CSS 选择器。`item` 在整页上选出每一条，其余在每条内部找；没有单独标题的（社交平台的帖子）取正文第一行作标题。有 `extract` 的源走 browse 的 `select` 模式（等 `wait_for`，往下滚三屏再取）。
+规则通常不是手写的：通用解析认不出页面时，插件用 `--mode outline --url <地址>` 取页面骨架（标签、少量 class、data-*、链接与时间属性、短文本，重复的兄弟只留 3 个），交给模型写选择器，再用试抓验证（至少 3 条、链接和标题各不相同），不过关带着结果让模型再改一次。见 `host/recipe.mjs`。
+
 ## CLI
 ```bash
 # 抓一轮（外部命令路径不给就自动探测）

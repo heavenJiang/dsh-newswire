@@ -80,6 +80,7 @@ The evening digest has a one-line summary, the day's main threads, what to watch
 - **Cache-friendly prompts**: fixed instructions come first and material last, so hosted models' prefix caches hit.
 - **Measured concurrency**: it tests whether the model server can run requests in parallel and sets batch concurrency from that. A slow local GPU and a fast hosted API are both handled.
 - **Three depth levels and a daily budget**: Lean, Balanced and Deep set how much is read, how much is written and how many stories are analyzed. You can cap tokens per day, and every call is logged.
+- **The model learns, the program runs it**: for pages the generic parser can't read, the model reads the structure once and writes parsing rules, which run every round after a test fetch verifies them; when a redesign breaks them, they are relearned. The model's understanding costs tokens once, then every round is free, stable and can't invent links.
 - **No model needed**: save-tokens mode makes no model calls at all and builds the same layout from rules. If any model step fails, it falls back to the rule result.
 
 ### 🛡 Credibility you can see
@@ -174,6 +175,8 @@ The panel follows the harness's light and dark themes and works at phone width.
 | study_abroad | International | UK Visas and Immigration, IRCC Canada, USCIS, The PIE News, ICEF Monitor |
 
 **Want another source?** On the Sources tab, click "+ Add a source", enter a name and an RSS feed or news list page URL, test-fetch to see what comes back, then add it. Type (RSS or list page), region and id are worked out for you, and new sources start on trial.
+
+**A page the generic parser can't read** (an account's posts on X, say)? Click "Let the model learn this page": the model reads the page structure once and writes parsing rules, a test fetch verifies them right away, and if they fail the model gets the results and tries again. Once learned, the program follows the rules every round with no model calls. In testing, a local model learned an X feed in about 40 seconds, with an exact time on every post. On Balanced and Deep, a source that parses nothing two rounds in a row (usually a site redesign) is relearned in the background.
 
 **Not sure a source is worth it?** The Sources tab gives each one a scorecard: front-page stories, first reports, exclusives, corroborations, share of low-value items, completeness and fetch success. It also recommends on, trial or off. A source on trial only corroborates others and never leads a story or a push on its own.
 

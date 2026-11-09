@@ -111,6 +111,81 @@ const ARTICLE_BODY = [
   "}, MAXN);"
 ];
 
+// 按解析规则提取（规则通常由模型看过页面结构后生成，见 host/recipe.mjs）：
+// extract = { item, link?, title?, time?, summary?, wait_for? }，都是 CSS 选择器；item 选出每一条，其余在每条内部找。
+// 没有单独标题的（社交平台的帖子）取正文第一行作标题，全文作摘要。往下滚几屏，让懒加载的列表多出一些。
+const SELECT_BODY = [
+  "const EX = EXTRACT;",
+  "try { await page.waitForSelector(EX.wait_for || EX.item, { state: 'attached', timeout: 15000 }); } catch (e) {}",
+  "for (let i = 0; i < 3; i++) { try { await page.mouse.wheel(0, 2200); } catch (e) {} await new Promise((r) => setTimeout(r, 900)); }",
+  "const payload = await page.evaluate((a) => {",
+  "  const ex = a.ex, max = a.max; const out = []; const seen = new Set();",
+  "  const flat = (t) => String(t || '').replace(/\\s+/g, ' ').trim();",
+  "  let list = []; try { list = Array.from(document.querySelectorAll(ex.item)); } catch (e) { return { items: [], error: 'bad item selector' }; }",
+  "  const q = (el, sel) => { if (!sel) return null; try { return el.matches(sel) ? el : el.querySelector(sel); } catch (e) { return null; } };",
+  "  for (const it of list) {",
+  "    const lEl = q(it, ex.link) || (it.matches('a[href]') ? it : it.querySelector('a[href]'));",
+  "    const link = lEl && lEl.href ? lEl.href.split('#')[0] : '';",
+  "    if (!/^https?:/.test(link) || seen.has(link)) continue;",
+  "    const tEl = q(it, ex.title) || lEl;",
+  "    const raw = tEl ? String(tEl.innerText || tEl.textContent || '').trim() : '';",
+  "    const first = flat(raw.split(/\\n+/)[0]);",
+  "    if (!first) continue;",
+  "    seen.add(link);",
+  "    const title = first.length > 120 ? first.slice(0, 100) + '…' : first;",
+  "    const sEl = q(it, ex.summary);",
+  "    let summary = flat(sEl ? sEl.innerText : raw);",
+  "    if (summary === title) summary = '';",
+  "    const tm = q(it, ex.time) || it.querySelector('time');",
+  "    const iso = tm ? (tm.getAttribute('datetime') || '') : '';",
+  "    out.push({ title, link, published_at: iso, published_raw: tm && !iso ? flat(tm.innerText).slice(0, 40) : '', summary: summary.slice(0, 1200), content: '' });",
+  "    if (out.length >= max) break;",
+  "  }",
+  "  return { items: out, found: list.length };",
+  "}, { ex: EX, max: MAXN });"
+];
+
+// 页面结构概要：给模型看的骨架（标签、id、少量 class、data-* 、链接与时间属性、短文本），
+// 只有一个子元素又没有自己文字的层级压成一行，连续相同的兄弟只留前 3 个，总长有上限。
+const OUTLINE_BODY = [
+  "await new Promise((r) => setTimeout(r, 2500));",
+  "for (let i = 0; i < 2; i++) { try { await page.mouse.wheel(0, 1800); } catch (e) {} await new Promise((r) => setTimeout(r, 900)); }",
+  "const payload = await page.evaluate(() => {",
+  "  const SKIP = new Set(['SCRIPT','STYLE','SVG','NOSCRIPT','IFRAME','PATH','G','LINK','META','TEMPLATE','CANVAS','VIDEO','IMG','PICTURE','SOURCE','BUTTON','INPUT','FORM','NAV','HEADER','FOOTER','ASIDE']);",
+  "  const lines = []; let size = 0; const LIMIT = 24000;",
+  "  const sig = (el) => {",
+  "    let s = el.tagName.toLowerCase();",
+  "    if (el.id && !/\\d{4,}/.test(el.id)) s += '#' + el.id;",
+  "    const cls = Array.from(el.classList || []).filter((c) => c.length < 30 && !/^css-|^r-|[0-9a-z]{6,}\\d/.test(c)).slice(0, 2);",
+  "    if (cls.length) s += '.' + cls.join('.');",
+  "    for (const at of el.attributes || []) if (/^data-(testid|id|type|role)$|^role$|^itemprop$/.test(at.name) && at.value.length < 40) s += '[' + at.name + '=' + at.value + ']';",
+  "    if (el.tagName === 'A' && el.getAttribute('href')) s += '[href=' + el.getAttribute('href').slice(0, 70) + ']';",
+  "    if (el.tagName === 'TIME' && el.getAttribute('datetime')) s += '[datetime=' + el.getAttribute('datetime') + ']';",
+  "    return s;",
+  "  };",
+  "  const own = (el) => Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ').replace(/\\s+/g, ' ').trim();",
+  "  const walk = (el, depth, prefix) => {",
+  "    if (size > LIMIT || depth > 60 || SKIP.has(el.tagName.toUpperCase())) return;",
+  "    const kids = Array.from(el.children).filter((c) => !SKIP.has(c.tagName.toUpperCase()));",
+  "    const txt = own(el);",
+  "    if (kids.length === 1 && !txt && el.tagName !== 'A' && el.tagName !== 'ARTICLE' && el.tagName !== 'LI') { walk(kids[0], depth + 1, prefix + sig(el) + ' > '); return; }",
+  "    const line = '  '.repeat(Math.min(depth, 30)) + prefix + sig(el) + (txt ? ' “' + txt.slice(0, 60) + '”' : '');",
+  "    lines.push(line); size += line.length + 1;",
+  "    let run = 0, last = '';",
+  "    for (const c of kids) {",
+  "      const k = sig(c);",
+  "      run = k === last ? run + 1 : 0; last = k;",
+  "      if (run === 3) { const n = kids.filter((x) => sig(x) === k).length; const l2 = '  '.repeat(Math.min(depth + 1, 30)) + '…（同样的 ' + k + ' 共 ' + n + ' 个）'; lines.push(l2); size += l2.length; }",
+  "      if (run >= 3) continue;",
+  "      walk(c, depth + 1, '');",
+  "    }",
+  "  };",
+  "  const root = document.querySelector('main, [role=main]') || document.body;",
+  "  walk(root, 0, '');",
+  "  return { items: [], outline: lines.join('\\n').slice(0, LIMIT), truncated: size > LIMIT };",
+  "});"
+];
+
 // 站点适配器用：把渲染后的整页 HTML 交回 Node 侧，由 engine/adapters/<id>.mjs 解析（与 http 通道共用同一解析器）。
 const HTML_BODY = [
   "if (WAITFOR) { try { await page.waitForSelector(WAITFOR, { state: 'attached', timeout: 15000 }); } catch (e) {} } else { await new Promise((r) => setTimeout(r, 1200)); }",
@@ -147,9 +222,10 @@ const CLS_BODY = [
 export function renderJob(mode, url, max, opts) {
   const m = opts || {};
   const token = m.token || "x";
-  const body = mode === "rss" ? RSS_BODY : mode === "cls_api" ? CLS_BODY : mode === "article" ? ARTICLE_BODY : mode === "html" ? HTML_BODY : INDEX_BODY;
+  let body = mode === "rss" ? RSS_BODY : mode === "cls_api" ? CLS_BODY : mode === "article" ? ARTICLE_BODY : mode === "html" ? HTML_BODY : mode === "select" ? SELECT_BODY : mode === "outline" ? OUTLINE_BODY : INDEX_BODY;
   const pre = mode === "cls_api" ? [] : head(url);
   const fill = (l) => l.replaceAll("WAITFOR", JSON.stringify(m.waitFor || ""));
+  if (mode === "select") body = body.map((l) => l.replaceAll("EXTRACT", JSON.stringify(m.extract || {})));
   const src = pre.map(fill).concat(body.map((l) => l.replaceAll("MAXN", String(max || 20)).replaceAll("SINCE", String(m.sinceHours || 24)).replaceAll("PAGES", String(m.pages || 8)).replaceAll("UNTIL", String(m.until ? Math.floor(Date.parse(String(m.until).replace(" ", "T") + (String(m.until).includes("T") ? "" : "Z")) / 1000) || 0 : 0)).replaceAll("CATEGORY", JSON.stringify(m.category || "")).replaceAll("WAITFOR", JSON.stringify(m.waitFor || "")))).concat(tail(mode, token));
   return "'use strict';\n" + src.join("\n");
 }
