@@ -53,12 +53,14 @@ test("本轮新条目补正文：便宜的源全补、没记录的源试 2 篇�
   for (let i = 0; i < 3; i++) { art(db, "s" + i, "slow", { run: "old" }); body(db, "s" + i, true, 12000, "agent_reach"); }
   for (let i = 0; i < 4; i++) art(db, "nc" + i, "cheap");
   art(db, "ad", "cheap", { kind: "promo" });
-  art(db, "ok", "cheap", { completeness: "full" });
+  art(db, "ok", "cheap", { completeness: "full", summary: "完整的正文。".repeat(60) });
+  // 列表里看着完整、其实只有一句导语：抓得到原文的源也补
+  art(db, "lead", "cheap", { completeness: "full", summary: "一句导语，全文要点开原文才有。" });
   for (let i = 0; i < 4; i++) art(db, "nf" + i, "fresh");
   art(db, "ns", "slow");
   const profiles = bodyProfiles(db, SRC(["cheap", "slow", "fresh"]));
   const got = fillCandidates(db, { runId: "r1", profiles, budget: 60 }).map((x) => x.id).sort();
-  assert.deepEqual(got, ["nc0", "nc1", "nc2", "nc3", "nf0", "nf1"]);
+  assert.deepEqual(got, ["lead", "nc0", "nc1", "nc2", "nc3", "nf0", "nf1"]);
   assert.equal(fillCandidates(db, { runId: "r1", profiles, budget: 3 }).length, 3, "有预算");
   db.close();
 });
@@ -89,6 +91,10 @@ test("并发补正文：同一网站最多 2 个并发；成功回填正文与�
 test("快讯：标题本身是完整的一句话就算完整", () => {
   assert.equal(completeness({ title: "日本10年期国债收益率上行5.5个基点至2.69%。", summary: "" }), "full");
   assert.equal(completeness({ title: "伊朗称油轮起火", summary: "" }), "title_only");
+  // 感叹号收尾的多是标题党，不是快讯全文；列表把发布日期当成了摘要的，也不算内容
+  assert.equal(completeness({ title: "突传利空！全球首富马斯克，或被调查！", summary: "" }), "title_only");
+  assert.equal(completeness({ title: "王大泉主任率团赴美加韩访问交流", summary: "2025-02-24" }), "title_only");
+  assert.equal(completeness({ title: "某某会议召开", summary: "2026年11月9日 10:31" }), "title_only");
 });
 
 test("健康度带上每个源的正文策略与建议代码", () => {
@@ -98,5 +104,29 @@ test("健康度带上每个源的正文策略与建议代码", () => {
   const d = h.sources.find((x) => x.source_id === "dead");
   assert.equal(d.body_mode, "blocked");
   assert.equal(d.advice, "blocked");
+  db.close();
+});
+
+test("列表自带全文的源要抽查原文：一致就保持；原文明显更长（列表只是导语）就改为去原文补", () => {
+  const db = tmpDb();
+  for (let i = 0; i < 6; i++) art(db, "r" + i, "rich", { run: "old", completeness: "full", summary: "列表里的一段文字。".repeat(4) });
+  art(db, "now", "rich", { completeness: "full", summary: "本轮最长的一条。".repeat(10) });
+  art(db, "now2", "rich", { completeness: "full", summary: "短" });
+  let p = bodyProfiles(db, SRC(["rich"]));
+  assert.equal(p.get("rich").mode, "list");
+  assert.deepEqual(fillCandidates(db, { runId: "r1", profiles: p }).map((x) => x.id), ["now"], "每轮抽查 1 篇，挑列表文字最长的");
+  const check = (id, len, listLen) => db.prepare("INSERT INTO article_bodies (article_id, ok, ms, channel, fetched_at, content, text_len, list_len) VALUES (?,1,300,'http',?,?,?,?)").run(id, iso(60000), "x".repeat(len), len, listLen);
+  // 电报：原文与列表一样长
+  check("r0", 36, 36); check("r1", 40, 36); check("r2", 36, 36);
+  p = bodyProfiles(db, SRC(["rich"]));
+  assert.equal(p.get("rich").mode, "list");
+  assert.equal(p.get("rich").checked, 3);
+  assert.deepEqual(fillCandidates(db, { runId: "r1", profiles: p }), [], "抽满 3 篇不再抽");
+  // 同花顺一类：列表是导语，原文长得多
+  db.prepare("DELETE FROM article_bodies").run();
+  check("r0", 1500, 36); check("r1", 900, 36);
+  p = bodyProfiles(db, SRC(["rich"]));
+  assert.equal(p.get("rich").mode, "fetch");
+  assert.deepEqual(fillCandidates(db, { runId: "r1", profiles: p }).map((x) => x.id).sort(), ["now", "now2"]);
   db.close();
 });

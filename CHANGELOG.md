@@ -2,6 +2,19 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.5 (2026-11-09)
+
+- **Full text judged source by source**:
+  - Sources whose list already carries the full text (like Cailian wire flashes) get one original page checked per round, up to 3 in 7 days, to confirm they match. If the original pages are clearly longer, the list was only a lead, and the source switches to fetching bodies.
+  - Sources whose full article is a click away (like 10jqka and TechFlow) get a body fetched for every item that lists only a title or a one-line lead.
+  - Runs → Content completeness lists every source with how its full text is obtained and how that was decided.
+- **Cleaner body extraction**:
+  - Article containers are recognized first, so one- or two-sentence flashes are captured whole instead of falling back to the reader.
+  - When the reader reads a whole page, text starts at the article's title line. Disclaimers, related-headline lists, live news feeds, comments and social links are cut. Before this, a short flash could pick up neighboring headlines from the sidebar as its body.
+  - Bodies already stored are cleaned with the new rules.
+- **Completeness fixes**: a "summary" that is only a date, or a headline ending in "!" (often clickbait), no longer counts as complete, so its body is fetched.
+- Program-built leads end at a full sentence instead of breaking off with an ellipsis.
+
 ## 1.1.4 (2026-11-09)
 
 - When adding a source with a very short domain (x.com), the id uses the full domain (`x_com`, `x_com_reuters`) instead of `s_x`; the matching test is fixed (one 1.1.3 unit test failed on this).

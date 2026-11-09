@@ -9,8 +9,9 @@ import { httpFetch, jinaFetch } from "../channels/http.mjs";
 import { browseFetch } from "../channels/browse.mjs";
 import { classify } from "../channels/classify.mjs";
 import { clean, isoUtc } from "../util/text.mjs";
+import { MIN_BODY, MIN_SHORT, trimTail, anchorReader } from "./bodytext.mjs";
 
-const MIN_BODY = 150;
+export { trimTail, anchorReader };
 const PER_EVENT = 2;
 
 function findArticleBody(o, depth) {
@@ -28,6 +29,40 @@ export const CHALLENGE = /(security verification|verify you are (a )?human|just 
 
 const BOILER = /(版权所有|未经授权|责任编辑|扫码|下载.{0,6}APP|关注.{0,8}公众号|Copyright|All rights reserved|Sign up|Subscribe|cookie)/i;
 
+/** 常见的文章正文容器（class 名）。 */
+const CONTAINER = /<(div|section|article)\b[^>]*\bclass=["'][^"']*?\b(article-content|article-body|article_content|articleContent|article-text|news-content|news_content|post-content|post_content|entry-content|detail-content|content-detail|art_detail_content|article-detail|article_detail|main-text|rich_media_content|art_context)\b[^"']*["'][^>]*>/gi;
+
+/** 从 start 处的开标签取到配对的闭标签（同名标签按深度配对）。 */
+function elementAt(s, start, tag) {
+  const rx = new RegExp("<(/?)" + tag + "\\b[^>]*>", "gi");
+  rx.lastIndex = start;
+  let depth = 0;
+  let m;
+  while ((m = rx.exec(s))) {
+    depth += m[1] ? -1 : 1;
+    if (depth === 0) return s.slice(start, rx.lastIndex);
+    if (rx.lastIndex - start > 400000) break;
+  }
+  return s.slice(start, start + 200000);
+}
+
+function blockText(block) {
+  const paras = (block.match(/<p[\s>][\s\S]*?<\/p>/gi) || []).map((p) => clean(p));
+  const lines = paras.length ? paras : block.replace(/<(br|\/div|\/section|\/li|\/h\d)\b[^>]*>/gi, "\n").split("\n").map((l) => clean(l));
+  const seen = new Set();
+  return trimTail(lines.filter((t) => t.length >= 8 && !BOILER.test(t) && (seen.has(t) ? false : seen.add(t))).join("\n"));
+}
+
+/** 文章容器里的正文：取最长的那个容器。短讯（一两句话）也算。 */
+function containerBody(s) {
+  let best = "";
+  for (const m of s.matchAll(CONTAINER)) {
+    const t = blockText(elementAt(s, m.index, m[1]));
+    if (t.length > best.length) best = t;
+  }
+  return best;
+}
+
 /** 从整页 HTML 抽正文。@returns { text, extractor } 或 null */
 export function extractBody(html) {
   const s = String(html || "");
@@ -35,7 +70,7 @@ export function extractBody(html) {
   const ld = s.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
   for (const block of ld) {
     try {
-      const body = clean(findArticleBody(JSON.parse(block.replace(/^<script[^>]*>/i, "").replace(/<\/script>$/i, "")), 0));
+      const body = trimTail(clean(findArticleBody(JSON.parse(block.replace(/^<script[^>]*>/i, "").replace(/<\/script>$/i, "")), 0)));
       if (body.length >= MIN_BODY) return { text: body.slice(0, 20000), extractor: "json-ld" };
     } catch {
       // 坏的 JSON-LD 跳过
@@ -56,13 +91,17 @@ export function extractBody(html) {
     try { walk(JSON.parse(nd[1]), 0); } catch { /* 坏的跳过 */ }
     if (best.length >= MIN_BODY) return { text: best.slice(0, 20000), extractor: "next-data" };
   }
+  const box = containerBody(s);
+  if (box.length >= MIN_BODY) return { text: box.slice(0, 20000), extractor: "container" };
   let scope = s.replace(/<(script|style|noscript|nav|header|footer|aside|form)[\s\S]*?<\/\1>/gi, " ");
   const art = scope.match(/<article[\s\S]*?<\/article>/i);
   if (art && (art[0].match(/<p[\s>]/gi) || []).length >= 2) scope = art[0];
   const paras = (scope.match(/<p[\s>][\s\S]*?<\/p>/gi) || []).map((p) => clean(p)).filter((t) => t.length >= 25 && !BOILER.test(t));
   const seen = new Set();
-  const text = paras.filter((t) => (seen.has(t) ? false : seen.add(t))).join("\n");
+  const text = trimTail(paras.filter((t) => (seen.has(t) ? false : seen.add(t))).join("\n"));
   if (text.length >= MIN_BODY) return { text: text.slice(0, 20000), extractor: "paragraphs" };
+  // 短讯：正文容器里只有一两句话，也是全文
+  if (box.length >= MIN_SHORT) return { text: box, extractor: "container" };
   return null;
 }
 
@@ -73,7 +112,7 @@ export function readerText(md) {
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .split("\n").map((l) => l.replace(/^#+\s*/, "").trim())
-    .filter((l) => l.length >= 25 && !BOILER.test(l))
+    .filter((l) => l.length >= 8 && !BOILER.test(l))
     .join("\n").slice(0, 20000);
 }
 
@@ -105,15 +144,21 @@ export function bodyCandidates(db, o) {
 }
 
 /** 浏览器 article 模式读出的正文（<article> / <main> 的文字）。 */
-async function browseBody(url) {
+async function browseBody(url, title) {
   const r = await browseFetch("article", url, 1, { timeoutMs: 45000 });
   if (!r.ok || !r.data) return null;
   if (r.data.paywall) return { paywalled: true };
   if (CHALLENGE.test(String(r.data.text || "").slice(0, 2000))) return { blocked: true };
-  const text = String(r.data.text || "").split("\n").map((l) => l.trim()).filter((l) => l.length >= 25 && !BOILER.test(l)).join("\n");
-  return text.length >= MIN_BODY ? { text: text.slice(0, 20000) } : null;
+  const raw = String(r.data.text || "").split("\n").map((l) => l.trim()).filter((l) => l.length >= 8 && !BOILER.test(l)).join("\n");
+  const anchored = anchorReader(raw, title);
+  const text = anchored || trimTail(raw);
+  return text.length >= (anchored ? MIN_SHORT : MIN_BODY) ? { text: text.slice(0, 20000) } : null;
 }
 
+/**
+ * 抓一篇正文。o.title 给了的话，阅读器 / 浏览器读出的整页文字从标题那行开始取
+ * （避免把导航、侧栏里别的新闻当成这篇的正文）；结尾的免责声明、相关新闻列表截掉。
+ */
 export async function fetchBody(url, o) {
   const opt = o || {};
   const r = await httpFetch(url, { timeoutMs: opt.timeoutMs || 15000 });
@@ -123,16 +168,19 @@ export async function fetchBody(url, o) {
     if (got) return { ok: true, text: got.text, extractor: got.extractor, channel: "http" };
   }
   if (opt.browse && (!r.ok || r.http_status === 401 || r.http_status === 403)) {
-    const b = await browseBody(url).catch(() => null);
+    const b = await browseBody(url, opt.title).catch(() => null);
     if (b && b.paywalled) return { ok: false, paywalled: true, error: "paywall", channel: "browse" };
     if (b && b.blocked) return { ok: false, error: "bot_blocked", channel: "browse" };
     if (b) return { ok: true, text: b.text, extractor: "browse", channel: "browse" };
   }
   const j = await jinaFetch(url, { timeoutMs: 30000 });
   if (j.ok) {
-    const text = readerText(j.text);
-    if (CHALLENGE.test(text.slice(0, 2000))) return { ok: false, error: "bot_blocked", channel: "agent_reach" };
-    if (text.length >= MIN_BODY) return { ok: true, text, extractor: "reader", channel: "agent_reach" };
+    const all = readerText(j.text);
+    if (CHALLENGE.test(all.slice(0, 2000))) return { ok: false, error: "bot_blocked", channel: "agent_reach" };
+    // 对上了标题：从标题行取，短讯也算；对不上：整页文字截掉结尾样板，要够长才算
+    const anchored = anchorReader(all, opt.title);
+    const text = anchored || trimTail(all);
+    if (text.length >= (anchored ? MIN_SHORT : MIN_BODY)) return { ok: true, text, extractor: "reader", channel: "agent_reach" };
     return { ok: false, error: "reader: too short", channel: "agent_reach" };
   }
   return { ok: false, error: r.ok ? "no body found" : r.error || "http " + r.http_status, channel: r.ok ? "http" : "agent_reach" };
@@ -140,30 +188,39 @@ export async function fetchBody(url, o) {
 
 /** 抓一批正文并入库；返回 { tried, ok }。 */
 export async function fetchBodies(db, list, o) {
-  const ins = db.prepare("INSERT OR REPLACE INTO article_bodies (article_id, content, text_len, extractor, channel, paywalled, ok, error, fetched_at, run_id, ms) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+  const ins = db.prepare("INSERT OR REPLACE INTO article_bodies (article_id, content, text_len, extractor, channel, paywalled, ok, error, fetched_at, run_id, ms, list_len) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+  const prior = listInfo(db);
   const up = db.prepare("UPDATE articles SET completeness = 'full', content = ?, text_len = ?, training_ready = CASE WHEN paywalled = 1 THEN 0 ELSE ? END WHERE id = ? AND LENGTH(COALESCE(content, '')) < ?");
   let ok = 0;
   for (const c of list) {
     const s = Date.now();
-    const r = await fetchBody(c.url, o);
+    const p = prior(c.id);
+    const r = await fetchBody(c.url, Object.assign({}, o, { title: c.title || p.title }));
     const took = Date.now() - s;
     const now = isoUtc(Date.now());
     if (r.ok) {
       ok++;
-      ins.run(c.id, r.text, r.text.length, r.extractor, r.channel, 0, 1, null, now, o.runId, took);
+      ins.run(c.id, r.text, r.text.length, r.extractor, r.channel, 0, 1, null, now, o.runId, took, p.len);
       up.run(r.text, r.text.length, r.text.length >= (o.minTextLen || 200) ? 1 : 0, c.id, r.text.length);
     } else {
-      ins.run(c.id, null, 0, null, r.channel, r.paywalled ? 1 : 0, 0, String(r.error || "").slice(0, 300), now, o.runId, took);
+      ins.run(c.id, null, 0, null, r.channel, r.paywalled ? 1 : 0, 0, String(r.error || "").slice(0, 300), now, o.runId, took, p.len);
     }
     await new Promise((res) => setTimeout(res, 400));
   }
   return { tried: list.length, ok };
 }
 
+/** 抓正文前这条在列表里已有的文字长度与标题（用来判断详情页是不是比列表更全）。 */
+function listInfo(db) {
+  const q = db.prepare("SELECT title, MAX(LENGTH(COALESCE(summary, '')), LENGTH(COALESCE(content, ''))) AS len FROM articles WHERE id = ?");
+  return (id) => { const r = q.get(id) || {}; return { title: r.title || "", len: r.len || 0 }; };
+}
+
 // ------------------------------------------------------------------ 按源学正文策略
 /**
  * 每个源该怎么拿正文，按近 7 天的实际情况定（配置只是起点）：
- *   list     列表自带正文（近 24 小时完整的占 ≥ 80%），不必再抓
+ *   list     列表自带正文（近 24 小时完整的占 ≥ 80%），不必再抓；每轮抽查 1 篇详情页（近 7 天抽满 3 篇为止），
+ *            一半以上的详情页明显比列表长，说明列表只是导语，改按抓得到与否定策略
  *   fetch    正文抓得到且便宜（成功率 ≥ 60%、中位耗时 ≤ 4 秒）：新条目逐条补
  *   slow     抓得到但慢（阅读器、浏览器）：只补上版与重点事件的
  *   blocked  近 7 天试过 ≥ 3 次从未成功：跳过，提示换源
@@ -172,7 +229,9 @@ export async function fetchBodies(db, list, o) {
  */
 export function bodyProfiles(db, sources) {
   const tries = new Map(db.prepare(`SELECT a.source_id, COUNT(*) n, SUM(b.ok) ok,
-      SUM(CASE WHEN b.ok = 1 AND b.channel = 'http' THEN 1 ELSE 0 END) http_ok
+      SUM(CASE WHEN b.ok = 1 AND b.channel = 'http' THEN 1 ELSE 0 END) http_ok,
+      SUM(CASE WHEN b.ok = 1 AND b.list_len IS NOT NULL THEN 1 ELSE 0 END) checked,
+      SUM(CASE WHEN b.ok = 1 AND b.list_len IS NOT NULL AND b.text_len > b.list_len * 1.3 + 80 THEN 1 ELSE 0 END) deeper
     FROM article_bodies b JOIN articles a ON a.id = b.article_id WHERE b.fetched_at >= datetime('now', '-7 days') GROUP BY a.source_id`).all().map((r) => [r.source_id, r]));
   const fill = new Map(db.prepare(`SELECT source_id, COUNT(*) n, SUM(CASE WHEN completeness = 'full' THEN 1 ELSE 0 END) n_full
     FROM articles WHERE first_seen_at >= datetime('now', '-1 day') AND COALESCE(kind, 'news') NOT IN ('promo', 'digest_item') GROUP BY source_id`).all().map((r) => [r.source_id, r]));
@@ -186,36 +245,50 @@ export function bodyProfiles(db, sources) {
   const median = (xs) => { if (!xs || !xs.length) return null; const s = xs.slice().sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
   const out = new Map();
   for (const [id, src] of sources) {
-    const t = tries.get(id) || { n: 0, ok: 0, http_ok: 0 };
+    const t = tries.get(id) || { n: 0, ok: 0, http_ok: 0, checked: 0, deeper: 0 };
+    const listShort = t.checked >= 2 && t.deeper * 2 >= t.checked;
     const f = fill.get(id) || { n: 0, n_full: 0 };
     const med = median(ms.get(id));
     const rate = t.n ? (t.ok || 0) / t.n : null;
     let mode;
     if (src.paywall || src.body === "none") mode = "none";
-    else if (f.n >= 5 && f.n_full / f.n >= 0.8) mode = "list";
+    else if (f.n >= 5 && f.n_full / f.n >= 0.8 && !listShort) mode = "list";
     else if (t.n >= 3 && !t.ok) mode = "blocked";
     else if (t.n < 2) mode = "probe";
     else if (rate >= 0.6 && (med == null || med <= 4000)) mode = "fetch";
     else if (rate > 0) mode = "slow";
     else mode = "probe";
-    out.set(id, { mode, tried: t.n, ok: t.ok || 0, rate: rate == null ? null : Math.round(rate * 100), median_ms: med, list_full: f.n ? Math.round((f.n_full / f.n) * 100) : null });
+    out.set(id, { mode, tried: t.n, ok: t.ok || 0, checked: t.checked || 0, deeper: t.deeper || 0, rate: rate == null ? null : Math.round(rate * 100), median_ms: med, list_full: f.n ? Math.round((f.n_full / f.n) * 100) : null });
   }
   return out;
 }
 
-/** 本轮该补正文的新条目：按源策略挑（fetch 全补、probe 每源 2 篇），不全的、非广告的、没抓过的。 */
+/**
+ * 本轮该补正文的新条目（非广告、没抓过的），按源策略挑：
+ *   fetch  不全的全补；列表里看着完整但不到 o.shortLen 字的也补（多半只是导语）
+ *   probe  不全的每源试 2 篇
+ *   list   抽查：近 7 天抽查不满 3 篇时，挑本轮列表文字最长的 1 篇去看详情页是否更全
+ */
 export function fillCandidates(db, o) {
   const prof = o.profiles;
-  const rows = db.prepare(`SELECT DISTINCT a.id, a.url, a.source_id FROM observations ob JOIN articles a ON a.id = ob.article_id
+  const shortLen = o.shortLen || 300;
+  const rows = db.prepare(`SELECT DISTINCT a.id, a.url, a.source_id, a.title, a.completeness,
+      MAX(LENGTH(COALESCE(a.summary, '')), LENGTH(COALESCE(a.content, ''))) AS len FROM observations ob JOIN articles a ON a.id = ob.article_id
       LEFT JOIN article_bodies b ON b.article_id = a.id
-    WHERE ob.run_id = ? AND b.article_id IS NULL AND COALESCE(a.completeness, '') != 'full' AND COALESCE(a.kind, 'news') IN ('news', 'digest') AND a.paywalled = 0`).all(o.runId);
+    WHERE ob.run_id = ? AND b.article_id IS NULL AND COALESCE(a.kind, 'news') IN ('news', 'digest') AND a.paywalled = 0
+    ORDER BY len DESC`).all(o.runId);
   const per = new Map();
   const out = [];
   for (const r of rows) {
     const p = prof.get(r.source_id);
     if (!p) continue;
     const n = per.get(r.source_id) || 0;
-    if (p.mode === "fetch" || (p.mode === "probe" && n < 2)) { out.push(r); per.set(r.source_id, n + 1); }
+    const partial = r.completeness !== "full";
+    const take = p.mode === "fetch" ? partial || r.len < shortLen
+      : p.mode === "probe" ? partial && n < 2
+      : p.mode === "list" ? (p.checked || 0) < 3 && n < 1
+      : false;
+    if (take) { out.push({ id: r.id, url: r.url, source_id: r.source_id, title: r.title }); per.set(r.source_id, n + 1); }
     if (out.length >= (o.budget || 60)) break;
   }
   return out;
@@ -224,8 +297,9 @@ export function fillCandidates(db, o) {
 /** 并发补正文：同一网站同时最多 2 个请求，总时长有上限。@returns { tried, ok, ms } */
 export async function fillBodies(db, list, o) {
   const t0 = Date.now();
-  const ins = db.prepare("INSERT OR REPLACE INTO article_bodies (article_id, content, text_len, extractor, channel, paywalled, ok, error, fetched_at, run_id, ms) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+  const ins = db.prepare("INSERT OR REPLACE INTO article_bodies (article_id, content, text_len, extractor, channel, paywalled, ok, error, fetched_at, run_id, ms, list_len) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
   const up = db.prepare("UPDATE articles SET completeness = 'full', content = ?, text_len = ?, training_ready = CASE WHEN paywalled = 1 THEN 0 ELSE ? END WHERE id = ? AND LENGTH(COALESCE(content, '')) < ?");
+  const prior = listInfo(db);
   const host = (u) => { try { return new URL(u).host; } catch { return ""; } };
   const busy = new Map();
   const queue = list.slice();
@@ -238,16 +312,17 @@ export async function fillBodies(db, list, o) {
       const h = host(c.url);
       busy.set(h, (busy.get(h) || 0) + 1);
       const s = Date.now();
-      const r = await (o.fetch || fetchBody)(c.url, o).catch((e) => ({ ok: false, error: e.message }));
+      const p = prior(c.id);
+      const r = await (o.fetch || fetchBody)(c.url, Object.assign({}, o, { title: c.title || p.title })).catch((e) => ({ ok: false, error: e.message }));
       busy.set(h, busy.get(h) - 1);
       tried++;
       const now = isoUtc(Date.now());
       if (r.ok) {
         ok++;
-        ins.run(c.id, r.text, r.text.length, r.extractor, r.channel, 0, 1, null, now, o.runId || null, Date.now() - s);
+        ins.run(c.id, r.text, r.text.length, r.extractor, r.channel, 0, 1, null, now, o.runId || null, Date.now() - s, p.len);
         up.run(r.text, r.text.length, r.text.length >= (o.minTextLen || 200) ? 1 : 0, c.id, r.text.length);
       } else {
-        ins.run(c.id, null, 0, null, r.channel || null, r.paywalled ? 1 : 0, 0, String(r.error || "").slice(0, 300), now, o.runId || null, Date.now() - s);
+        ins.run(c.id, null, 0, null, r.channel || null, r.paywalled ? 1 : 0, 0, String(r.error || "").slice(0, 300), now, o.runId || null, Date.now() - s, p.len);
       }
     }
   };

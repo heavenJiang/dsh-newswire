@@ -166,13 +166,22 @@ export function cleanLead(t) {
     .trim();
 }
 
+/** 导语截到整句：限长内最后一个句号处（至少留下一半长度），找不到整句才硬截加省略号。 */
+export function clipSentence(s, n) {
+  const t = String(s || "").replace(/\s+/g, " ").trim();
+  if (t.length <= n) return t;
+  const head = t.slice(0, n);
+  const end = Math.max(...["。", "！", "？", "；"].map((p) => head.lastIndexOf(p)));
+  return end >= n / 2 ? head.slice(0, end + 1) : clip(t, n);
+}
+
 /** 程序拼稿：导语取最早一条的摘要（去掉套话），要点取其它媒体说法不同的标题，各方说法取分歧数字；不写「影响」（程序说不出影响）。 */
 function ruleCopy(items, facts, layout, factors, bodies) {
   const S = layout.story;
   // 导语：最早一条有摘要的；都没有摘要时用抓到的正文开头；再没有才用标题
   const body = (it) => (bodies && bodies.get(it.id)) || "";
   const first = items.find((it) => it.summary && it.summary !== it.title) || items.find((it) => body(it)) || items[0];
-  const lead = clip(cleanLead((first.summary && first.summary !== first.title ? first.summary : "") || body(first) || first.title), S.lead_chars);
+  const lead = clipSentence(cleanLead((first.summary && first.summary !== first.title ? first.summary : "") || body(first) || first.title), S.lead_chars);
   const points = [];
   const seen = [bigrams(lead)];
   for (const it of items) {

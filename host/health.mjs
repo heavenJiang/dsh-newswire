@@ -7,9 +7,10 @@
  */
 import { bodyProfiles } from "../engine/pipeline/bodies.mjs";
 
-/** 给只有标题 / 内容变少的源一条建议（代码，面板按语言显示）。 */
+/** 每个源一条「全文拿不拿得到」的判断（代码，面板按语言显示）；内容突然变少的提示改版。 */
 function advice(status, p) {
   if (status === "degraded") return "degraded";
+  if (p && p.mode === "list") return p.checked ? "list" : "listPending";
   return p && ["blocked", "slow", "fetch", "probe", "none"].includes(p.mode) ? p.mode : null;
 }
 
@@ -40,7 +41,7 @@ export function contentHealth(db) {
     else if (r.n >= 5 && (r.n_trunc + r.n_title) / r.n >= 0.5) status = "partial";
     return { source_id: r.source_id, name: r.name || r.source_id, n: r.n, full: r.n_full, truncated: r.n_trunc, title_only: r.n_title, promo: r.n_promo, digest: r.n_digest, digest_items: r.n_items,
       title_only_before: was == null ? null : Math.round(was * 100), bodies_tried: bd.tried, bodies_ok: bd.ok || 0, status,
-      body_mode: (prof.get(r.source_id) || {}).mode || null, advice: status === "ok" ? null : advice(status, prof.get(r.source_id)) };
+      body_mode: (prof.get(r.source_id) || {}).mode || null, checked: (prof.get(r.source_id) || {}).checked || 0, deeper: (prof.get(r.source_id) || {}).deeper || 0, advice: advice(status, prof.get(r.source_id)) };
   }).sort((a, b) => ["degraded", "titles_only", "partial", "ok"].indexOf(a.status) - ["degraded", "titles_only", "partial", "ok"].indexOf(b.status) || b.n - a.n);
   const sum = (k) => sources.reduce((s, x) => s + (x[k] || 0), 0);
   return { sources, totals: { items: sum("n"), full: sum("full"), truncated: sum("truncated"), title_only: sum("title_only"), promo: sum("promo"), digest: sum("digest"), digest_items: sum("digest_items") }, degraded: sources.filter((x) => x.status === "degraded").map((x) => x.name) };

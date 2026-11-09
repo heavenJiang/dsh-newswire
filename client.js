@@ -97,10 +97,10 @@ window.__ModuleLoader__.load({
         'sb.perDay': '日均 {n} 条', 'sb.board': '上版 {n}', 'sb.first': '首报 {n}', 'sb.excl': '独家 {n}', 'sb.corrob': '印证 {n}', 'sb.low': '低价值 {p}%', 'sb.full': '内容完整 {p}%', 'sb.promo': '广告 {n}', 'sb.fetch': '抓取成功 {p}%',
         'sb.v.core': '核心', 'sb.v.support': '印证', 'sb.v.ok': '一般', 'sb.v.low': '低价值', 'sb.v.unstable': '抓取不稳', 'sb.v.insufficient': '数据不足',
         'sb.why.core': '常上版面，或常常最先报道、独家报道，值得保留。', 'sb.why.support': '多为别家的报道提供印证，让可信度判断更准。', 'sb.why.ok': '贡献一般：不常上版，也不常与别家重合。', 'sb.why.low': '绝大多数是低价值内容，几乎不与别家报道重合，开着主要是增加噪声。', 'sb.why.unstable': '近期一半以上的轮次抓取失败，先在下面「高级」里试抓排查。', 'sb.why.insufficient': '数据太少，还看不出价值：可以先试用。',
-        'ct.adv.degraded': '页面可能改版了：去「数据源」试抓这个源，看解析结果', 'ct.adv.blocked': '正文被拦截或是动态页面，抓不到：只能提供标题，可考虑停用或换成有全文的源', 'ct.adv.slow': '正文抓得到但慢：只给上版和重点事件补正文', 'ct.adv.fetch': '正文抓得到：新条目每轮逐条补', 'ct.adv.probe': '正在试抓正文，几轮后定下策略', 'ct.adv.none': '付费墙或配置为不抓正文',
-        'ct.advice': '建议', 'ct.mode.list': '列表自带', 'ct.mode.fetch': '逐条补', 'ct.mode.slow': '只补重点', 'ct.mode.blocked': '抓不到', 'ct.mode.probe': '试抓中', 'ct.mode.none': '不抓',
+        'ct.adv.degraded': '页面可能改版了：去「数据源」试抓这个源，看解析结果', 'ct.adv.blocked': '正文被拦截或是动态页面，抓不到：只能提供标题，可考虑停用或换成有全文的源', 'ct.adv.slow': '正文抓得到但慢：只给上版和重点事件补正文', 'ct.adv.fetch': '正文抓得到：新条目每轮逐条补', 'ct.adv.probe': '正在试抓正文，几轮后定下策略', 'ct.adv.none': '付费墙或配置为不抓正文', 'ct.adv.list': '列表自带全文：抽查了 {c} 篇原文，与列表一致', 'ct.adv.listPending': '列表看起来是全文，正在抽查原文核实',
+        'ct.advice': '全文', 'ct.mode.list': '列表自带', 'ct.mode.fetch': '逐条补', 'ct.mode.slow': '只补重点', 'ct.mode.blocked': '抓不到', 'ct.mode.probe': '试抓中', 'ct.mode.none': '不抓',
         'sd.fromDigest': '摘自《{t}》',
-        'ct.title': '内容完整度', 'ct.sum': '近 24 小时 {n} 条 · 完整 {f} · 过滤广告与引流 {p} 条 · 合集 {d} 篇拆出 {i} 条', 'ct.hint': '抓到了但不全比抓不到更难发现：这里按源列出只有标题、摘要被截断的情况。要上版的报道会先去原文补全文；某个源突然只剩标题，多半是页面改版了。',
+        'ct.title': '内容完整度', 'ct.sum': '近 24 小时 {n} 条 · 完整 {f} · 过滤广告与引流 {p} 条 · 合集 {d} 篇拆出 {i} 条', 'ct.hint': '抓到了但不全比抓不到更难发现。这里逐个源列出全文拿不拿得到：列表自带全文的（如电报）会抽查几篇原文核实；列表只有标题或导语、要点开原文才有全文的（如同花顺、深潮），程序去原文补，抓不到的标出来。某个源突然只剩标题，多半是页面改版了。',
         'ct.src': '来源', 'ct.state': '状态', 'ct.n': '条数', 'ct.full': '完整', 'ct.trunc': '截断', 'ct.titleOnly': '只有标题', 'ct.bodies': '正文补抓', 'ct.before': '此前 {p}%', 'ct.allOk': '各源内容完整。',
         'ct.st.degraded': '突然变少', 'ct.st.titles_only': '只有标题', 'ct.st.partial': '部分不全', 'ct.st.ok': '正常', 'ct.filtered': '已过滤 {n} 条（近 3 天）', 'ct.digest': '合集已拆条', 'ct.promo': '广告', 'ct.restore': '这是新闻，恢复', 'ct.restored': '已恢复',
         'st.thin': '{s} 内容变少', 'fb.promo': '这是广告或推广', 'fb.promoHint': '整条撤下；之后模型编排时会参照它识别同类内容', 'fb.promoDone': '已撤下，可在「运行 → 内容完整度」里恢复',
@@ -211,10 +211,10 @@ window.__ModuleLoader__.load({
         'sb.perDay': '{n}/day', 'sb.board': 'in edition {n}', 'sb.first': 'first {n}', 'sb.excl': 'exclusive {n}', 'sb.corrob': 'corroborates {n}', 'sb.low': 'low value {p}%', 'sb.full': 'complete {p}%', 'sb.promo': 'ads {n}', 'sb.fetch': 'fetch ok {p}%',
         'sb.v.core': 'core', 'sb.v.support': 'corroborates', 'sb.v.ok': 'average', 'sb.v.low': 'low value', 'sb.v.unstable': 'unstable', 'sb.v.insufficient': 'too little data',
         'sb.why.core': 'Often in the edition, or often first or exclusive; worth keeping.', 'sb.why.support': 'Mostly corroborates other outlets, which sharpens credibility.', 'sb.why.ok': 'Average: rarely in the edition, rarely overlaps with others.', 'sb.why.low': 'Mostly low-value items that rarely overlap with other outlets; it mainly adds noise.', 'sb.why.unstable': 'Over half of recent rounds failed to fetch; test it under Advanced.', 'sb.why.insufficient': 'Too little data to judge; try it on trial.',
-        'ct.adv.degraded': 'The page may have changed: test this source under Sources and check what it parses', 'ct.adv.blocked': 'Bodies are blocked or rendered by script: titles only; consider disabling it or using a source with full text', 'ct.adv.slow': 'Bodies come through but slowly: fetched only for edition and key stories', 'ct.adv.fetch': 'Bodies come through: every new item is filled each round', 'ct.adv.probe': 'Trying a few bodies; a strategy is set after a few rounds', 'ct.adv.none': 'Paywalled or set not to fetch bodies',
-        'ct.advice': 'Advice', 'ct.mode.list': 'in list', 'ct.mode.fetch': 'every item', 'ct.mode.slow': 'key items only', 'ct.mode.blocked': 'blocked', 'ct.mode.probe': 'probing', 'ct.mode.none': 'off',
+        'ct.adv.degraded': 'The page may have changed: test this source under Sources and check what it parses', 'ct.adv.blocked': 'Bodies are blocked or rendered by script: titles only; consider disabling it or using a source with full text', 'ct.adv.slow': 'Bodies come through but slowly: fetched only for edition and key stories', 'ct.adv.fetch': 'Bodies come through: every new item is filled each round', 'ct.adv.probe': 'Trying a few bodies; a strategy is set after a few rounds', 'ct.adv.none': 'Paywalled or set not to fetch bodies', 'ct.adv.list': 'Full text in the list: {c} original pages checked and they match', 'ct.adv.listPending': 'The list looks complete; checking a few original pages to confirm',
+        'ct.advice': 'Full text', 'ct.mode.list': 'in list', 'ct.mode.fetch': 'every item', 'ct.mode.slow': 'key items only', 'ct.mode.blocked': 'blocked', 'ct.mode.probe': 'probing', 'ct.mode.none': 'off',
         'sd.fromDigest': 'from “{t}”',
-        'ct.title': 'Content completeness', 'ct.sum': 'last 24h: {n} items · {f} complete · {p} ads and promos filtered · {d} roundups split into {i} items', 'ct.hint': 'Getting partial content is harder to notice than getting nothing. Sources with only titles or cut-off summaries are listed here; stories going into the edition fetch the full article first. A source that suddenly has only titles has probably changed its page.',
+        'ct.title': 'Content completeness', 'ct.sum': 'last 24h: {n} items · {f} complete · {p} ads and promos filtered · {d} roundups split into {i} items', 'ct.hint': 'Getting partial content is harder to notice than getting nothing. Each source is listed with whether its full text can be had: sources whose list already carries the full text (like wire flashes) are confirmed by checking a few original pages; sources that only list a title or lead (the full article is a click away) get their bodies fetched from the original page, and those that cannot be fetched are marked. A source that suddenly drops to titles only has usually changed its page',
         'ct.src': 'Source', 'ct.state': 'State', 'ct.n': 'Items', 'ct.full': 'Full', 'ct.trunc': 'Cut off', 'ct.titleOnly': 'Title only', 'ct.bodies': 'Bodies fetched', 'ct.before': 'was {p}%', 'ct.allOk': 'All sources deliver full content.',
         'ct.st.degraded': 'dropped suddenly', 'ct.st.titles_only': 'titles only', 'ct.st.partial': 'partly cut off', 'ct.st.ok': 'ok', 'ct.filtered': '{n} filtered (last 3 days)', 'ct.digest': 'roundup, split', 'ct.promo': 'ad', 'ct.restore': 'This is news — restore', 'ct.restored': 'restored',
         'st.thin': '{s}: less content', 'fb.promo': 'This is an ad or promotion', 'fb.promoHint': 'removes it; the model uses it as an example to spot similar items', 'fb.promoDone': 'Removed; restore it under Runs → Content completeness',
@@ -1251,7 +1251,8 @@ window.__ModuleLoader__.load({
         postJson(API.feedback, { kind: 'not_promo', article_id: id }).then(function () { setRestored(function (m) { var n = Object.assign({}, m); n[id] = true; return n }) }).catch(function () {})
       }
       var pct = function (a, b) { return b ? Math.round(a * 100 / b) + '%' : '–' }
-      var bad = (c.sources || []).filter(function (x) { return x.status !== 'ok' })
+      // 每个源都列出：全文拿不拿得到、怎么判断的（列表自带要抽查原文核实；需要点开的看补抓成败）
+      var bad = c.sources || []
       return h(Section, { title: t('ct.title'), aside: h('span', { className: 'nw-muted' }, t('ct.sum', { n: tt.items || 0, f: pct(tt.full || 0, tt.items || 0), p: tt.promo || 0, d: tt.digest || 0, i: tt.digest_items || 0 })) },
         h('p', { className: 'nw-muted nw-xs' }, t('ct.hint')),
         bad.length ? h('div', { className: 'nw-table-wrap' }, h('table', { className: 'nw-table' },
@@ -1261,7 +1262,7 @@ window.__ModuleLoader__.load({
               h('td', null, x.name), h('td', null, h('span', { className: x.status === 'degraded' ? 'nw-warn' : 'nw-muted' }, t('ct.st.' + x.status))),
               h('td', null, String(x.n)), h('td', null, String(x.full)), h('td', null, String(x.truncated)), h('td', null, String(x.title_only) + (x.title_only_before != null ? ' (' + t('ct.before', { p: x.title_only_before }) + ')' : '')),
               h('td', null, (x.bodies_tried ? x.bodies_ok + '/' + x.bodies_tried : '–') + (x.body_mode ? ' · ' + t('ct.mode.' + x.body_mode) : '')),
-              h('td', { className: 'nw-muted nw-xs' }, x.advice ? t('ct.adv.' + x.advice) : ''))
+              h('td', { className: 'nw-muted nw-xs' }, x.advice ? t('ct.adv.' + x.advice, { c: x.checked }) : ''))
           })))) : h('div', { className: 'nw-okc nw-xs' }, t('ct.allOk')),
         (q.filtered || []).length ? h('div', { className: 'nw-ct-filtered' },
           h('div', { className: 'nw-rs-k' }, t('ct.filtered', { n: q.filtered.length })),

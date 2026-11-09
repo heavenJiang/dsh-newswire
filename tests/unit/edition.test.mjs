@@ -176,3 +176,11 @@ test("旧闻：发布时间早于时段一天以上的不读（新源首轮的�
   assert.ok(!gatherItems(db, { since: SINCE }).some((x) => x.id === "old"));
   db.close();
 });
+
+test("程序导语截到整句，不在半句话处加省略号", async () => {
+  const { clipSentence } = await import("../../host/edition.mjs");
+  const body = "外交部发言人郭嘉昆主持例行记者会。法新社记者提问，路透社报道，60万块美国英伟达高级芯片正在香港，即将被送往中国大陆。请问外交部对此有何评论？郭嘉昆表示，中方在美国输华芯片问题上的立场是一贯的。";
+  assert.equal(clipSentence(body, 80), "外交部发言人郭嘉昆主持例行记者会。法新社记者提问，路透社报道，60万块美国英伟达高级芯片正在香港，即将被送往中国大陆。请问外交部对此有何评论？");
+  assert.equal(clipSentence("短句。", 80), "短句。");
+  assert.ok(clipSentence("一".repeat(200), 80).endsWith("…"));
+});

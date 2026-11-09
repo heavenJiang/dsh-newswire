@@ -16,8 +16,10 @@
  * v10 stories / story_items（跨版面延续的故事线）；pushes.story_id。
  * v11 story_updates（故事线进展）、kv（上次查看时间等状态）。
  * v12 digests（日报）、feedback（读者报错）。
+ * v22 article_bodies.list_len（判断列表是否全文）；按新规则清理已入库正文、重算完整度。
  */
 import { completeness } from "../pipeline/quality.mjs";
+import { anchorReader, trimTail, MIN_SHORT } from "../pipeline/bodytext.mjs";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
@@ -212,7 +214,29 @@ const V21 = [
   "CREATE TABLE IF NOT EXISTS tracker_syntheses (id INTEGER PRIMARY KEY AUTOINCREMENT, tracker_id TEXT, at TEXT, model TEXT, stories INTEGER, content TEXT)",
   "CREATE INDEX IF NOT EXISTS idx_tracker_syntheses ON tracker_syntheses(tracker_id, id)",
 ];
-export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21];
+// v22：正文抓取时记下列表里原有的文字长度（list_len），用来判断一个源的列表是不是全文；
+// 按新规则清理已入库的正文（阅读器读出的侧栏与别的新闻、结尾的免责声明与社群链接），并重算完整度。
+const V22 = [
+  "ALTER TABLE article_bodies ADD COLUMN list_len INTEGER",
+  (db) => {
+    const bodyUp = db.prepare("UPDATE article_bodies SET content = ?, text_len = ?, ok = ?, error = ? WHERE article_id = ?");
+    const artUp = db.prepare("UPDATE articles SET content = ?, text_len = ?, training_ready = CASE WHEN paywalled = 1 THEN 0 WHEN ? >= 200 THEN 1 ELSE 0 END WHERE id = ?");
+    for (const r of db.prepare("SELECT b.article_id, b.content, b.extractor, a.title, a.summary, a.content AS art FROM article_bodies b JOIN articles a ON a.id = b.article_id WHERE b.ok = 1").all()) {
+      const old = String(r.content || "");
+      const text = ((r.extractor === "reader" || r.extractor === "browse") && anchorReader(old, r.title)) || trimTail(old);
+      if (text === old) continue;
+      const ok = text.length >= MIN_SHORT;
+      bodyUp.run(ok ? text : null, ok ? text.length : 0, ok ? 1 : 0, ok ? null : "cleaned: not this article", r.article_id);
+      if (String(r.art || "") === old) {
+        const back = ok ? text : String(r.summary || "");
+        artUp.run(back, back.length, back.length, r.article_id);
+      }
+    }
+    const up = db.prepare("UPDATE articles SET completeness = ? WHERE id = ?");
+    for (const a of db.prepare("SELECT id, title, summary, content, completeness FROM articles").all()) { const c = completeness(a); if (c !== a.completeness) up.run(c, a.id); }
+  },
+];
+export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
 export function migrate(db) {

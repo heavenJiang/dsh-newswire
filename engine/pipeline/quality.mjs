@@ -39,14 +39,18 @@ export function matchNoise(rules, a) {
 
 const ELLIPSIS = /(…|\.\.\.|……|\[\.\.\.\]|展开全文|阅读全文|查看全文|点击查看)\s*$/;
 
+/** 只有日期 / 时间的「摘要」（列表里的发布日期被当成了摘要）不算内容。 */
+const DATE_ONLY = /^[\s\d\-:/.年月日时分秒T+Z()（）|·]*$/;
+
 /** 内容全不全：只有标题 / 被截断 / 完整。 */
 export function completeness(a) {
-  const s = String(a.summary || "").trim();
-  const c = String(a.content || "").trim();
+  const text = (x) => { const t = String(x || "").trim(); return DATE_ONLY.test(t) ? "" : t; };
+  const s = text(a.summary);
+  const c = text(a.content);
   const best = c.length > s.length ? c : s;
   const title = String(a.title || "").trim();
-  // 快讯：标题本身就是一句完整的话（以句号收尾、够长），就是全文
-  if ((!best || best === title) && title.length >= 15 && /[。！!]$/.test(title)) return "full";
+  // 快讯：标题本身就是一句完整的话（以句号收尾、够长），就是全文。感叹号收尾的多是吸引点击的标题，不算
+  if ((!best || best === title) && title.length >= 15 && /。$/.test(title)) return "full";
   if (!best || best === title) return "title_only";
   if (ELLIPSIS.test(best)) return "truncated";
   // 只有摘要、且长度正好卡在列表抓取的截断处（300 / 400 / 1200 字）：多半是被截断的

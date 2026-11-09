@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
-import { extractBody, readerText, bodyCandidates, CHALLENGE } from "../../engine/pipeline/bodies.mjs";
+import { extractBody, readerText, bodyCandidates, CHALLENGE, trimTail, anchorReader } from "../../engine/pipeline/bodies.mjs";
 import { exportDataset, DATASET_SCHEMA } from "../../engine/export.mjs";
 import { applyRetention } from "../../engine/retention.mjs";
 import { openDb } from "../../engine/store/schema.mjs";
@@ -23,6 +23,39 @@ test("正文抽取：JSON-LD 优先，其次 Next.js 数据，再次段落；去
   assert.equal(p.extractor, "paragraphs");
   assert.ok(!/首页 电报/.test(p.text) && !/版权所有/.test(p.text));
   assert.equal(extractBody("<p>太短</p>"), null);
+});
+
+test("正文容器：短讯（一句话）也算全文；容器外的侧栏、免责声明不算", () => {
+  const flash = "11月9日，外交部发言人主持例行记者会，就中俄美元首会晤相关问题回应称，中方同相关方保持沟通。（澎湃新闻）";
+  const html = '<div class="news-content article-content" id="x"><div class="news-content-parsed"><p>' + flash + '</p><strong></strong></div></div>' +
+    '<span>免责声明：风险提示：本文内容仅供参考，不代表本站观点。</span><aside><p>' + LONG + '</p><p>' + LONG.slice(3) + '</p></aside>';
+  const r = extractBody(html);
+  assert.equal(r.extractor, "container");
+  assert.equal(r.text, flash);
+  // 容器里有长文时优先用容器
+  const art = '<div class="article-content"><p>' + LONG + '</p><p>' + LONG.slice(2) + '</p><p>' + LONG.slice(4) + '</p><p>联系我们：support@example.com</p></div><div class="side"><p>' + "侧栏里的别的新闻标题很长很长很长".repeat(3) + "</p></div>";
+  const a = extractBody(art);
+  assert.equal(a.extractor, "container");
+  assert.ok(!/侧栏|联系我们/.test(a.text));
+});
+
+test("阅读器整页文字：从标题那行取，截掉结尾样板与相关新闻列表", () => {
+  const page = ["首页 全部文章 深度&专访 7x24h快讯", "特朗普称将与中俄元首在APEC讨论美伊冲突", "11月9日，外交部发言人郭嘉昆主持例行记者会，就相关问题作出回应。",
+    "免责声明：风险提示：本文内容仅供参考。", "美股三大指数集体高开，标普500指数涨0.85%。", "联系我们：support@x.com"].join("\n");
+  assert.equal(anchorReader(page, "特朗普称将与中俄元首在APEC讨论美伊冲突及无核化问题，外交部回应"), "11月9日，外交部发言人郭嘉昆主持例行记者会，就相关问题作出回应。");
+  assert.equal(anchorReader(page, "亚玛顿：控股股东拟6.8亿元转让20%股份"), "", "对不上标题，交给调用方按更严的长度要求处理");
+  assert.equal(trimTail("正文第一段\n正文第二段\nTelegram订阅群： https://t.me/x\nTwitter官方账号： https://x.com/y"), "正文第一段\n正文第二段");
+  // 阅读器读出的相关新闻列表
+  assert.equal(trimTail("交通运输部11月9日发布公告。\n*   ### 国务院关税税则委员会：继续暂停\n*   _00:19_### 美国先减关税"), "交通运输部11月9日发布公告。");
+  assert.equal(trimTail("正文。\n1 ### 利好！拟最高回购2亿元2 ### 今夜全线拉升"), "正文。");
+  // 深潮快讯页：开头的时间与分享按钮、结尾的 7x24h 快讯流
+  assert.equal(trimTail(["2026.11.09 - 03:16", "分享至分享到Twitter", "深潮 TechFlow 消息，马斯克今日发帖。", "截至发稿，该帖浏览量已超过 30 万次。", "7x24h 快讯",
+    "11/9 15:26美联储古尔斯比：大问题一直出在通胀方面", "11/9 15:25特朗普质疑中期选举公正性", "11/9 15:15首发 PNC 企业客户可接收 USDC"].join("\n")),
+  "深潮 TechFlow 消息，马斯克今日发帖。\n截至发稿，该帖浏览量已超过 30 万次。");
+  // 圈子帖：相关文章列表与评论区
+  assert.equal(trimTail("鲁比奥为军事行动辩护。\n*   指南针，被罚！\n*   今夜，全线拉升！\n*   又一家A股公司分红！\n所有评论（14）\n*    网友  评论内容"), "鲁比奥为军事行动辩护。");
+  // 正文里偶尔一行带时间不算新闻流
+  assert.equal(trimTail("美股开盘。\n22:30 公布CPI数据。\n市场等待结果。"), "美股开盘。\n22:30 公布CPI数据。\n市场等待结果。");
 });
 
 test("验证页不是正文", () => {
