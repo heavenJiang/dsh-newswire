@@ -2,6 +2,15 @@
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 
+/** 按响应头或页面 <meta charset> 解码（GBK / GB2312 的中文站不少），默认 UTF-8。 */
+export function decodeBody(buf, contentType) {
+  let cs = (/charset=["']?([\w-]+)/i.exec(String(contentType || "")) || [])[1];
+  if (!cs) cs = (/<meta[^>]+charset=["']?([\w-]+)/i.exec(buf.subarray(0, 4096).toString("latin1")) || [])[1];
+  cs = String(cs || "utf-8").toLowerCase();
+  if (cs === "gb2312" || cs === "gbk") cs = "gb18030";
+  try { return new TextDecoder(cs).decode(buf); } catch { return buf.toString("utf8"); }
+}
+
 export async function httpFetch(url, opts) {
   const o = opts || {};
   const t0 = Date.now();
@@ -9,7 +18,7 @@ export async function httpFetch(url, opts) {
   const timer = setTimeout(() => ctl.abort(), o.timeoutMs || 15000);
   try {
     const res = await fetch(url, { signal: ctl.signal, redirect: "follow", headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "accept-language": "zh-CN,zh;q=0.9,en;q=0.8" } });
-    const text = await res.text();
+    const text = decodeBody(Buffer.from(await res.arrayBuffer()), res.headers.get("content-type"));
     const latency = Date.now() - t0;
     if (!res.ok) return { ok: false, http_status: res.status, latency_ms: latency, error: "HTTP " + res.status, text: text.slice(0, 4000) };
     return { ok: true, http_status: res.status, latency_ms: latency, bytes: Buffer.byteLength(text), text };

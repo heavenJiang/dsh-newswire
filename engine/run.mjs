@@ -297,7 +297,7 @@ try {
 }
 // 补正文：按源学到的策略——便宜的源新条目逐条补，没记录的源试 2 篇来学（每轮预算 --fill-budget，最长 90 秒）
 const profiles = bodyProfiles(db, allSources());
-const fillBudget = Number(A["fill-budget"] ?? 60);
+const fillBudget = Number(A["fill-budget"] ?? 150);
 if (fillBudget > 0) {
   try {
     const list = fillCandidates(db, { runId, profiles, budget: fillBudget });

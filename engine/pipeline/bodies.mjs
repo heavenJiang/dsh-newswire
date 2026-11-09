@@ -9,7 +9,7 @@ import { httpFetch, jinaFetch } from "../channels/http.mjs";
 import { browseFetch } from "../channels/browse.mjs";
 import { classify } from "../channels/classify.mjs";
 import { clean, isoUtc } from "../util/text.mjs";
-import { MIN_BODY, MIN_SHORT, trimTail, anchorReader } from "./bodytext.mjs";
+import { MIN_BODY, MIN_SHORT, trimTail, anchorReader, relevant, PAYWALL_TEXT } from "./bodytext.mjs";
 
 export { trimTail, anchorReader };
 const PER_EVENT = 2;
@@ -30,7 +30,7 @@ export const CHALLENGE = /(security verification|verify you are (a )?human|just 
 const BOILER = /(版权所有|未经授权|责任编辑|扫码|下载.{0,6}APP|关注.{0,8}公众号|Copyright|All rights reserved|Sign up|Subscribe|cookie)/i;
 
 /** 常见的文章正文容器（class 名）。 */
-const CONTAINER = /<(div|section|article)\b[^>]*\bclass=["'][^"']*?\b(article-content|article-body|article_content|articleContent|article-text|news-content|news_content|post-content|post_content|entry-content|detail-content|content-detail|art_detail_content|article-detail|article_detail|main-text|rich_media_content|art_context)\b[^"']*["'][^>]*>/gi;
+const CONTAINER = /<(div|section|article)\b[^>]*\bclass=["'][^"']*?\b(article-content|article-body|article_content|articleContent|article-text|news-content|news_content|post-content|post_content|entry-content|detail-content|content-detail|art_detail_content|article-detail|article_detail|main-text|rich_media_content|rich_text_content|rich-text-content|art_context)\b[^"']*["'][^>]*>/gi;
 
 /** 从 start 处的开标签取到配对的闭标签（同名标签按深度配对）。 */
 function elementAt(s, start, tag) {
@@ -71,7 +71,13 @@ export function extractBody(html) {
   for (const block of ld) {
     try {
       const body = trimTail(clean(findArticleBody(JSON.parse(block.replace(/^<script[^>]*>/i, "").replace(/<\/script>$/i, "")), 0)));
-      if (body.length >= MIN_BODY) return { text: body.slice(0, 20000), extractor: "json-ld" };
+      if (body.length >= MIN_BODY) {
+        // 有的站点 JSON-LD 里只放前 N 字：文章容器里更长、开头一样时用容器
+        const box = containerBody(s);
+        const head = body.replace(/\s/g, "").slice(0, 20);
+        if (box.length > body.length * 1.2 && box.replace(/\s/g, "").includes(head)) return { text: box.slice(0, 20000), extractor: "container" };
+        return { text: body.slice(0, 20000), extractor: "json-ld" };
+      }
     } catch {
       // 坏的 JSON-LD 跳过
     }
@@ -143,15 +149,35 @@ export function bodyCandidates(db, o) {
   return out;
 }
 
+/**
+ * 正文不在详情页 HTML 里、而在别处的站点：返回真正的正文地址。
+ *   巨潮资讯：详情页是前端模板，公告全文是 static.cninfo.com.cn 上的 PDF
+ */
+export function bodyUrl(url) {
+  try {
+    const u = new URL(url);
+    if (/(^|\.)cninfo\.com\.cn$/.test(u.hostname) && u.pathname.includes("/disclosure/detail")) {
+      const id = u.searchParams.get("announcementId");
+      const day = String(u.searchParams.get("announcementTime") || "").slice(0, 10);
+      if (/^\d+$/.test(id || "") && /^\d{4}-\d{2}-\d{2}$/.test(day)) return { url: "https://static.cninfo.com.cn/finalpage/" + day + "/" + id + ".PDF", kind: "pdf" };
+    }
+  } catch { /* 不是合法地址 */ }
+  return null;
+}
+
 /** 浏览器 article 模式读出的正文（<article> / <main> 的文字）。 */
-async function browseBody(url, title) {
+async function browseBody(url, title, lead) {
+  // 浏览器读出的是整页（article / main）文字：要对得上标题才算
   const r = await browseFetch("article", url, 1, { timeoutMs: 45000 });
   if (!r.ok || !r.data) return null;
   if (r.data.paywall) return { paywalled: true };
   if (CHALLENGE.test(String(r.data.text || "").slice(0, 2000))) return { blocked: true };
   const raw = String(r.data.text || "").split("\n").map((l) => l.trim()).filter((l) => l.length >= 8 && !BOILER.test(l)).join("\n");
+  if (PAYWALL_TEXT.test(raw.slice(0, 3000))) return { paywalled: true };
   const anchored = anchorReader(raw, title);
   const text = anchored || trimTail(raw);
+  // 对上了标题也要看后文：短讯页上标题行就是全文，后面跟的是行情条、别的快讯
+  if (title && !relevant(text, title, lead)) return { blocked: false, unrelated: true };
   return text.length >= (anchored ? MIN_SHORT : MIN_BODY) ? { text: text.slice(0, 20000) } : null;
 }
 
@@ -161,6 +187,15 @@ async function browseBody(url, title) {
  */
 export async function fetchBody(url, o) {
   const opt = o || {};
+  const alt = bodyUrl(url);
+  if (alt && alt.kind === "pdf") {
+    // PDF 交给阅读器转文字
+    const j = await jinaFetch(alt.url, { timeoutMs: 45000 });
+    if (!j.ok) return { ok: false, error: j.error || "pdf: fetch failed", channel: "agent_reach" };
+    const text = trimTail(readerText(j.text));
+    if (opt.title && !relevant(text, opt.title, opt.lead)) return { ok: false, error: "pdf: not this article", channel: "agent_reach" };
+    return text.length >= MIN_SHORT ? { ok: true, text: text.slice(0, 20000), extractor: "pdf", channel: "agent_reach" } : { ok: false, error: "pdf: too short", channel: "agent_reach" };
+  }
   const r = await httpFetch(url, { timeoutMs: opt.timeoutMs || 15000 });
   if (r.ok) {
     if (classify("", r.http_status, r.text).kind === "paywall") return { ok: false, paywalled: true, error: "paywall", channel: "http" };
@@ -168,9 +203,10 @@ export async function fetchBody(url, o) {
     if (got) return { ok: true, text: got.text, extractor: got.extractor, channel: "http" };
   }
   if (opt.browse && (!r.ok || r.http_status === 401 || r.http_status === 403)) {
-    const b = await browseBody(url, opt.title).catch(() => null);
+    const b = await browseBody(url, opt.title, opt.lead).catch(() => null);
     if (b && b.paywalled) return { ok: false, paywalled: true, error: "paywall", channel: "browse" };
     if (b && b.blocked) return { ok: false, error: "bot_blocked", channel: "browse" };
+    if (b && b.unrelated) return { ok: false, error: "browse: not this article", channel: "browse" };
     if (b) return { ok: true, text: b.text, extractor: "browse", channel: "browse" };
   }
   const j = await jinaFetch(url, { timeoutMs: 30000 });
@@ -178,8 +214,10 @@ export async function fetchBody(url, o) {
     const all = readerText(j.text);
     if (CHALLENGE.test(all.slice(0, 2000))) return { ok: false, error: "bot_blocked", channel: "agent_reach" };
     // 对上了标题：从标题行取，短讯也算；对不上：整页文字截掉结尾样板，要够长才算
+    if (PAYWALL_TEXT.test(all.slice(0, 3000))) return { ok: false, paywalled: true, error: "paywall", channel: "agent_reach" };
     const anchored = anchorReader(all, opt.title);
     const text = anchored || trimTail(all);
+    if (opt.title && !relevant(text, opt.title, opt.lead)) return { ok: false, error: "reader: not this article", channel: "agent_reach" };
     if (text.length >= (anchored ? MIN_SHORT : MIN_BODY)) return { ok: true, text, extractor: "reader", channel: "agent_reach" };
     return { ok: false, error: "reader: too short", channel: "agent_reach" };
   }
@@ -195,7 +233,7 @@ export async function fetchBodies(db, list, o) {
   for (const c of list) {
     const s = Date.now();
     const p = prior(c.id);
-    const r = await fetchBody(c.url, Object.assign({}, o, { title: c.title || p.title }));
+    const r = await fetchBody(c.url, Object.assign({}, o, { title: c.title || p.title, lead: p.lead }));
     const took = Date.now() - s;
     const now = isoUtc(Date.now());
     if (r.ok) {
@@ -212,8 +250,8 @@ export async function fetchBodies(db, list, o) {
 
 /** 抓正文前这条在列表里已有的文字长度与标题（用来判断详情页是不是比列表更全）。 */
 function listInfo(db) {
-  const q = db.prepare("SELECT title, MAX(LENGTH(COALESCE(summary, '')), LENGTH(COALESCE(content, ''))) AS len FROM articles WHERE id = ?");
-  return (id) => { const r = q.get(id) || {}; return { title: r.title || "", len: r.len || 0 }; };
+  const q = db.prepare("SELECT title, COALESCE(NULLIF(content, ''), summary, '') AS lead, MAX(LENGTH(COALESCE(summary, '')), LENGTH(COALESCE(content, ''))) AS len FROM articles WHERE id = ?");
+  return (id) => { const r = q.get(id) || {}; return { title: r.title || "", lead: String(r.lead || "").slice(0, 200), len: r.len || 0 }; };
 }
 
 // ------------------------------------------------------------------ 按源学正文策略
@@ -266,8 +304,8 @@ export function bodyProfiles(db, sources) {
 /**
  * 本轮该补正文的新条目（非广告、没抓过的），按源策略挑：
  *   fetch  不全的全补；列表里看着完整但不到 o.shortLen 字的也补（多半只是导语）
- *   probe  不全的每源试 2 篇
- *   list   抽查：近 7 天抽查不满 3 篇时，挑本轮列表文字最长的 1 篇去看详情页是否更全
+ *   probe  每源试 2 篇：先挑不全的；都显得完整时（RSS 摘要常这样）也拿来抽查，否则永远学不到
+ *   list   抽查：近 7 天抽查不满 3 篇时，挑本轮列表文字最长的去看详情页是否更全（还没抽查过的 2 篇，之后每轮 1 篇）
  */
 export function fillCandidates(db, o) {
   const prof = o.profiles;
@@ -285,8 +323,8 @@ export function fillCandidates(db, o) {
     const n = per.get(r.source_id) || 0;
     const partial = r.completeness !== "full";
     const take = p.mode === "fetch" ? partial || r.len < shortLen
-      : p.mode === "probe" ? partial && n < 2
-      : p.mode === "list" ? (p.checked || 0) < 3 && n < 1
+      : p.mode === "probe" ? n < 2 && (partial || (p.checked || 0) < 3)
+      : p.mode === "list" ? (p.checked || 0) < 3 && n < ((p.checked || 0) === 0 ? 2 : 1)
       : false;
     if (take) { out.push({ id: r.id, url: r.url, source_id: r.source_id, title: r.title }); per.set(r.source_id, n + 1); }
     if (out.length >= (o.budget || 60)) break;
@@ -313,7 +351,7 @@ export async function fillBodies(db, list, o) {
       busy.set(h, (busy.get(h) || 0) + 1);
       const s = Date.now();
       const p = prior(c.id);
-      const r = await (o.fetch || fetchBody)(c.url, Object.assign({}, o, { title: c.title || p.title })).catch((e) => ({ ok: false, error: e.message }));
+      const r = await (o.fetch || fetchBody)(c.url, Object.assign({}, o, { title: c.title || p.title, lead: p.lead })).catch((e) => ({ ok: false, error: e.message }));
       busy.set(h, busy.get(h) - 1);
       tried++;
       const now = isoUtc(Date.now());

@@ -107,6 +107,15 @@ test("健康度带上每个源的正文策略与建议代码", () => {
   db.close();
 });
 
+test("还没记录的源、列表条目都显得完整（RSS 摘要）：也要试抓来学，不能一直停在试抓中", () => {
+  const db = tmpDb();
+  for (let i = 0; i < 3; i++) art(db, "f" + i, "fresh", { completeness: "full", summary: "RSS 里的一段摘要。".repeat(3 + i) });
+  const p = bodyProfiles(db, SRC(["fresh"]));
+  assert.equal(p.get("fresh").mode, "probe");
+  assert.deepEqual(fillCandidates(db, { runId: "r1", profiles: p }).map((x) => x.id), ["f2", "f1"]);
+  db.close();
+});
+
 test("列表自带全文的源要抽查原文：一致就保持；原文明显更长（列表只是导语）就改为去原文补", () => {
   const db = tmpDb();
   for (let i = 0; i < 6; i++) art(db, "r" + i, "rich", { run: "old", completeness: "full", summary: "列表里的一段文字。".repeat(4) });
@@ -114,7 +123,10 @@ test("列表自带全文的源要抽查原文：一致就保持；原文明显�
   art(db, "now2", "rich", { completeness: "full", summary: "短" });
   let p = bodyProfiles(db, SRC(["rich"]));
   assert.equal(p.get("rich").mode, "list");
-  assert.deepEqual(fillCandidates(db, { runId: "r1", profiles: p }).map((x) => x.id), ["now"], "每轮抽查 1 篇，挑列表文字最长的");
+  assert.deepEqual(fillCandidates(db, { runId: "r1", profiles: p }).map((x) => x.id), ["now", "now2"], "还没抽查过：本轮抽 2 篇，列表文字长的在前");
+  db.prepare("INSERT INTO article_bodies (article_id, ok, ms, channel, fetched_at, content, text_len, list_len) VALUES ('r5',1,300,'http',?,'x',36,36)").run(iso(60000));
+  assert.deepEqual(fillCandidates(db, { runId: "r1", profiles: bodyProfiles(db, SRC(["rich"])) }).map((x) => x.id), ["now"], "抽查过之后每轮 1 篇");
+  db.prepare("DELETE FROM article_bodies").run();
   const check = (id, len, listLen) => db.prepare("INSERT INTO article_bodies (article_id, ok, ms, channel, fetched_at, content, text_len, list_len) VALUES (?,1,300,'http',?,?,?,?)").run(id, iso(60000), "x".repeat(len), len, listLen);
   // 电报：原文与列表一样长
   check("r0", 36, 36); check("r1", 40, 36); check("r2", 36, 36);

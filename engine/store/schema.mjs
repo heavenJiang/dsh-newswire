@@ -19,7 +19,7 @@
  * v22 article_bodies.list_len（判断列表是否全文）；按新规则清理已入库正文、重算完整度。
  */
 import { completeness } from "../pipeline/quality.mjs";
-import { anchorReader, trimTail, MIN_SHORT } from "../pipeline/bodytext.mjs";
+import { anchorReader, trimTail, relevant, MIN_SHORT } from "../pipeline/bodytext.mjs";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
@@ -215,7 +215,7 @@ const V21 = [
   "CREATE INDEX IF NOT EXISTS idx_tracker_syntheses ON tracker_syntheses(tracker_id, id)",
 ];
 // v22：正文抓取时记下列表里原有的文字长度（list_len），用来判断一个源的列表是不是全文；
-// 按新规则清理已入库的正文（阅读器读出的侧栏与别的新闻、结尾的免责声明与社群链接），并重算完整度。
+// 按新规则清理已入库的正文（阅读器读出的侧栏与别的新闻、结尾的免责声明与社群链接；整页读出、对不上标题的作废），并重算完整度。
 const V22 = [
   "ALTER TABLE article_bodies ADD COLUMN list_len INTEGER",
   (db) => {
@@ -223,9 +223,11 @@ const V22 = [
     const artUp = db.prepare("UPDATE articles SET content = ?, text_len = ?, training_ready = CASE WHEN paywalled = 1 THEN 0 WHEN ? >= 200 THEN 1 ELSE 0 END WHERE id = ?");
     for (const r of db.prepare("SELECT b.article_id, b.content, b.extractor, a.title, a.summary, a.content AS art FROM article_bodies b JOIN articles a ON a.id = b.article_id WHERE b.ok = 1").all()) {
       const old = String(r.content || "");
-      const text = ((r.extractor === "reader" || r.extractor === "browse") && anchorReader(old, r.title)) || trimTail(old);
-      if (text === old) continue;
-      const ok = text.length >= MIN_SHORT;
+      const loose = r.extractor === "reader" || r.extractor === "browse";
+      const text = (loose && anchorReader(old, r.title)) || trimTail(old);
+      // 整页读出的：对不上标题的不是这篇（快讯流、行情条、捐款或付费提示）
+      const ok = text.length >= MIN_SHORT && (!loose || relevant(text, r.title, r.summary));
+      if (ok && text === old) continue;
       bodyUp.run(ok ? text : null, ok ? text.length : 0, ok ? 1 : 0, ok ? null : "cleaned: not this article", r.article_id);
       if (String(r.art || "") === old) {
         const back = ok ? text : String(r.summary || "");

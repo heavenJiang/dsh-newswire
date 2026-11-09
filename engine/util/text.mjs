@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 export function sha1(s) { return crypto.createHash("sha1").update(String(s)).digest("hex"); }
 
-const NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", hellip: "…", mdash: "—", ndash: "–", ldquo: '"', rdquo: '"', lsquo: "'", rsquo: "'", middot: "·" };
+const NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", hellip: "…", mdash: "—", ndash: "–", ldquo: '"', rdquo: '"', lsquo: "'", rsquo: "'", middot: "·", emsp: " ", ensp: " ", thinsp: " ", zwsp: "", times: "×", yen: "¥", copy: "©", reg: "®", trade: "™", laquo: "«", raquo: "»" };
 export function decodeEntities(s) {
   return String(s)
     .replace(/&#x([0-9a-fA-F]+);/g, (m, h) => String.fromCodePoint(parseInt(h, 16)))

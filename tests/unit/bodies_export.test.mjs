@@ -5,7 +5,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
-import { extractBody, readerText, bodyCandidates, CHALLENGE, trimTail, anchorReader } from "../../engine/pipeline/bodies.mjs";
+import { extractBody, readerText, bodyCandidates, CHALLENGE, trimTail, anchorReader, bodyUrl } from "../../engine/pipeline/bodies.mjs";
+import { relevant, PAYWALL_TEXT } from "../../engine/pipeline/bodytext.mjs";
+import { decodeBody } from "../../engine/channels/http.mjs";
 import { exportDataset, DATASET_SCHEMA } from "../../engine/export.mjs";
 import { applyRetention } from "../../engine/retention.mjs";
 import { openDb } from "../../engine/store/schema.mjs";
@@ -44,6 +46,7 @@ test("阅读器整页文字：从标题那行取，截掉结尾样板与相关�
     "免责声明：风险提示：本文内容仅供参考。", "美股三大指数集体高开，标普500指数涨0.85%。", "联系我们：support@x.com"].join("\n");
   assert.equal(anchorReader(page, "特朗普称将与中俄元首在APEC讨论美伊冲突及无核化问题，外交部回应"), "11月9日，外交部发言人郭嘉昆主持例行记者会，就相关问题作出回应。");
   assert.equal(anchorReader(page, "亚玛顿：控股股东拟6.8亿元转让20%股份"), "", "对不上标题，交给调用方按更严的长度要求处理");
+  assert.equal(anchorReader("实时行情 美元指数 101.91 欧元/美元 1.16 黄金 4010 原油 87.7 埃及政府官员：我国与雪佛龙签署离岸天然气勘探协议。 美国9月批发库存环比增长0.7%。", "埃及政府官员：我国与雪佛龙签署离岸天然气勘探协议。"), "", "标题挤在快讯流中间不算对上");
   assert.equal(trimTail("正文第一段\n正文第二段\nTelegram订阅群： https://t.me/x\nTwitter官方账号： https://x.com/y"), "正文第一段\n正文第二段");
   // 阅读器读出的相关新闻列表
   assert.equal(trimTail("交通运输部11月9日发布公告。\n*   ### 国务院关税税则委员会：继续暂停\n*   _00:19_### 美国先减关税"), "交通运输部11月9日发布公告。");
@@ -56,6 +59,43 @@ test("阅读器整页文字：从标题那行取，截掉结尾样板与相关�
   assert.equal(trimTail("鲁比奥为军事行动辩护。\n*   指南针，被罚！\n*   今夜，全线拉升！\n*   又一家A股公司分红！\n所有评论（14）\n*    网友  评论内容"), "鲁比奥为军事行动辩护。");
   // 正文里偶尔一行带时间不算新闻流
   assert.equal(trimTail("美股开盘。\n22:30 公布CPI数据。\n市场等待结果。"), "美股开盘。\n22:30 公布CPI数据。\n市场等待结果。");
+});
+
+test("整页读出的文字要对得上标题：行情条、捐款提示、付费墙页不是正文", () => {
+  assert.ok(relevant("据外媒报道，法国官员怀疑伊朗是10月份冰箱黑客攻击事件的幕后黑手。", "法国官员怀疑伊朗是10月份冰箱黑客攻击事件的幕后黑手。"));
+  assert.ok(!relevant("实时行情 查看更多 > 综览 外汇 商品 债券 资产 现价 涨跌 美元指数 DXY 101.91 -0.38 欧元/美元", "法国官员怀疑伊朗是10月份冰箱黑客攻击事件的幕后黑手。"));
+  assert.ok(!relevant("Can you stand with independent journalism? AP is proudly independent with no parent company.", "SpaceXAI started Southaven data center construction without water permits"));
+  assert.ok(relevant("Nvidia shares fell after an internal probe into CEO Jensen Huang was announced, and the company said…", "Internal probe into CEO Jensen Huang and Nvidia shares"));
+  assert.ok(PAYWALL_TEXT.test("Try unlimited access Only $1 for 4 weeks"));
+  // 评论式标题与正文用词少有重合，也要认得出
+  assert.ok(relevant("11月6日，北京。中国社会科学院大学冷门绝学学院揭牌，全国冷门绝学联盟同步启动。这是全国高校设立的第一个冷门绝学学院。", "马上评｜“绝学”何以继？“冷门”何以兴？"));
+  assert.ok(relevant("举办中国国际进口博览会，是中国主动向世界开放市场的重大举措。2026年11月5日至10日，第九届进博会在上海举行。", "壹视界·心相知丨在上海，遇见世界"));
+  assert.ok(!relevant("{{month}} {{date}} {{hourSecond}} {{bulletinStatus}}{{stockName}}{{stockCode}}{{price}} 浏览 收藏公告 {{fundtitle}} 公告下载", "荣昌生物关于与烟台荣昌制药股份有限公司签署许可协议暨关联交易的公告"));
+  // 快讯流页面里出现了这条的标题，但开头是行情条：不是正文
+  assert.ok(!relevant("实时行情 查看更多 > 综览 外汇 商品 债券 资产 现价 涨跌 美元指数 DXY 101.91 欧元/美元 1.16 英镑/美元 1.31 美元/日元 154.2 黄金 4010 原油 87.7 比特币 74000 ".repeat(8) + "埃及政府官员：我国与雪佛龙签署离岸天然气勘探协议。 美国9月批发库存环比增长0.7%。", "埃及政府官员：我国与雪佛龙签署离岸天然气勘探协议。"));
+  assert.deepEqual(bodyUrl("https://www.cninfo.com.cn/new/disclosure/detail?stockCode=688331&orgId=9900047137&announcementId=1225664560&announcementTime=2026-11-10"), { url: "https://static.cninfo.com.cn/finalpage/2026-11-10/1225664560.PDF", kind: "pdf" });
+  assert.equal(bodyUrl("https://www.cls.cn/detail/1"), null);
+  // PDF 抽出的公告字间有空格；中文译名标题配英文原文时看列表里的原文开头
+  assert.ok(relevant("证券代码： 688331 荣昌生物 关于与烟台荣昌制药股份 有限公司签署许可协议暨关联 交易的公告", "荣昌生物关于与烟台荣昌制药股份有限公司签署许可协议暨关联交易的公告"));
+  assert.ok(relevant("Why AI Agents Are Repeating 2019's Microservices Mistake. The author reviews a multi-agent workflow…", "AI Agent 为何在重演 2019 年微服务的错误", "Why AI Agents Are Repeating 2019’s Microservices Mistake 作者复盘"));
+});
+
+test("正文首尾样板：备案号、版权、发布时间与浏览数、字号按钮、X 帖子前缀", () => {
+  assert.equal(trimTail(["时间：2024年10月21日 浏览次数：564 【字体：大中小】", "2024年10月17日下午，夏建辉副主任在中心会见了新西兰梅西大学副校长一行。", "关于我们　联系我们　法律声明　网站地图", "京ICP备05070218号 京公网安备11010202000001号"].join("\n")),
+    "2024年10月17日下午，夏建辉副主任在中心会见了新西兰梅西大学副校长一行。");
+  assert.equal(trimTail('qinbafrank on X: "聊聊沃伦担任银行委员会主席对加密的影响。'), "聊聊沃伦担任银行委员会主席对加密的影响。");
+  assert.equal(trimTail("正文一段。\n经营许可证：沪B2-2017116 © 2014-2026 上海东方报业有限公司"), "正文一段。");
+  // 图集说明、图片署名、署名行
+  assert.equal(trimTail(["1 of 4 |", "Options traders work on the floor of the New York Stock Exchange. (AP Photo/Yuki Iwamura)", "License this photo", "BY  DAMIAN TROISE", "NEW YORK (AP) — Wall Street's winners and losers after the midterms."].join("\n")),
+    "NEW YORK (AP) — Wall Street's winners and losers after the midterms.");
+  assert.equal(trimTail("正文。\n风险提示及免责条款\n市场有风险，投资需谨慎。"), "正文。");
+});
+
+test("按页面声明的字符集解码（GBK 中文站）", () => {
+  const gbk = Buffer.from([0xd6, 0xd0, 0xce, 0xc4]); // 「中文」的 GBK 编码
+  assert.equal(decodeBody(Buffer.concat([Buffer.from('<meta charset="gb2312">'), gbk]), "text/html"), '<meta charset="gb2312">中文');
+  assert.equal(decodeBody(gbk, "text/html; charset=GBK"), "中文");
+  assert.equal(decodeBody(Buffer.from("中文"), "text/html"), "中文");
 });
 
 test("验证页不是正文", () => {

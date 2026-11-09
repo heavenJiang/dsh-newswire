@@ -2,6 +2,27 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.6 (2026-11-10)
+
+Fixes from checking original pages for all 44 sources, including removed ones:
+
+- **Whole-page text must match the title to count as the body**:
+  - The reader and the browser read the whole page. The title's key terms must appear in the text, and the opening must relate to the title.
+  - Thresholds come from measured data: real articles score ≥ 0.1 even with editorial headlines; junk scores ≤ 0.03.
+  - Junk now recognized and rejected: the market ticker on 华尔街见闻 flash pages, AP's donation box, FT paywall pages, and the 巨潮 page template.
+  - Matching the title line is not enough on its own: on flash pages the title line is the whole story, and what follows is something else.
+- **Charsets**: pages are decoded by the charset in the response header or page, so GBK sites (such as regional 中新网 sites) are no longer garbled.
+- **巨潮 announcements** are read from the announcement PDF. The detail page is only a front-end template with no content.
+- **JSON-LD truncated by the site** (链捕手 keeps only the first 1,200 characters): the article container is used when it is longer.
+- **Paywall prompt pages** ("Try unlimited access", "订阅后阅读") are recorded as paywalled, not taken as the body.
+- **Leading and trailing boilerplate** is removed:
+  - license numbers, copyright, abuse-report contacts, "about / contact";
+  - publish time, view counts, font-size buttons;
+  - membership upsells, "listen", share buttons, the "xx on X:" prefix;
+  - `&emsp;` and similar entities.
+- New sources whose list looks complete get 2 original pages checked in the first round, so "the list is only a summary" (true of most RSS feeds) is found sooner.
+- The 1.1.5 migration also re-checks stored bodies by these rules; mismatches are voided and fall back to the list text.
+
 ## 1.1.5 (2026-11-09)
 
 - **Full text judged source by source**:
