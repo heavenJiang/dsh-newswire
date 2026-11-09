@@ -1,0 +1,107 @@
+{
+  "name": "dsh-newswire",
+  "version": "1.0.0",
+  "description": "见微知著 (Newswire) for DeepSeek Harness: news from dozens of Chinese and international outlets, read by an LLM and laid out as a newspaper-style edition with storylines and cited, fact-checked copy; tracking of companies, technologies and themes with impact and outlook analysis; phone pushes and a daily digest. LLM mode or save-tokens mode.",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "news",
+    "newswire",
+    "crawler",
+    "cross-validation",
+    "browse",
+    "agent-reach",
+    "sqlite",
+    "新闻",
+    "见微知著",
+    "llm",
+    "tracking"
+  ],
+  "icon": "./icon.svg",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/heavenJiang/dsh-newswire.git"
+  },
+  "homepage": "https://github.com/heavenJiang/dsh-newswire#readme",
+  "bugs": {
+    "url": "https://github.com/heavenJiang/dsh-newswire/issues"
+  },
+  "license": "MIT",
+  "author": "heavenJiang",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json",
+    "./engine/run.mjs": "./engine/run.mjs",
+    "./engine/config/sources.json": "./engine/config/sources.json",
+    "./engine/config/taxonomy.json": "./engine/config/taxonomy.json",
+    "./engine/config/layout.json": "./engine/config/layout.json"
+  },
+  "files": [
+    "locale/*.json",
+    "docs",
+    "index.js",
+    "client.js",
+    "host",
+    "cordis.patch.yml",
+    "icon.svg",
+    "scripts/setup.sh",
+    "engine/*.mjs",
+    "engine/adapters",
+    "engine/channels",
+    "engine/parsers",
+    "engine/pipeline",
+    "engine/store",
+    "engine/util",
+    "engine/config",
+    "engine/README.md",
+    "engine/README.zh.md",
+    "engine/queries.sql",
+    "README.md",
+    "README.zh.md",
+    "CHANGELOG.md",
+    "CHANGELOG.zh.md"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.2.0-0 <0.3.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": ">=3.18.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "^3.19.0"
+  },
+  "scripts": {
+    "test": "node --test tests/unit/*.test.mjs",
+    "smoke": "node tests/fake_ctx_smoke.mjs",
+    "smoke:client": "node tests/client_smoke.mjs",
+    "check": "node --check index.js && node --check client.js && npm test && npm run smoke:client && npm run eval",
+    "check:online": "npm run check && npm run smoke",
+    "preview": "node scripts/preview.mjs",
+    "eval": "node scripts/eval.mjs"
+  }
+}

@@ -1,0 +1,1248 @@
+{
+  "version": 5,
+  "rules_version": "2026.11.4+noise3",
+  "note": "分类体系（两级树，条目多标签）+ 地区词表 + 跨语言实体别名 + 关注/屏蔽词。改完用 newswire_reprocess 重算历史标签与事件。英文关键词按整词匹配；全大写且不超过 4 个字母的缩写区分大小写。",
+  "labels": [
+    {
+      "id": "macro",
+      "name": "宏观经济",
+      "children": [
+        {
+          "id": "macro.monetary",
+          "name": "货币政策",
+          "keywords": [
+            "央行",
+            "降准",
+            "降息",
+            "加息",
+            "LPR",
+            "MLF",
+            "逆回购",
+            "公开市场操作",
+            "美联储",
+            "欧央行",
+            "日本央行",
+            "利率决议",
+            "货币政策",
+            "准备金",
+            "流动性",
+            "Fed",
+            "FOMC",
+            "rate cut",
+            "rate hike",
+            "central bank",
+            "ECB",
+            "BOJ",
+            "Powell",
+            "鲍威尔",
+            "信贷",
+            "贷款",
+            "银行间"
+          ]
+        },
+        {
+          "id": "macro.fiscal",
+          "name": "财政",
+          "keywords": [
+            "财政",
+            "国债",
+            "专项债",
+            "赤字",
+            "减税",
+            "财政部",
+            "预算",
+            "税收",
+            "化债",
+            "fiscal",
+            "budget",
+            "Treasury Department",
+            "tax cut"
+          ]
+        },
+        {
+          "id": "macro.data",
+          "name": "经济数据",
+          "keywords": [
+            "CPI",
+            "PPI",
+            "GDP",
+            "PMI",
+            "社融",
+            "M2",
+            "失业率",
+            "非农",
+            "通胀",
+            "社会消费品零售",
+            "工业增加值",
+            "进出口",
+            "贸易顺差",
+            "外汇储备",
+            "inflation",
+            "payrolls",
+            "unemployment",
+            "retail sales",
+            "jobs report"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "markets",
+      "name": "金融市场",
+      "children": [
+        {
+          "id": "markets.ashare",
+          "name": "A股",
+          "keywords": [
+            "A股",
+            "沪指",
+            "深成指",
+            "创业板",
+            "科创板",
+            "上证",
+            "深交所",
+            "上交所",
+            "北交所",
+            "证监会",
+            "涨停",
+            "跌停",
+            "两市",
+            "成交额",
+            "回购",
+            "减持",
+            "增持",
+            "定增",
+            "停牌",
+            "复牌",
+            "沪深"
+          ]
+        },
+        {
+          "id": "markets.hk_us",
+          "name": "港美股",
+          "keywords": [
+            "港股",
+            "恒指",
+            "恒生",
+            "美股",
+            "道指",
+            "纳指",
+            "标普",
+            "纳斯达克",
+            "中概股",
+            "Nasdaq",
+            "S&P",
+            "Dow",
+            "Wall Street",
+            "stocks",
+            "Hang Seng"
+          ]
+        },
+        {
+          "id": "markets.bond_fx",
+          "name": "债券与汇率",
+          "keywords": [
+            "债券",
+            "国债收益率",
+            "美债",
+            "收益率",
+            "汇率",
+            "人民币",
+            "美元指数",
+            "离岸",
+            "日元",
+            "欧元",
+            "bond",
+            "yield",
+            "Treasuries",
+            "dollar",
+            "yuan",
+            "currency"
+          ]
+        },
+        {
+          "id": "markets.commodity",
+          "name": "大宗商品",
+          "keywords": [
+            "黄金",
+            "白银",
+            "原油",
+            "布伦特",
+            "WTI",
+            "铜价",
+            "铁矿石",
+            "大宗商品",
+            "期货",
+            "OPEC",
+            "天然气",
+            "gold",
+            "oil prices",
+            "crude",
+            "copper",
+            "commodities"
+          ]
+        },
+        {
+          "id": "markets.crypto",
+          "name": "加密资产",
+          "keywords": [
+            "比特币",
+            "以太坊",
+            "加密货币",
+            "稳定币",
+            "BTC",
+            "ETH",
+            "Solana",
+            "币安",
+            "链上",
+            "DeFi",
+            "Hyperliquid",
+            "XRP",
+            "Bitcoin",
+            "crypto",
+            "stablecoin",
+            "Coinbase",
+            "Binance"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "industry",
+      "name": "公司与产业",
+      "children": [
+        {
+          "id": "industry.ai_semis",
+          "name": "AI 与半导体",
+          "keywords": [
+            "AI",
+            "人工智能",
+            "大模型",
+            "算力",
+            "芯片",
+            "半导体",
+            "英伟达",
+            "GPU",
+            "光模块",
+            "数据中心",
+            "OpenAI",
+            "Anthropic",
+            "台积电",
+            "晶圆",
+            "Nvidia",
+            "chip",
+            "chips",
+            "semiconductor",
+            "data center"
+          ]
+        },
+        {
+          "id": "industry.ev_energy",
+          "name": "新能源",
+          "keywords": [
+            "新能源",
+            "光伏",
+            "锂电",
+            "储能",
+            "电动车",
+            "新能源汽车",
+            "特斯拉",
+            "比亚迪",
+            "宁德时代",
+            "风电",
+            "氢能",
+            "EV",
+            "Tesla",
+            "solar",
+            "battery"
+          ]
+        },
+        {
+          "id": "industry.consumer",
+          "name": "消费",
+          "keywords": [
+            "消费",
+            "白酒",
+            "餐饮",
+            "旅游",
+            "电商",
+            "双十一",
+            "茅台",
+            "免税",
+            "consumer",
+            "retailer"
+          ]
+        },
+        {
+          "id": "industry.pharma",
+          "name": "医药",
+          "keywords": [
+            "医药",
+            "创新药",
+            "疫苗",
+            "药企",
+            "集采",
+            "生物医药",
+            "FDA",
+            "pharma",
+            "drugmaker",
+            "vaccine"
+          ]
+        },
+        {
+          "id": "industry.property",
+          "name": "地产",
+          "keywords": [
+            "房地产",
+            "楼市",
+            "房价",
+            "房企",
+            "万科",
+            "碧桂园",
+            "恒大",
+            "住房",
+            "property",
+            "housing",
+            "real estate"
+          ]
+        },
+        {
+          "id": "industry.corporate",
+          "name": "公司公告",
+          "keywords": [
+            "公告",
+            "财报",
+            "营收",
+            "净利润",
+            "并购",
+            "重组",
+            "收购",
+            "股权",
+            "业绩",
+            "分红",
+            "earnings",
+            "revenue",
+            "acquisition",
+            "merger",
+            "buyback"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "politics",
+      "name": "时政与地缘",
+      "children": [
+        {
+          "id": "politics.domestic",
+          "name": "国内时政",
+          "keywords": [
+            "国务院",
+            "中共中央",
+            "习近平",
+            "李强",
+            "全会",
+            "全国人大",
+            "政协",
+            "发改委",
+            "印发",
+            "条例",
+            "中央经济工作会议",
+            "政治局"
+          ]
+        },
+        {
+          "id": "politics.diplomacy",
+          "name": "外交",
+          "keywords": [
+            "外交部",
+            "会谈",
+            "会晤",
+            "峰会",
+            "双边",
+            "联合国",
+            "大使",
+            "外长",
+            "访华",
+            "diplomat",
+            "summit",
+            "talks",
+            "United Nations",
+            "UN"
+          ]
+        },
+        {
+          "id": "politics.conflict",
+          "name": "冲突与安全",
+          "keywords": [
+            "战争",
+            "袭击",
+            "导弹",
+            "冲突",
+            "军事",
+            "停火",
+            "空袭",
+            "无人机",
+            "遇袭",
+            "武装",
+            "胡塞",
+            "war",
+            "attack",
+            "missile",
+            "strike",
+            "ceasefire",
+            "troops",
+            "airstrike",
+            "军方",
+            "military",
+            "drone",
+            "美军",
+            "革命卫队",
+            "特遣部队",
+            "军队",
+            "航母",
+            "拦截",
+            "Houthi",
+            "militants"
+          ]
+        },
+        {
+          "id": "politics.trade",
+          "name": "贸易与制裁",
+          "keywords": [
+            "关税",
+            "贸易战",
+            "出口管制",
+            "实体清单",
+            "制裁",
+            "反倾销",
+            "tariff",
+            "tariffs",
+            "export controls",
+            "sanctions",
+            "trade war"
+          ]
+        },
+        {
+          "id": "politics.elections",
+          "name": "选举",
+          "keywords": [
+            "选举",
+            "大选",
+            "中期选举",
+            "投票",
+            "组阁",
+            "election",
+            "midterm",
+            "midterms",
+            "vote",
+            "coalition"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tech",
+      "name": "科技",
+      "children": [
+        {
+          "id": "tech.frontier",
+          "name": "前沿科技",
+          "keywords": [
+            "航天",
+            "星舰",
+            "SpaceX",
+            "量子",
+            "机器人",
+            "自动驾驶",
+            "卫星",
+            "火箭",
+            "具身智能",
+            "robot",
+            "quantum",
+            "rocket",
+            "satellite",
+            "月球",
+            "登月",
+            "太空",
+            "空间站",
+            "NASA",
+            "moon",
+            "space"
+          ]
+        },
+        {
+          "id": "tech.internet",
+          "name": "互联网",
+          "keywords": [
+            "互联网",
+            "腾讯",
+            "阿里",
+            "字节",
+            "抖音",
+            "微信",
+            "苹果",
+            "谷歌",
+            "微软",
+            "Meta",
+            "亚马逊",
+            "Google",
+            "Microsoft",
+            "Apple",
+            "Amazon"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "study",
+      "name": "教育与留学",
+      "children": [
+        {
+          "id": "study.visa",
+          "name": "签证与移民",
+          "keywords": [
+            "签证",
+            "移民",
+            "绿卡",
+            "H-1B",
+            "OPT",
+            "学签",
+            "F-1",
+            "入境政策",
+            "visa",
+            "immigration",
+            "green card",
+            "study permit",
+            "student visa",
+            "student visas",
+            "study visa",
+            "visa refusal",
+            "international students",
+            "international student",
+            "post-study work",
+            "Graduate route",
+            "sponsor",
+            "sponsors",
+            "licensed sponsors",
+            "Confirmation of Acceptance for Studies",
+            "CAS",
+            "study permits",
+            "SEVIS",
+            "I-20",
+            "学生签证",
+            "国际学生",
+            "留学生",
+            "签证拒签",
+            "工作签证"
+          ]
+        },
+        {
+          "id": "study.rankings",
+          "name": "院校与排名",
+          "keywords": [
+            "QS",
+            "世界大学排名",
+            "大学排名",
+            "US News",
+            "泰晤士高等教育",
+            "university rankings",
+            "QS World University Rankings",
+            "Times Higher Education",
+            "THE rankings",
+            "rankings",
+            "排名"
+          ]
+        },
+        {
+          "id": "study.admission",
+          "name": "申请与录取",
+          "keywords": [
+            "录取",
+            "招生",
+            "申请季",
+            "研究生招生",
+            "本科招生",
+            "高考",
+            "考研",
+            "admission",
+            "admissions",
+            "enrollment",
+            "university",
+            "universities",
+            "tuition",
+            "tuition fees",
+            "undergraduate",
+            "postgraduate",
+            "graduate school",
+            "留学",
+            "出国留学",
+            "学历认证",
+            "学历学位认证",
+            "中外合作办学",
+            "国际教育",
+            "TNE",
+            "transnational education"
+          ]
+        },
+        {
+          "id": "study.exams",
+          "name": "语言与标化考试",
+          "keywords": [
+            "雅思",
+            "托福",
+            "GRE",
+            "GMAT",
+            "SAT",
+            "IELTS",
+            "TOEFL",
+            "English language test",
+            "Duolingo English Test",
+            "PTE",
+            "多邻国"
+          ]
+        },
+        {
+          "id": "study.scholarship",
+          "name": "奖学金",
+          "keywords": [
+            "奖学金",
+            "国家留学基金",
+            "公派留学",
+            "scholarship",
+            "scholarships",
+            "fellowship",
+            "公派",
+            "奖学金项目"
+          ]
+        },
+        {
+          "id": "study.jobs",
+          "name": "海外就业",
+          "keywords": [
+            "海外就业",
+            "留学生就业",
+            "工签",
+            "work permit",
+            "graduate route",
+            "Global Talent",
+            "H-1B",
+            "OPT",
+            "work rights",
+            "留学英才",
+            "招聘会",
+            "回国就业"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "society",
+      "name": "社会",
+      "children": [
+        {
+          "id": "society.livelihood",
+          "name": "民生",
+          "keywords": [
+            "民生",
+            "社保",
+            "养老",
+            "医保",
+            "寒潮",
+            "降雪",
+            "降温",
+            "暴雨",
+            "天气预报",
+            "停航",
+            "大风",
+            "交通管制",
+            "停运"
+          ]
+        },
+        {
+          "id": "society.disaster",
+          "name": "灾害与安全",
+          "keywords": [
+            "地震",
+            "火灾",
+            "洪水",
+            "台风",
+            "事故",
+            "坍塌",
+            "遇难",
+            "伤亡",
+            "枪击",
+            "earthquake",
+            "wildfire",
+            "flood",
+            "shooting",
+            "killed",
+            "dead",
+            "遇害",
+            "死亡"
+          ]
+        }
+      ]
+    }
+  ],
+  "category_defaults": {
+    "国内时政": "politics.domestic",
+    "国内财经与公告": "markets",
+    "国际宏观": "politics",
+    "市场与交易": "markets",
+    "科技与AI": "tech",
+    "留学与签证": "study"
+  },
+  "regions": {
+    "CN": [
+      "中国",
+      "国内",
+      "我国",
+      "北京",
+      "上海",
+      "深圳",
+      "广东",
+      "A股",
+      "国务院",
+      "人民币",
+      "China",
+      "Chinese",
+      "Beijing"
+    ],
+    "HK": [
+      "香港",
+      "港股",
+      "恒指",
+      "Hong Kong"
+    ],
+    "US": [
+      "美国",
+      "美联储",
+      "特朗普",
+      "白宫",
+      "华盛顿",
+      "纽约",
+      "美股",
+      "U.S.",
+      "United States",
+      "Trump",
+      "Washington",
+      "Wall Street",
+      "Fed",
+      "US"
+    ],
+    "UK": [
+      "英国",
+      "伦敦",
+      "英格兰银行",
+      "Britain",
+      "British",
+      "London"
+    ],
+    "EU": [
+      "欧盟",
+      "欧洲",
+      "欧央行",
+      "德国",
+      "法国",
+      "意大利",
+      "EU",
+      "Europe",
+      "European",
+      "Germany",
+      "France"
+    ],
+    "JP": [
+      "日本",
+      "东京",
+      "日元",
+      "Japan",
+      "Japanese",
+      "Tokyo"
+    ],
+    "AU": [
+      "澳大利亚",
+      "澳洲",
+      "Australia"
+    ],
+    "CA": [
+      "加拿大",
+      "Canada"
+    ],
+    "ME": [
+      "中东",
+      "伊朗",
+      "以色列",
+      "沙特",
+      "加沙",
+      "也门",
+      "胡塞",
+      "黎巴嫩",
+      "Iran",
+      "Israel",
+      "Saudi",
+      "Gaza",
+      "Yemen",
+      "Mideast",
+      "Middle East",
+      "Lebanon"
+    ],
+    "RU": [
+      "俄罗斯",
+      "俄方",
+      "普京",
+      "克里姆林宫",
+      "Russia",
+      "Russian",
+      "Kremlin",
+      "Putin"
+    ],
+    "UA": [
+      "乌克兰",
+      "泽连斯基",
+      "基辅",
+      "Ukraine",
+      "Ukrainian",
+      "Kyiv",
+      "Zelenskyy"
+    ],
+    "IN": [
+      "印度",
+      "India",
+      "Indian"
+    ],
+    "LATAM": [
+      "阿根廷",
+      "巴西",
+      "墨西哥",
+      "委内瑞拉",
+      "Argentina",
+      "Brazil",
+      "Mexico",
+      "Venezuela"
+    ]
+  },
+  "entities": {
+    "_note": "跨语言同一事件匹配用：同一实体的中英文写法。weak=true 的太泛，不计入匹配证据。",
+    "china": {
+      "aliases": [
+        "中国",
+        "China",
+        "Chinese"
+      ],
+      "weak": true
+    },
+    "usa": {
+      "aliases": [
+        "美国",
+        "U.S.",
+        "United States",
+        "America"
+      ],
+      "weak": true
+    },
+    "fed": {
+      "aliases": [
+        "美联储",
+        "Federal Reserve",
+        "Fed"
+      ]
+    },
+    "ecb": {
+      "aliases": [
+        "欧央行",
+        "欧洲央行",
+        "ECB",
+        "European Central Bank"
+      ]
+    },
+    "pboc": {
+      "aliases": [
+        "中国人民银行",
+        "人民银行",
+        "央行",
+        "PBOC"
+      ]
+    },
+    "trump": {
+      "aliases": [
+        "特朗普",
+        "Trump"
+      ]
+    },
+    "biden": {
+      "aliases": [
+        "拜登",
+        "Biden"
+      ]
+    },
+    "xi": {
+      "aliases": [
+        "习近平",
+        "Xi Jinping"
+      ]
+    },
+    "putin": {
+      "aliases": [
+        "普京",
+        "Putin"
+      ]
+    },
+    "zelenskyy": {
+      "aliases": [
+        "泽连斯基",
+        "Zelenskyy",
+        "Zelensky"
+      ]
+    },
+    "netanyahu": {
+      "aliases": [
+        "内塔尼亚胡",
+        "Netanyahu"
+      ]
+    },
+    "eisenkot": {
+      "aliases": [
+        "艾森科特",
+        "Eisenkot"
+      ]
+    },
+    "powell": {
+      "aliases": [
+        "鲍威尔",
+        "Powell"
+      ]
+    },
+    "milei": {
+      "aliases": [
+        "米莱",
+        "Milei"
+      ]
+    },
+    "pope_leo": {
+      "aliases": [
+        "教皇利奥",
+        "教宗良",
+        "Pope Leo"
+      ]
+    },
+    "mamdani": {
+      "aliases": [
+        "曼达尼",
+        "Mamdani"
+      ]
+    },
+    "iran": {
+      "aliases": [
+        "伊朗",
+        "Iran",
+        "Iranian"
+      ]
+    },
+    "israel": {
+      "aliases": [
+        "以色列",
+        "Israel",
+        "Israeli"
+      ]
+    },
+    "saudi": {
+      "aliases": [
+        "沙特",
+        "Saudi"
+      ]
+    },
+    "riyadh": {
+      "aliases": [
+        "利雅得",
+        "Riyadh"
+      ]
+    },
+    "aramco": {
+      "aliases": [
+        "阿美",
+        "沙特阿美",
+        "Aramco"
+      ]
+    },
+    "houthi": {
+      "aliases": [
+        "胡塞",
+        "Houthi",
+        "Houthis"
+      ]
+    },
+    "yemen": {
+      "aliases": [
+        "也门",
+        "Yemen"
+      ]
+    },
+    "syria": {
+      "aliases": [
+        "叙利亚",
+        "Syria"
+      ]
+    },
+    "gaza": {
+      "aliases": [
+        "加沙",
+        "Gaza"
+      ]
+    },
+    "hormuz": {
+      "aliases": [
+        "霍尔木兹",
+        "Hormuz"
+      ]
+    },
+    "russia": {
+      "aliases": [
+        "俄罗斯",
+        "Russia",
+        "Russian",
+        "Kremlin",
+        "克里姆林宫"
+      ]
+    },
+    "ukraine": {
+      "aliases": [
+        "乌克兰",
+        "Ukraine",
+        "Ukrainian"
+      ]
+    },
+    "zaporizhzhia": {
+      "aliases": [
+        "扎波罗热",
+        "Zaporizhzhia"
+      ]
+    },
+    "poland": {
+      "aliases": [
+        "波兰",
+        "Poland",
+        "Polish"
+      ]
+    },
+    "krakow": {
+      "aliases": [
+        "克拉科夫",
+        "Krakow"
+      ]
+    },
+    "japan": {
+      "aliases": [
+        "日本",
+        "Japan"
+      ],
+      "weak": true
+    },
+    "uk": {
+      "aliases": [
+        "英国",
+        "Britain",
+        "UK"
+      ],
+      "weak": true
+    },
+    "eu": {
+      "aliases": [
+        "欧盟",
+        "EU",
+        "European Union"
+      ]
+    },
+    "un": {
+      "aliases": [
+        "联合国",
+        "United Nations"
+      ]
+    },
+    "opec": {
+      "aliases": [
+        "欧佩克",
+        "OPEC"
+      ]
+    },
+    "nvidia": {
+      "aliases": [
+        "英伟达",
+        "Nvidia"
+      ]
+    },
+    "openai": {
+      "aliases": [
+        "OpenAI"
+      ]
+    },
+    "anthropic": {
+      "aliases": [
+        "Anthropic"
+      ]
+    },
+    "tesla": {
+      "aliases": [
+        "特斯拉",
+        "Tesla"
+      ]
+    },
+    "apple": {
+      "aliases": [
+        "苹果公司",
+        "Apple"
+      ]
+    },
+    "microsoft": {
+      "aliases": [
+        "微软",
+        "Microsoft"
+      ]
+    },
+    "google": {
+      "aliases": [
+        "谷歌",
+        "Google",
+        "Alphabet"
+      ]
+    },
+    "meta": {
+      "aliases": [
+        "Meta"
+      ]
+    },
+    "amazon": {
+      "aliases": [
+        "亚马逊",
+        "Amazon"
+      ]
+    },
+    "tsmc": {
+      "aliases": [
+        "台积电",
+        "TSMC"
+      ]
+    },
+    "spacex": {
+      "aliases": [
+        "SpaceX",
+        "星舰",
+        "Starship"
+      ]
+    },
+    "berkshire": {
+      "aliases": [
+        "伯克希尔",
+        "Berkshire"
+      ]
+    },
+    "bitcoin": {
+      "aliases": [
+        "比特币",
+        "Bitcoin",
+        "BTC"
+      ]
+    },
+    "ethereum": {
+      "aliases": [
+        "以太坊",
+        "Ethereum",
+        "ETH"
+      ]
+    },
+    "gold": {
+      "aliases": [
+        "黄金",
+        "gold"
+      ],
+      "weak": true
+    },
+    "oil": {
+      "aliases": [
+        "原油",
+        "oil",
+        "crude"
+      ],
+      "weak": true
+    }
+  },
+  "watch": [
+    "IPO",
+    "immigration levels",
+    "student cap",
+    "visa policy",
+    "停火",
+    "关税",
+    "制裁",
+    "加息",
+    "学签",
+    "战争",
+    "拒签",
+    "暂停上市",
+    "熔断",
+    "移民政策",
+    "立案",
+    "签证政策",
+    "美联储",
+    "退市",
+    "降准",
+    "降息"
+  ],
+  "mute": [
+    "直播预告",
+    "抽奖"
+  ],
+  "noise": [
+    {
+      "id": "cls_paid_columns",
+      "name": "财联社付费栏目引流",
+      "kind": "promo",
+      "source": "^cls",
+      "title": "^【(风口研报|电报解读|金牌纪要库|财联社早知道|研选|玩转ETF|点金互动易|公告全知道|九点特供|盘中宝|狙击龙虎榜|题材挖掘|科创板早知道|主力动向|机构调研|涨停揭秘|异动解读|VIP)[^】]*】",
+      "note": "财联社 VIP 栏目的预告：隐去公司名、引导订阅"
+    },
+    {
+      "id": "withheld_company_teaser",
+      "name": "隐去公司名的荐股引流",
+      "kind": "promo",
+      "all": [
+        "(这家|另一家|该)(公司|企业)(?!(公告|称|表示))",
+        "(分析师|机构)(强call|看好|称)|有望|受益"
+      ],
+      "title": "^【[^】]{2,12}】",
+      "note": "标题带栏目名、正文以「这家公司」代替公司名并给出看好结论"
+    },
+    {
+      "id": "ad_markers",
+      "name": "广告标记",
+      "kind": "promo",
+      "title": "(^|[【\\[（(])(广告|推广|赞助|软文|PR)([】\\]）):：]|$)",
+      "note": "标题里明确标注的广告"
+    },
+    {
+      "id": "marketing_cta",
+      "name": "营销引导",
+      "kind": "promo",
+      "text": "(扫码(领取|入群|关注|下载)|点击(领取|下载|报名)|限时(优惠|免费|特惠)|开户(礼|福利|送)|立即(抢购|购买|报名)|长按识别二维码|添加客服|私信领取)",
+      "note": "正文里有引导扫码、领取、开户等营销话术"
+    },
+    {
+      "id": "live_preview",
+      "name": "直播与活动预告",
+      "kind": "promo",
+      "title": "(直播预告|今晚直播|报名开启|抽奖|福利来了|粉丝福利)",
+      "note": "活动、直播、抽奖预告"
+    },
+    {
+      "id": "market_ticks",
+      "name": "行情跳动",
+      "kind": "ticker",
+      "title": "^.{4,64}$",
+      "note": "单条行情跳动（如「日经225指数涨2%」「现货黄金报4112美元」）：汇入行情速览",
+      "title_all": [
+        "^(美股|港股|A股|亚太|欧股|国内|日本|韩国|台湾|香港|美国|欧洲|现货|纽约|伦敦|布伦特|WTI|离岸|在岸)?\\s*[^，。：:｜|！!？?“”\"【]{0,12}(指数|收益率|期货|期金|期银|铜价|银价|汇率|人民币|黄金|金价|白银|原油|油价|美元|比特币|BTC|ETH|SOL|欧元|日元|英镑|台币|国债|股指|A50|恒指|恒生|纳指|道指|标普|日经|东证|KOSPI|Kospi|富时|斯托克|DAX|CAC|MSCI)[^，。：:｜|！!？?“”\"]{0,14}(高开|低开|涨|跌|上行|下行|上升|下降|收报|报|突破|跌破|触及|向上|向下|扩大)",
+        "(\\d+(\\.\\d+)?%|\\d+(\\.\\d+)?个?基点|\\d[\\d,]*(\\.\\d+)?\\s*(点|美元|元)|报\\s*\\d+\\.\\d{3,4}\\b)"
+      ]
+    }
+  ]
+}

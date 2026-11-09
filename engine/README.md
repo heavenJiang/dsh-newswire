@@ -1,0 +1,177 @@
+# dsh-newswire engine
+
+English | [中文](README.zh.md)
+
+Plain Node.js (22 or later, only the built-in `node:sqlite`, no third-party dependencies). The plugin runs `run.mjs` as a subprocess; it also runs on its own.
+
+## Layout
+```
+engine/
+  run.mjs               CLI: fetch (one round into the database) | cycle (full round + push message) | reprocess (recompute labels and events) | export (dataset) | test-source (trial fetch, nothing stored)
+  taxonomy.mjs          Topics: labels, regions, entities, number tokens, counting units
+  cursor.mjs            Continuity: checks, checkpoint advance, look-back window
+  export.mjs            Dataset export (articles / events / manifest)
+  retention.mjs         Raw snapshot compression and deletion by day
+  lock.mjs              Cross-process file lock (dataDir/run.lock)
+  config.mjs            Source config loading and upgrades (new sources and fields merged in, old file kept as .bak)
+  bins.mjs              External command detection: browse / agent-reach / mcporter (explicit path → PATH → common locations)
+  constants.mjs         Channel constants (no side effects; safe for the host side)
+  query.mjs             Read queries shared by plugin tools and panel routes
+  channels/
+    browse.mjs          browse CLI: status / session / execute; page scripts per mode (rss / html_index / cls_api / html / article)
+    agent_reach.mjs     agent-reach: feedparser from its venv for RSS; the web backend doctor reports (web-reader MCP or Jina Reader) for pages
+    http.mjs            Plain requests and jina (r.jina.ai)
+    classify.mjs        Failure classes (error_kind + hint); error text scrubbed of local paths
+    exa.mjs             Backfill search (Exa through mcporter)
+  adapters/             Site adapters (whole page HTML → items + source heat)
+    techflow.mjs jiemian.mjs thepaper.mjs apnews.mjs   index.mjs registry   _util.mjs
+  parsers/generic.mjs   Generic parsers: RSS/Atom, HTML links, Markdown, JSON API (with signal field mapping)
+  pipeline/
+    fetch.mjs           Channel chain for one source (no database; shared by trial and real fetches)
+    ingest.mjs          One source, one round: fetch → continuity → paging / search backfill → store → continuity, gaps, checkpoint
+    paging.mjs          Paging backfill: param / cursor / id_walk
+    events.mjs          Classify → cluster events → cross-validate and score; reprocess
+    bodies.mjs          Body fetching and extraction for top events
+    select.mjs          Source heat, event selection for push, the phone message
+    normalize.mjs       Raw item → stored record (dedup key, time confidence, titles for untitled flashes, navigation-label filter)
+    signals.mjs         Heat signal normalization
+    digest.mjs          Digest Markdown and JSONL/CSV export
+  store/
+    schema.mjs          Tables and migrations (PRAGMA user_version)
+    db.mjs              Writes
+  config/sources.json   Source seed (copied to dataDir on first run)
+  config/taxonomy.json  Topic seed (same)
+  queries.sql           Troubleshooting SQL
+```
+
+## How much to fetch: continuity first
+
+A round does not fetch a fixed number of items; it **fetches until it reaches where the last round ended**. A source with a continuity cursor keeps everything newer than the last round's newest item, up to 300 per round; Cailian pages back in time until it passes 5 minutes before the last round's newest item (at most 60 pages, a guard against a looping API), so even an overnight gap closes in one round. `max_items` in the config only sets how many a new source takes on its **first** round. That way even a busy Cailian (about 50 items an hour) leaves no gap.
+
+## Data flow
+```
+config → browse preflight → per source, try the channel chain (browse → agent_reach → http → jina; the first channel with ≥1 item wins)
+       → raw response to raw/YYYYMMDD/HH/<source>.<channel>.<ext>
+       → parse (adapter first, otherwise generic) → normalize (time confidence, dedup key, signals)
+       → continuity check; on a gap, page back or search
+       → articles (merged) + observations (rank and heat this round) + signal_availability + continuity / coverage_gaps / source_cursors
+       → classify → cluster and score events → fetch bodies for top events → digest → (cycle) pick pushes, write the message
+       → raw retention (gzip after a day, delete after the retention period)
+```
+
+## Continuity
+| Source kind | Check | On a gap |
+|---|---|---|
+| Stream (`continuity: "stream"`; default for rss / json_api / cls_api) | One of the previous round's 50 newest items appears → connected; otherwise the oldest trusted time ≤ the previous newest trusted time → connected by time; id_walk sources check whether ids connect | Page back per `paging`: `param` (page number), `cursor` (API cursor), `id_walk` (detail pages by id), `native` (the source script pages back by time, as for 财联社); still a gap and `backfill` not off → Exa search (at most 3 sources per round) |
+| Snapshot (`continuity: "snapshot"`; default for list pages) | Curated front pages, not checked | — |
+
+Each source looks back from its last success plus 15 minutes (1–48 hours); 财联社 sizes its paging from that. In `cycle` mode, 6 hours or more since the last cycle, or before 08:00, is overnight mode: item and page limits ×4.
+Statuses `first` / `connected` / `connected_time` / `gap_filled` / `gap_partial` / `gap_open` / `snapshot` / `failed` go to `continuity`; gaps and recovered counts to `coverage_gaps`. A checkpoint advances only after the source succeeds, so a failed period is covered by the next round.
+
+## Topics
+`taxonomy.json`: `labels` (two-level tree; leaves have keywords / patterns / exclude), `category_defaults` (source category → default label), `regions` (code → words), `entities` (cross-language aliases; `weak` ones do not count as evidence), `watch` (watch words, event +5), `mute` (mute words, event importance 0).
+Chinese keywords match as substrings; English ones as whole words, case-insensitive, with s/es/ed/ing endings for longer words; all-caps abbreviations of up to 4 characters are case-sensitive. A title hit scores 2, a summary hit 1; 2 or more adds the label (confidence score/4); with no hit, the source category's default label (0.3) is used. Labels and regions go to `article_labels` (regions as `region:XX`) with `rules_version`. Event labels use rule labels only.
+
+## Event clustering and cross-validation
+- Each round assigns this round's items to events of the last 48 hours (candidates recalled through an inverted index) or starts a new event. Navigation-like short titles (English under 4 words, Chinese under 6 characters) are skipped.
+- Merge: same-language title bigram similarity ≥0.5, or ≥0.3 with a matching key number (amounts convert across Chinese and English, plus percentages and casualty counts), within 6 hours. Different numbers for the same counting unit (件, 家, 台, 亿元…) mean two stories unless the titles are nearly identical (casualty counts and percentages are exempt; they go to the dispute check). Across languages: two or more specific shared entities plus a matching number (or three entities), within 6 hours.
+- Importance 0–100 = independent outlets (one per group, reposting or aggregating sources count half; 1→10, 2→30, 3→40, 4→46, 5+→50) + source weights (≤10) + home and abroad 10 + authoritative source 5 + source heat (highest member heat ×0.5, ≤25) + three outlets within an hour 5 + seen in 3+ rounds 5 + watch words 5; mute words set it to 0. Factors are stored in `events.factors`.
+- Credibility: single / corroborated (2+ independent outlets) / confirmed (includes a source with tier=primary and weight ≥0.9) / disputed (two or more outlets each give one different casualty count or percentage; amounts are not compared, since totals and parts are often both right).
+- Display title: the shortest Chinese member title when there is one, otherwise the lead article's title; the lead prefers primary sources, then the highest heat, then the earliest.
+- Reprocessing records each event in the round its first member was first seen (the timeline depends on it).
+
+## Push selection
+Events touched this round whose first report is within the look-back window: multi-source (corroborated / confirmed / disputed) with importance ≥ `min_corroborated` (50), single-source ≥ `min_single` (36, which in practice needs level A or two strong signals such as level B plus top-15% views). A pushed event is pushed again only when its credibility is upgraded or its importance rises by ≥ `upgrade_jump` (20), marked ↑. At most `max` (8) per round, by importance.
+
+## Bodies
+Events with importance ≥50 this round, up to 2 members per event (primary sources first), `--body-budget` per round (default 12). Paywalled sources, `body: "list"` sources (news flashes whose list text is the full text, training-ready from 60 characters), `body: "none"` sources, and sources whose body fetches failed 3+ times in 7 days without success are skipped.
+Extraction: plain request → JSON-LD `articleBody` → the longest body field in Next.js `__NEXT_DATA__` → page paragraphs (inside `<article>` when present, without navigation and boilerplate); when the request is refused (401/403) and browse is available, the real browser reads the article; the reader (Jina) last. Verification pages are never taken as bodies or bypassed; they are recorded as `bot_blocked`. Results go to `article_bodies`, and fill `articles.content` and `training_ready` when longer than what was there.
+
+## Dataset export
+`--mode export --from YYYY-MM-DD [--to …] [--kind all|articles|events] [--pack core]` writes `dataDir/datasets/dataset-<from>_<to>-<time>/`: `articles.jsonl` (with every round's observations), `events.jsonl` (members, score trail, pushes), `manifest.json` (dataset schema `dsh-newswire-dataset/1`, range, sources, versions, runs, open gaps and failed source-rounds). Bodies are given only when `training_ready=1`; otherwise `content_withheld` is `paywall` or `too_short`.
+
+## Topic packs
+Sources carry `pack`; `sources.json` holds `packs.<pack>` (name, message title, default schedule) and `push.<pack>` (thresholds, optional `require_labels`). `--packs <pack>` runs one pack; the round is recorded with that pack (`runs.pack`), and the overnight check and look-back use only that pack's previous cycle. Overnight means before 10:00 local time and 6 hours or more since the pack's last cycle (or its first cycle). `--lock-wait-ms` makes a round wait for the lock instead of giving up (the plugin waits up to 15 minutes), so two packs' scheduled rounds that meet run one after the other.
+
+## Times from links
+When a source gives no time, the link is checked: a full timestamp (`/2026101415255489242/`) counts as `page_text`; a date only (`t20261107_`, `/20261029/`, `/2026/11-08/`) is stored as `url_date` (Beijing midnight) for display and datasets, but continuity and clustering treat it as untrusted. Time confidence only rises on merge: fetched < url_date < page_text < feed. Push selection skips events whose lead article's time (including a link date) is more than a day before the look-back window, so a new source's old list items are not pushed.
+
+## Data model (schema v21)
+| Table | Contents |
+|---|---|
+| `sources` | Source config snapshot (with weight / tier / grp / pack / adapter / removed_at) |
+| `runs` | Each round: start and end, mode, pack, sources ok and failed, new and duplicate items |
+| `articles` | Deduplicated articles. Key `id = sha1(canonical_url + normalized title)`; `time_confidence` = feed (time from the source) / page_text (inferred from page text or a timestamp in the link) / url_date (date only, from the link) / fetched (approximated by fetch time; `published_at` is NULL); `parser_version`; `pack` |
+| `observations` | **Every item, every round**: `rank`, `section`, `views/comments/likes/shares/favorites`, `hot` (JSON array, as the source wrote it), `level`, `signals_raw`. An item seen in several rounds forms a heat series |
+| `signal_availability` | Which signals each source has actually provided, how often, and when last |
+| `fetch_attempts` | Every channel attempt: channel, backend, ok, http_status, items, latency_ms, error_kind, error (scrubbed of local paths), hint, note |
+| `source_cursors` | Checkpoint per source: last_ok_at, head_keys (dedup keys of the newest 50), head_time / tail_time (trusted time range), max_id (id_walk) |
+| `continuity` | Continuity status per round and source, overlap, pages, recovered items, gap range |
+| `coverage_gaps` | Gaps and recovery (backfilled / partial / open; by paging or agent_reach_search) |
+| `article_labels` | Item labels and regions (label, confidence, origin, rules_version) |
+| `events` | Events: title, lead article, first and last seen, members, independent outlets, outlets, home/abroad mix, importance, credibility, labels, regions, entities, score factors, dispute, round of birth; `llm_notes`: the model's explanation (summary / why / watch, model, time, member count when written, prompt version) |
+| `event_members` | Event members (an item belongs to at most one event): similarity and how it joined (seed / title / title+number / entity) |
+| `event_scores` | Event score trail per round |
+| `pushes` | Pushes: event_id, lead article, importance and credibility at the time, reason (new / upgraded / jumped) |
+| `article_bodies` | Bodies: text, length, extractor (json-ld / next-data / paragraphs / browse / reader), channel, paywalled, success and error |
+| `briefings` | Model briefings (v8): pack, round, time, model, look-back hours, headline, content (points / watch, each with event_ids), events considered, success and error, duration. Failures get a row too |
+| `editions` | Editions (v9): pack, round, time, mode (llm / rules), model, layout version, period, items read, headline, full content (front page, sections, stories, worth watching, to verify), error, duration, calls |
+| `edition_items` | Where each item landed in an edition: story, rule event, section, topics, importance (the model's judgment in LLM mode) |
+| `stories` | Storylines (v10): stories that persist across editions — title, section, topics, importance, status (active / merged and into which), the model's copy (with the item count when written, to decide reuse), first and last edition |
+| `story_items` | Which storyline each item belongs to (one per item), its rule event, when it joined |
+| `story_updates` | Storyline developments (v11): edition, time, text, reports added, written by model or program |
+| `kv` | Simple state such as the last viewing time per pack (`seen:<pack>`) |
+| `digests` | Daily digests (v12): pack, date, mode, model, headline, full content (arcs, tomorrow, numbers), duration, calls |
+| `feedback` | Reader feedback: a wrong sentence (error), a misplaced report, "this is an ad" (promo) and "this is news" (not_promo), with storyline, edition, note, and when it was handled |
+
+Content-quality columns on `articles` (v13): `kind` = news / promo (ads, paid-column teasers, marketing) / digest (a roundup; once split it no longer takes part) / digest_item (one item split from a roundup, `parent_id` points to it); `kind_by` = rule / llm / reader (a reader's call is never overridden by rules or the model); `kind_note` names the rule or the roundup; `completeness` = full / truncated / title_only; `kind` can also be ticker (a single market move, shown in the edition's Markets box, never its own story or event). v16: `title_zh` is the Chinese title of a foreign-language item (translated and checked by the model in LLM mode; clustering compares it and the panel shows it); `link_to` is the model's "same story" call, pointing at the first report of that event; clustering follows it, including on reprocess. Noise rules live under `noise` in `taxonomy.json` (`source` / `title` / `text` / `all` regexes); run `--mode reprocess` after editing them.
+| `articles_fts` | FTS5 full-text index (trigram; Chinese from 3 characters; shorter queries fall back to LIKE) |
+
+Merging: when a dedup key appears again, the longer summary and body win; the publish time is upgraded only from fetched to a trusted time; the first-seen time never changes. The timeline has dedicated indexes; the first screen of any day loads in about 1 ms.
+
+## Heat signals
+Only values the source actually gives; missing values are NULL (not 0). Per source (checked 2026-11-08):
+
+| Source | Signals |
+|---|---|
+| 财联社电报 | level (A/B/C), views, shares, comments |
+| 华尔街见闻 | level (score, 2 = important), comments |
+| 深潮 TechFlow | views, shares, favorites, hot (热门 / 推送 / 日推荐) |
+| 界面快讯 | hot (a-item-red → 加红), rank |
+| 澎湃首页 | likes (praiseTimes), comments (interactionNum), section (头图 / 要闻 / 频道) |
+| AP | hot (Most Read #n / Most commented #n), comments (most commented list), section |
+| Other RSS / list pages | rank only |
+
+## Site adapters
+`adapters/<id>.mjs` exports `{ id, browseMode: "html", waitFor, parse(html, { url, max }) }`. The browse channel reads the rendered page in `html` mode (waiting up to 15 seconds for the `waitFor` selector); the http channel passes the response body to the same `parse`.
+To add one: write the module → register it in `adapters/index.mjs` → save a snapshot as `tests/fixtures/<id>.html.gz` → add assertions to `tests/unit/adapters.test.mjs`.
+
+## CLI
+```bash
+# One round (external command paths are detected when not given)
+node engine/run.mjs --config ~/.dsh/newswire/sources.json --db ~/.dsh/newswire/news.sqlite \
+  --out ~/.dsh/newswire/out --raw ~/.dsh/newswire/raw --since-hours 24 --export jsonl,csv \
+  [--sources a,b] [--categories x] [--packs core] [--max-items N] [--body-budget 12] [--raw-retention-days 180]
+
+# Full round for the scheduled task: last stdout line NEWSWIRE_JSON { message, parts, stats, picks, continuity }; --dry-run records no pushes; --defer-push proposes candidates without recording them (in LLM mode the plugin decides from the edition)
+node engine/run.mjs --mode cycle --config ~/.dsh/newswire/sources.json --db ~/.dsh/newswire/news.sqlite \
+  --out ~/.dsh/newswire/out --raw ~/.dsh/newswire/raw [--overnight] [--min-corroborated 50] [--min-single 36] [--max-push 8] [--dry-run] [--defer-push]
+
+# Recompute after editing taxonomy.json or source body modes (default last 72 hours; stage=labels for labels only)
+node engine/run.mjs --mode reprocess --config ~/.dsh/newswire/sources.json --db ~/.dsh/newswire/news.sqlite --hours 72
+
+# Export a dataset
+node engine/run.mjs --mode export --config ~/.dsh/newswire/sources.json --db ~/.dsh/newswire/news.sqlite --from 2026-11-01 --to 2026-11-07
+
+# Trial fetch (nothing stored): a configured source or a new one in a JSON file; last stdout line NEWSWIRE_JSON {...}
+node engine/run.mjs --mode test-source --config ~/.dsh/newswire/sources.json --source jiemian --max-items 5
+node engine/run.mjs --mode test-source --source-file ./new-source.json
+```
+
+## Failure classes
+browser_unavailable, channel_unavailable (agent-reach not installed), dns, connection_reset, timeout, tls, http_404, rate_limited, bot_blocked, paywall, parse_error, unknown. Each comes with a hint.
+
+## Known limits
+- agent-reach's page backend is currently Jina Reader (mcporter has no web-reader configured), which gives no times or heat.
+- AP refuses plain requests (403) and can only be fetched through browse; Jina is refused too. Reuters bodies need a login and are treated as paywalled.
+- Slow list pages (such as Reuters) set `wait_for` to a selector that browse waits for before reading (up to 15 seconds).

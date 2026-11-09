@@ -1,0 +1,7 @@
+{
+  "kinds.accuracy": 100,
+  "digests.accuracy": 100,
+  "terms.accuracy": 100,
+  "cluster_rules.precision": 100,
+  "cluster_rules.recall": 3.8
+}

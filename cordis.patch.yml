@@ -1,0 +1,10 @@
+# dsh-newswire：新闻抓取。Host 半边注册 newswire_* 工具与 /api/newswire/* 面板路由，以及一段说明通道与口径的 systemPrompt。
+# 抓取引擎随包在 engine/；产物（sources.json / news.sqlite / raw / out）写到 config.dataDir。
+# browse / agent-reach / mcporter 的路径留空即自动探测（PATH 与常见安装位置）；装在别处时在插件设置里填。
+- insert:
+    - id: dsh-newswire
+      name: 'dsh-newswire'
+      config:
+        windowHours: 24
+        browseSession: 'news-ingest'
+        timeoutMs: 600000

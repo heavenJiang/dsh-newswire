@@ -1,0 +1,771 @@
+{
+  "version": 6,
+  "timezone": "Asia/Shanghai",
+  "defaults": {
+    "channels": [
+      "browse",
+      "agent_reach",
+      "http"
+    ],
+    "timeout_ms": 30000,
+    "max_items": 20,
+    "retries_per_channel": 1,
+    "backoff_ms": 800,
+    "fetch_content": false,
+    "min_text_len": 200
+  },
+  "packs": {
+    "core": {
+      "name": "核心：财经·时政·国际·科技",
+      "title": "要闻",
+      "enabled": true,
+      "schedule": {
+        "cron": "0 7-21/2 * * *",
+        "time_zone": "Asia/Shanghai"
+      }
+    },
+    "study_abroad": {
+      "name": "留学资讯",
+      "title": "留学资讯",
+      "enabled": true,
+      "schedule": {
+        "cron": "30 8,20 * * *",
+        "time_zone": "Asia/Shanghai"
+      }
+    }
+  },
+  "push": {
+    "core": {
+      "min_corroborated": 50,
+      "min_single": 36,
+      "max": 8,
+      "upgrade_jump": 20
+    },
+    "study_abroad": {
+      "min_corroborated": 40,
+      "min_single": 15,
+      "max": 8,
+      "upgrade_jump": 20,
+      "require_labels": [
+        "study"
+      ]
+    }
+  },
+  "categories": [
+    "国内时政",
+    "国内财经与公告",
+    "国际宏观",
+    "科技与AI",
+    "市场与交易",
+    "留学与签证"
+  ],
+  "sources": [
+    {
+      "id": "cls_telegraph",
+      "name": "财联社电报",
+      "category": "国内财经与公告",
+      "region": "CN",
+      "lang": "zh",
+      "type": "cls_api",
+      "url": "https://www.cls.cn/telegraph",
+      "channels": [
+        "browse"
+      ],
+      "max_items": 60,
+      "note": "签名接口 v1/roll/get_roll_list，翻页按 last_time；信号：level(A/B/C)、阅读、分享、评论",
+      "weight": 0.85,
+      "tier": "primary",
+      "group": "cls",
+      "pack": "core",
+      "paging": {
+        "mode": "native"
+      },
+      "body": "list"
+    },
+    {
+      "id": "gov_cn",
+      "name": "中国政府网·最新政策",
+      "category": "国内时政",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://www.gov.cn/zhengce/zuixin/",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 1.0,
+      "tier": "primary",
+      "group": "gov_cn",
+      "pack": "core",
+      "continuity": "stream"
+    },
+    {
+      "id": "xinhua_politics",
+      "name": "新华网·时政",
+      "category": "国内时政",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://www.news.cn/politics/",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.95,
+      "tier": "primary",
+      "group": "xinhua",
+      "pack": "core",
+      "continuity": "snapshot",
+      "backfill": false
+    },
+    {
+      "id": "chinanews_scroll",
+      "name": "中新网·滚动",
+      "category": "国内时政",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://www.chinanews.com.cn/scroll/news.shtml",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.85,
+      "tier": "primary",
+      "group": "chinanews",
+      "pack": "core",
+      "continuity": "stream",
+      "trial": true
+    },
+    {
+      "id": "yicai",
+      "name": "第一财经",
+      "category": "国内财经与公告",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://www.yicai.com/news/",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.85,
+      "tier": "primary",
+      "group": "yicai",
+      "pack": "core",
+      "continuity": "stream",
+      "trial": true
+    },
+    {
+      "id": "stcn",
+      "name": "证券时报网",
+      "category": "国内财经与公告",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://www.stcn.com/article/list/a_stock.html",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.8,
+      "tier": "primary",
+      "group": "stcn",
+      "pack": "core",
+      "continuity": "stream",
+      "trial": true
+    },
+    {
+      "id": "caixin",
+      "name": "财新网",
+      "category": "国内财经与公告",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://www.caixin.com/",
+      "channels": [
+        "browse",
+        "http",
+        "jina"
+      ],
+      "paywall": true,
+      "note": "正文多有订阅墙",
+      "weight": 0.9,
+      "tier": "primary",
+      "group": "caixin",
+      "pack": "core",
+      "continuity": "snapshot",
+      "backfill": false,
+      "body": "none",
+      "trial": true
+    },
+    {
+      "id": "bbc_world",
+      "name": "BBC World",
+      "category": "国际宏观",
+      "region": "UK",
+      "lang": "en",
+      "type": "rss",
+      "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.9,
+      "tier": "primary",
+      "group": "bbc",
+      "pack": "core"
+    },
+    {
+      "id": "nyt_world",
+      "name": "NYT World",
+      "category": "国际宏观",
+      "region": "US",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.85,
+      "tier": "primary",
+      "group": "nyt",
+      "pack": "core",
+      "trial": true
+    },
+    {
+      "id": "guardian_world",
+      "name": "Guardian World",
+      "category": "国际宏观",
+      "region": "UK",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://www.theguardian.com/world/rss",
+      "channels": [
+        "http",
+        "browse"
+      ],
+      "weight": 0.8,
+      "tier": "primary",
+      "group": "guardian",
+      "pack": "core",
+      "trial": true
+    },
+    {
+      "id": "ft_home",
+      "name": "FT Home",
+      "category": "国际宏观",
+      "region": "UK",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://www.ft.com/rss/home",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.9,
+      "tier": "primary",
+      "group": "ft",
+      "pack": "core"
+    },
+    {
+      "id": "dj_world",
+      "name": "Dow Jones World (WSJ feed)",
+      "category": "国际宏观",
+      "region": "US",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://feeds.a.dj.com/rss/RSSWorldNews.xml",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.9,
+      "tier": "primary",
+      "group": "dowjones",
+      "pack": "core",
+      "trial": true
+    },
+    {
+      "id": "aljazeera",
+      "name": "Al Jazeera",
+      "category": "国际宏观",
+      "region": "QA",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://www.aljazeera.com/xml/rss/all.xml",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.75,
+      "tier": "primary",
+      "group": "aljazeera",
+      "pack": "core",
+      "trial": true
+    },
+    {
+      "id": "dw_chinese",
+      "name": "DW 中文",
+      "category": "国际宏观",
+      "region": "DE",
+      "lang": "zh",
+      "type": "rss",
+      "url": "https://rss.dw.com/rdf/rss-chi-all",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.8,
+      "tier": "primary",
+      "group": "dw",
+      "pack": "core",
+      "enabled": false
+    },
+    {
+      "id": "scmp",
+      "name": "南华早报",
+      "category": "国际宏观",
+      "region": "HK",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://www.scmp.com/rss/91/feed",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.75,
+      "tier": "primary",
+      "group": "scmp",
+      "pack": "core",
+      "trial": true
+    },
+    {
+      "id": "reuters",
+      "name": "Reuters",
+      "category": "国际宏观",
+      "region": "INTL",
+      "lang": "en",
+      "type": "html_index",
+      "url": "https://www.reuters.com/world/",
+      "channels": [
+        "browse",
+        "agent_reach",
+        "http"
+      ],
+      "note": "预期：直取与浏览器均可能被判为反爬，作为失败样本；页面加载慢，wait_for 等文章链接出现",
+      "weight": 0.95,
+      "tier": "primary",
+      "group": "reuters",
+      "pack": "core",
+      "wait_for": "a[data-testid=\"Heading\"], a[href*=\"/world/\"][href$=\"/\"]",
+      "continuity": "snapshot",
+      "backfill": false
+    },
+    {
+      "id": "wallstreetcn",
+      "name": "华尔街见闻·快讯",
+      "category": "市场与交易",
+      "region": "CN",
+      "lang": "zh",
+      "type": "json_api",
+      "url": "https://api-one-wscn.awtmt.com/apiv1/content/lives?channel=global-channel&limit=40",
+      "channels": [
+        "http",
+        "agent_reach",
+        "jina"
+      ],
+      "max_items": 40,
+      "json": {
+        "list": "data.items",
+        "title": "title",
+        "link": "uri",
+        "time": "display_time",
+        "summary": "content",
+        "likes": "likes_count",
+        "signals": {
+          "level": "score",
+          "comments": "comment_count"
+        }
+      },
+      "note": "API 型源：直取 + agent-reach/jina 降级；score=2 为源头标记的重要快讯（记为 level）",
+      "url_include": "/(livenews|articles)/",
+      "url_exclude": "(illegal-information|/authors/|/topics/|/ads?/)",
+      "weight": 0.75,
+      "tier": "secondary",
+      "group": "wallstreetcn",
+      "pack": "core",
+      "paging": {
+        "mode": "cursor",
+        "param": "cursor",
+        "next": "data.next_cursor",
+        "max_pages": 4
+      },
+      "body": "list"
+    },
+    {
+      "id": "guancha_science",
+      "name": "观察者网·科技",
+      "category": "科技与AI",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://www.guancha.cn/science",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.6,
+      "tier": "secondary",
+      "group": "guancha",
+      "pack": "core",
+      "continuity": "snapshot",
+      "backfill": false,
+      "trial": true
+    },
+    {
+      "id": "36kr_newsflashes",
+      "name": "36氪·快讯",
+      "category": "科技与AI",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://36kr.com/newsflashes",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "weight": 0.65,
+      "tier": "secondary",
+      "group": "36kr",
+      "pack": "core",
+      "continuity": "stream",
+      "body": "list"
+    },
+    {
+      "id": "techflow",
+      "name": "深潮 TechFlow·快讯",
+      "category": "市场与交易",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "adapter": "techflow",
+      "url": "https://www.techflowpost.com/newsletter/index.html",
+      "channels": [
+        "browse",
+        "http",
+        "agent_reach"
+      ],
+      "max_items": 40,
+      "weight": 0.6,
+      "tier": "secondary",
+      "group": "techflow",
+      "pack": "core",
+      "note": "适配器解析 Next.js 数据；信号：阅读/分享/收藏、热门/推送/日推荐。页面只直出约 9 条，缺口时按快讯 id 逐条取详情页补回",
+      "continuity": "stream",
+      "paging": {
+        "mode": "id_walk",
+        "template": "https://www.techflowpost.com/newsletter/{id}",
+        "id_pattern": "/newsletter/(\\d+)",
+        "max_steps": 40
+      },
+      "body": "list",
+      "trial": true
+    },
+    {
+      "id": "jiemian",
+      "name": "界面新闻·快讯",
+      "category": "国内财经与公告",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "adapter": "jiemian",
+      "url": "https://www.jiemian.com/lists/4.html",
+      "channels": [
+        "browse",
+        "http",
+        "agent_reach"
+      ],
+      "max_items": 40,
+      "weight": 0.8,
+      "tier": "primary",
+      "group": "jiemian",
+      "pack": "core",
+      "note": "适配器解析快讯列表（data-time 秒级时间戳）；信号：位置、加红",
+      "continuity": "stream",
+      "paging": {
+        "mode": "param",
+        "param": "page",
+        "start": 2,
+        "max_pages": 4
+      },
+      "body": "list"
+    },
+    {
+      "id": "thepaper",
+      "name": "澎湃新闻·首页",
+      "category": "国内时政",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "adapter": "thepaper",
+      "url": "https://www.thepaper.cn/",
+      "channels": [
+        "browse",
+        "http",
+        "agent_reach"
+      ],
+      "max_items": 60,
+      "weight": 0.8,
+      "tier": "primary",
+      "group": "thepaper",
+      "pack": "core",
+      "note": "适配器解析 __NEXT_DATA__ 推荐位；信号：点赞、互动数、区块（头图/要闻/频道）",
+      "continuity": "snapshot",
+      "backfill": false
+    },
+    {
+      "id": "apnews_world",
+      "name": "美联社·World",
+      "category": "国际宏观",
+      "region": "US",
+      "lang": "en",
+      "type": "html_index",
+      "adapter": "apnews",
+      "url": "https://apnews.com/world-news",
+      "channels": [
+        "browse",
+        "agent_reach"
+      ],
+      "max_items": 40,
+      "weight": 0.95,
+      "tier": "primary",
+      "group": "apnews",
+      "pack": "core",
+      "note": "直取 403，需 browse；信号：Most Read 排名、Most commented 评论数、区块",
+      "continuity": "snapshot",
+      "backfill": false,
+      "timeout_ms": 60000,
+      "trial": true
+    },
+    {
+      "id": "apnews_business",
+      "name": "美联社·Business",
+      "category": "市场与交易",
+      "region": "US",
+      "lang": "en",
+      "type": "html_index",
+      "adapter": "apnews",
+      "url": "https://apnews.com/business",
+      "channels": [
+        "browse",
+        "agent_reach"
+      ],
+      "max_items": 40,
+      "weight": 0.95,
+      "tier": "primary",
+      "group": "apnews",
+      "pack": "core",
+      "note": "同 apnews_world",
+      "continuity": "snapshot",
+      "backfill": false,
+      "timeout_ms": 60000,
+      "trial": true
+    },
+    {
+      "id": "cscse_notice",
+      "name": "教育部留学服务中心·通知公告",
+      "category": "留学与签证",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://www.cscse.edu.cn/cscse/sy/tzgg/index.html",
+      "channels": [
+        "browse",
+        "agent_reach"
+      ],
+      "max_items": 30,
+      "weight": 0.95,
+      "tier": "primary",
+      "group": "cscse",
+      "pack": "study_abroad",
+      "continuity": "stream",
+      "url_include": "/cscse/sy/tzgg/\\d+",
+      "note": "站点用旧式 TLS 重协商，Node 直接请求被拒，走浏览器；链接带完整时间戳",
+      "body": "fetch"
+    },
+    {
+      "id": "cscse_news",
+      "name": "教育部留学服务中心·新闻动态",
+      "category": "留学与签证",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://www.cscse.edu.cn/cscse/sy/xwdt/index.html",
+      "channels": [
+        "browse",
+        "agent_reach"
+      ],
+      "max_items": 30,
+      "weight": 0.95,
+      "tier": "primary",
+      "group": "cscse",
+      "pack": "study_abroad",
+      "continuity": "stream",
+      "url_include": "/cscse/sy/xwdt/\\d+",
+      "note": "站点用旧式 TLS 重协商，Node 直接请求被拒，走浏览器；链接带完整时间戳",
+      "body": "fetch"
+    },
+    {
+      "id": "moe_news",
+      "name": "教育部·工作动态",
+      "category": "留学与签证",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "http://www.moe.gov.cn/jyb_xwfb/gzdt_gzdt/",
+      "channels": [
+        "http",
+        "browse",
+        "agent_reach"
+      ],
+      "max_items": 30,
+      "weight": 1.0,
+      "tier": "primary",
+      "group": "moe",
+      "pack": "study_abroad",
+      "continuity": "stream",
+      "url_include": "/jyb_xwfb/gzdt_gzdt/.+/t\\d+_\\d+\\.html",
+      "note": "教育部工作动态，内容较杂，留学包推送只取带留学标签的事件；链接里有日期",
+      "body": "fetch"
+    },
+    {
+      "id": "csc_news",
+      "name": "国家留学基金委·新闻",
+      "category": "留学与签证",
+      "region": "CN",
+      "lang": "zh",
+      "type": "html_index",
+      "url": "https://www.csc.edu.cn/",
+      "channels": [
+        "browse",
+        "agent_reach"
+      ],
+      "max_items": 30,
+      "weight": 0.95,
+      "tier": "primary",
+      "group": "csc",
+      "pack": "study_abroad",
+      "continuity": "stream",
+      "note": "国家留学基金委首页新闻，直接请求返回 412，走浏览器",
+      "body": "fetch"
+    },
+    {
+      "id": "uk_ukvi",
+      "name": "GOV.UK·UK Visas and Immigration",
+      "category": "留学与签证",
+      "region": "UK",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://www.gov.uk/government/organisations/uk-visas-and-immigration.atom",
+      "channels": [
+        "http",
+        "agent_reach"
+      ],
+      "max_items": 30,
+      "weight": 1.0,
+      "tier": "primary",
+      "group": "ukvi",
+      "pack": "study_abroad",
+      "continuity": "stream",
+      "body": "fetch"
+    },
+    {
+      "id": "ca_ircc",
+      "name": "Canada·IRCC news",
+      "category": "留学与签证",
+      "region": "CA",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://api.io.canada.ca/io-server/gc/news/en/v2?dept=departmentofcitizenshipandimmigration&sort=publishedDate&orderBy=desc&pick=30&format=atom",
+      "channels": [
+        "http",
+        "agent_reach"
+      ],
+      "max_items": 30,
+      "weight": 1.0,
+      "tier": "primary",
+      "group": "ircc",
+      "pack": "study_abroad",
+      "continuity": "stream",
+      "body": "fetch"
+    },
+    {
+      "id": "us_uscis",
+      "name": "USCIS·News releases",
+      "category": "留学与签证",
+      "region": "US",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://www.uscis.gov/news/rss-feed/23269",
+      "channels": [
+        "http",
+        "agent_reach"
+      ],
+      "max_items": 30,
+      "weight": 1.0,
+      "tier": "primary",
+      "group": "uscis",
+      "pack": "study_abroad",
+      "continuity": "stream",
+      "note": "USCIS 新闻稿，混有执法类新闻，留学包推送只取带留学标签的事件",
+      "body": "fetch"
+    },
+    {
+      "id": "pie_news",
+      "name": "The PIE News",
+      "category": "留学与签证",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://thepienews.com/feed/",
+      "channels": [
+        "http",
+        "agent_reach"
+      ],
+      "max_items": 30,
+      "weight": 0.75,
+      "tier": "primary",
+      "group": "pie",
+      "pack": "study_abroad",
+      "continuity": "stream",
+      "note": "国际教育行业媒体，用于交叉印证",
+      "body": "fetch",
+      "trial": true
+    },
+    {
+      "id": "icef_monitor",
+      "name": "ICEF Monitor",
+      "category": "留学与签证",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://monitor.icef.com/feed/",
+      "channels": [
+        "http",
+        "agent_reach"
+      ],
+      "max_items": 30,
+      "weight": 0.7,
+      "tier": "primary",
+      "group": "icef",
+      "pack": "study_abroad",
+      "continuity": "stream",
+      "note": "国际教育行业媒体，用于交叉印证",
+      "body": "fetch",
+      "trial": true
+    }
+  ]
+}

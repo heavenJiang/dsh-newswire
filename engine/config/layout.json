@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "note": "版面版式：两种模式（模型 / 节省 token）都按这里排版。sections 的 id 对应 taxonomy.json 的一级分类，顺序即版面顺序，max 为该版块最多几篇；story 控制每篇的写法；style 是给模型的写作要求。改完在面板点「重新编排」即可看到效果。",
+  "window_hours": 12,
+  "min_importance": 25,
+  "front": { "count": 3 },
+  "sections": [
+    { "id": "politics", "max": 4 },
+    { "id": "macro", "max": 3 },
+    { "id": "markets", "max": 3 },
+    { "id": "industry", "max": 4 },
+    { "id": "tech", "max": 3 },
+    { "id": "study", "max": 4 },
+    { "id": "society", "max": 2 }
+  ],
+  "story": { "lead_chars": 120, "points": 3, "point_chars": 40, "views": 3, "impact_chars": 60 },
+  "watch": { "count": 3 },
+  "verify": { "count": 4, "min_importance": 30 },
+  "style": "客观、准确、简洁；用简体中文写，外文报道译成中文；数字、人名、机构名照录原文；不加评论性形容词；材料里没有的不写；各家说法不一致时如实并列。"
+}
