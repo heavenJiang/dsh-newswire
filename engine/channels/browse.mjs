@@ -186,6 +186,37 @@ const OUTLINE_BODY = [
   "});"
 ];
 
+// 模型读页面（「不限」档）：页面正文按阅读顺序给出，每个链接就地标号【n】，时间元素标成〈时间 …〉。
+// 模型只能用这些编号指链接，程序据此核对，模型编不出页面上没有的链接。
+const READ_BODY = [
+  "await new Promise((r) => setTimeout(r, 2500));",
+  "for (let i = 0; i < 3; i++) { try { await page.mouse.wheel(0, 2000); } catch (e) {} await new Promise((r) => setTimeout(r, 900)); }",
+  "const payload = await page.evaluate(() => {",
+  "  const SKIP = new Set(['SCRIPT','STYLE','SVG','NOSCRIPT','IFRAME','TEMPLATE','CANVAS','BUTTON','INPUT','FORM','SELECT','NAV','HEADER','FOOTER','ASIDE']);",
+  "  const root = document.querySelector('main, [role=main]') || document.body;",
+  "  const links = []; const times = []; const out = []; let size = 0; const LIMIT = 16000;",
+  "  const push = (t) => { if (size > LIMIT) return; out.push(t); size += t.length; };",
+  "  const BLOCK = /^(P|DIV|LI|ARTICLE|SECTION|H1|H2|H3|H4|H5|TR|DD|DT|BR)$/;",
+  "  const walk = (el) => {",
+  "    if (size > LIMIT) return;",
+  "    if (el.nodeType === 3) { const t = el.textContent.replace(/\\s+/g, ' '); if (t.trim()) push(t); return; }",
+  "    if (el.nodeType !== 1 || SKIP.has(el.tagName.toUpperCase())) return;",
+  "    const tag = el.tagName.toUpperCase();",
+  "    if (tag === 'TIME') { const iso = el.getAttribute('datetime') || ''; times.push(iso); push('〈时间 ' + (iso || el.innerText.trim()) + '〉'); return; }",
+  "    if (tag === 'A' && el.href && /^https?:/.test(el.href)) {",
+  "      const n = links.length + 1; links.push({ n, href: el.href.split('#')[0], text: (el.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 200) });",
+  "      push('【' + n + '】'); for (const c of el.childNodes) walk(c); return;",
+  "    }",
+  "    const blk = BLOCK.test(tag); if (blk) push('\\n');",
+  "    for (const c of el.childNodes) walk(c);",
+  "    if (blk) push('\\n');",
+  "  };",
+  "  walk(root);",
+  "  const text = out.join('').replace(/[ \\t]+\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').slice(0, LIMIT);",
+  "  return { items: [], text, links, times, truncated: size > LIMIT };",
+  "});"
+];
+
 // 站点适配器用：把渲染后的整页 HTML 交回 Node 侧，由 engine/adapters/<id>.mjs 解析（与 http 通道共用同一解析器）。
 const HTML_BODY = [
   "if (WAITFOR) { try { await page.waitForSelector(WAITFOR, { state: 'attached', timeout: 15000 }); } catch (e) {} } else { await new Promise((r) => setTimeout(r, 1200)); }",
@@ -222,7 +253,7 @@ const CLS_BODY = [
 export function renderJob(mode, url, max, opts) {
   const m = opts || {};
   const token = m.token || "x";
-  let body = mode === "rss" ? RSS_BODY : mode === "cls_api" ? CLS_BODY : mode === "article" ? ARTICLE_BODY : mode === "html" ? HTML_BODY : mode === "select" ? SELECT_BODY : mode === "outline" ? OUTLINE_BODY : INDEX_BODY;
+  let body = mode === "rss" ? RSS_BODY : mode === "cls_api" ? CLS_BODY : mode === "article" ? ARTICLE_BODY : mode === "html" ? HTML_BODY : mode === "select" ? SELECT_BODY : mode === "outline" ? OUTLINE_BODY : mode === "read" ? READ_BODY : INDEX_BODY;
   const pre = mode === "cls_api" ? [] : head(url);
   const fill = (l) => l.replaceAll("WAITFOR", JSON.stringify(m.waitFor || ""));
   if (mode === "select") body = body.map((l) => l.replaceAll("EXTRACT", JSON.stringify(m.extract || {})));

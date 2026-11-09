@@ -58,6 +58,15 @@ export async function fetchSource(src, env) {
   let parsedBy = "";
   let rawPath = "";
 
+  // 「不限」档：插件已让模型读过这个页面、程序核对过的条目，直接用；没有（模型没读或没读出来）才走通道
+  const pre = env.prefetched && env.prefetched[src.id];
+  if (pre && Array.isArray(pre.items) && pre.items.length) {
+    const full = { source_id: src.id, url: src.url, attempted_at: new Date().toISOString(), channel: "llm", ok: true, items: pre.items.length, latency_ms: pre.ms || 0, backend: pre.model || null, note: "model-read kept=" + pre.items.length + " dropped=" + (pre.dropped || 0) };
+    attempts.push(full);
+    if (env.onAttempt) env.onAttempt(full);
+    return { items: pre.items.slice(0, Math.max(max, pre.items.length)), won: "llm", parsed_by: "llm:read", raw_path: env.writeRaw(src.id + ".llm.json", JSON.stringify(pre, null, 1)), attempts };
+  }
+
   const record = (a) => {
     const full = Object.assign({ source_id: src.id, url: src.url, attempted_at: new Date().toISOString() }, a);
     attempts.push(full);

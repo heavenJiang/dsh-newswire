@@ -26,6 +26,7 @@ import { openIfExists, sinceIso, latestRun, recentRuns, countsByCategory, keywor
 import { readLock } from "./engine/lock.mjs";
 import { createModel, analyzeEvents } from "./host/model.mjs";
 import { cleanExtract, learnRecipe, judgeRecipe } from "./host/recipe.mjs";
+import { readSource, readTargets } from "./host/modelread.mjs";
 import { loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, storyDetail, sinceSeen, reassemble, scrubStory, qualityRows, editionById, editionList, tickerBoard, updateEditionContent, bodiesFor } from "./host/edition.mjs";
 import { buildDaily, saveDaily, latestDaily, dailyDates, composeDailyMessage, todayBj } from "./host/daily.mjs";
 import { recordPushes, DEFAULT_RULES } from "./engine/pipeline/select.mjs";
@@ -404,6 +405,12 @@ function engineJson(stdout) {
 
 function hhmmShanghai() { return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()); }
 
+/** 页面全文快照（模型读页面用）：链接就地标号，时间标出。 */
+async function pageRead(ctx, cfg, p, url, waitFor) {
+  const res = await runEngine(ctx, cfg, p, ["--mode", "read", "--config", p.cfgFile, "--url", url, ...(waitFor ? ["--wait-for", waitFor] : []), ...binFlags(cfg, "newswire-read")], 150000);
+  return engineJson(res.stdout) || { ok: false, error: "engine_" + res.stage };
+}
+
 /** 页面结构概要（给模型学解析规则）：用试抓的 browse 会话打开页面，返回骨架。 */
 async function pageOutline(ctx, cfg, p, url) {
   const res = await runEngine(ctx, cfg, p, ["--mode", "outline", "--config", p.cfgFile, "--url", url, ...binFlags(cfg, "newswire-test")], 150000);
@@ -723,12 +730,50 @@ export function apply(ctx, config) {
     const busy = busyWith();
     if (busy) return { ok: false, stage: "run_in_progress", tail: "已有一轮在跑：" + busy, run_id: busy };
     inflight.current = runId;
+    let pf = null;
     try {
       await ensureData(p);
-      return await runEngine(ctx, cfg, p, runFlags(p, cfg, Object.assign({}, args, { run_id: runId })));
+      pf = await modelReadPrefetch({ packs: args.packs, sources: args.sources, runId, budgetMs: args.read_budget_ms || 4 * 60000 });
+      return await runEngine(ctx, cfg, p, runFlags(p, cfg, Object.assign({}, args, { run_id: runId })).concat(pf ? ["--prefetched", pf.dir] : []));
     } finally {
       inflight.current = null;
+      if (pf) await rm(pf.dir, { recursive: true, force: true }).catch(() => {});
     }
+  }
+
+  /**
+   * 「不限」档：网页类的源先由模型读页面（程序核对过的条目存成 <dir>/<源 id>.json，引擎照常入库）。
+   * 有时间预算：读不完的源、读失败的源照常走程序解析。不是「不限」档、没有可用模型时返回 null。
+   */
+  async function modelReadPrefetch(o) {
+    if (!llmReady() || !depthParams(prefs()).modelRead || modelState.busy) return null;
+    const conf = await readConfigSources(p);
+    const targets = readTargets(conf.data.sources || [], { packs: o.packs, sources: o.sources });
+    if (!targets.length || !(o.budgetMs > 0)) return null;
+    const dir = path.join(p.tmp, "prefetch-" + o.runId);
+    await mkdir(dir, { recursive: true });
+    const t0 = Date.now();
+    const deadline = t0 + o.budgetMs;
+    const rs = { at: new Date().toISOString(), run_id: o.runId, targets: targets.length, read: 0, ok: 0, items: 0, dropped: 0, failed: [], skipped: 0, ms: 0, model: model.label() };
+    modelState.busy = "read";
+    try {
+      for (const src of targets) {
+        // 估一个源要多久（已读源的平均耗时，至少 40 秒）：来不及就留给程序
+        const per = rs.read ? Math.max(40000, (Date.now() - t0) / rs.read) : 40000;
+        if (Date.now() + per > deadline) { rs.skipped = targets.length - rs.read; break; }
+        rs.read++;
+        try {
+          const r = await readSource({ read: (u, w) => pageRead(ctx, cfg, p, u, w), model }, src, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
+          if (r.ok) { rs.ok++; rs.items += r.items.length; rs.dropped += r.dropped || 0; await writeFile(path.join(dir, src.id + ".json"), JSON.stringify({ items: r.items, dropped: r.dropped || 0, why: r.why || {}, ms: r.ms, model: model.label() })); }
+          else rs.failed.push(src.id + ":" + (r.error || "empty"));
+        } catch (err) { rs.failed.push(src.id + ":" + errText(err).slice(0, 60)); }
+      }
+    } finally {
+      modelState.busy = null;
+      rs.ms = Date.now() - t0;
+      modelState.read = rs;
+    }
+    return { dir, stat: rs };
   }
 
   const errText = (err) => String(err && err.message ? err.message : err).slice(0, 200);
@@ -741,7 +786,7 @@ export function apply(ctx, config) {
     const pr = prefs();
     return {
       mode: modeNow(), mode_from: pr.mode ? "panel" : "settings", service: Boolean(optional.llm), available: model.available(), ready: llmReady(), label: model.label(),
-      pinned: pr.provider && pr.model ? { provider: pr.provider, model: pr.model } : null, default: defaultSelection(), busy: modelState.busy, last: modelState.last,
+      pinned: pr.provider && pr.model ? { provider: pr.provider, model: pr.model } : null, default: defaultSelection(), busy: modelState.busy, last: modelState.last, read: modelState.read || null,
       depth: depthOf(pr), depths: Object.fromEntries(Object.entries(DEPTHS).map(([k, v]) => [k, v])), daily_tokens: Number(pr.daily_tokens) || 0,
       speed: Object.assign({ concurrency: pr.concurrency || null, probe: pr.probe || null }, model.profile()),
     };
@@ -1032,7 +1077,12 @@ export function apply(ctx, config) {
       await ensureData(p);
       // 两种模式都按版面推送（版面认得关注与屏蔽）：引擎只算规则候选、不记推送；版面编不出来时退回规则候选
       const wantLlm = modeNow() === "llm" && model.available();
-      const res = await runEngine(ctx, cfg, p, cycleFlags(p, cfg, Object.assign({}, args, { defer_push: !(args && args.dry_run === true) }), runId), Math.max(60000, Math.min(cfg.timeoutMs, left() - 120000)));
+      // 「不限」档：先让模型读网页类的源；给抓取、编排和发送留出时间（预编排已经读过一轮，这里只补到点前的变化）
+      const pf = await modelReadPrefetch({ packs: args && args.pack, runId, budgetMs: Math.min(5 * 60000, left() - 4 * 60000) });
+      let res;
+      try {
+        res = await runEngine(ctx, cfg, p, cycleFlags(p, cfg, Object.assign({}, args, { defer_push: !(args && args.dry_run === true) }), runId).concat(pf ? ["--prefetched", pf.dir] : []), Math.max(60000, Math.min(cfg.timeoutMs, left() - 120000)));
+      } finally { if (pf) await rm(pf.dir, { recursive: true, force: true }).catch(() => {}); }
       const out = engineJson(res.stdout);
       if (out && out.run_id) {
         const pack = out.pack || (args && args.pack) || "all";
@@ -1126,9 +1176,11 @@ export function apply(ctx, config) {
   function prewarmLeadMs() {
     const ms = (withDb(p, (db) => (db ? db.prepare("SELECT ms FROM editions WHERE mode = 'llm' AND ms IS NOT NULL ORDER BY id DESC LIMIT 5").all() : [])) || []).map((r) => r.ms).sort((a, b) => a - b);
     const typical = ms.length ? ms[Math.floor(ms.length / 2)] : 15 * 60000;
-    // 抓取约 2 分钟：模型在一轮预算里写得完就不用提前
-    if (typical + 3 * 60000 <= cfg.cycleBudgetMs) return 0;
-    return Math.min(45 * 60000, Math.max(8 * 60000, typical + 5 * 60000));
+    // 「不限」档还要先让模型读页面：按上一次读的实际耗时算进去
+    const reading = depthParams(prefs()).modelRead ? Math.min(25 * 60000, (modelState.read && modelState.read.ms) || 10 * 60000) : 0;
+    // 抓取约 2 分钟：模型在一轮预算里读得完、写得完就不用提前
+    if (typical + reading + 3 * 60000 <= cfg.cycleBudgetMs) return 0;
+    return Math.min(60 * 60000, Math.max(8 * 60000, typical + reading + 5 * 60000));
   }
   async function prewarmTick() {
     if (prewarm.running || !optional.schedule || !(modeNow() === "llm" && llmReady())) return;
@@ -1160,7 +1212,7 @@ export function apply(ctx, config) {
         if (!Number.isFinite(at) || until > lead || until < 4 * 60000 || prewarm.done.has(key)) continue;
         prewarm.done.set(key, at);
         const runId = newRunId("prep");
-        const res = await guardedRun({ packs: pack }, runId);
+        const res = await guardedRun({ packs: pack, read_budget_ms: Math.max(4 * 60000, until - 12 * 60000) }, runId);
         if (res.ok) await makeEdition({ pack, runId: res.run_id || runId, wantLlm: true });
         prewarm.tasksAt = 0;
         return;

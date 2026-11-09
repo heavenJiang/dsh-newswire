@@ -2,6 +2,7 @@
  * 模型运行时：和大模型深度结合，同时省 token。
  *
  * 模型投入（depth）：节省 / 均衡 / 深度——决定每份版面让模型读多少、写多少、自动分析几篇、译多少外文标题。
+ * 不限：在深度之上，网页类的源每轮都由模型直接读页面（见 host/modelread.mjs），不受每日 token 预算限制。
  * 速度自适应：并发数由实测决定（服务端真能并行就 3，本地单卡就 1）。
  * 账本：每次调用的步骤、耗时、输入 / 输出 / 缓存命中 token 都记下；可设每天的 token 预算，用完了模型步骤退回程序结果。
  */
@@ -9,6 +10,7 @@ export const DEPTHS = {
   lean: { maxItems: 100, maxStories: 8, autoAnalyze: 0, translate: 30, track: 1, label: "节省" },
   balanced: { maxItems: 150, maxStories: 16, autoAnalyze: 2, translate: 60, track: 2, label: "均衡" },
   deep: { maxItems: 220, maxStories: 24, autoAnalyze: 4, translate: 120, track: 4, label: "深度" },
+  full: { maxItems: 400, maxStories: 40, autoAnalyze: 8, translate: 300, track: 8, modelRead: true, unlimited: true, label: "不限" },
 };
 export const depthOf = (prefs) => (DEPTHS[prefs && prefs.depth] ? prefs.depth : "balanced");
 export const depthParams = (prefs) => DEPTHS[depthOf(prefs)];
@@ -36,8 +38,9 @@ export function usageToday(db) {
 export function makeGate(getDb, getPrefs) {
   let cache = { at: 0, total: 0 };
   return () => {
-    const limit = Number((getPrefs() || {}).daily_tokens) || 0;
-    if (!limit) return null;
+    const pr = getPrefs() || {};
+    const limit = Number(pr.daily_tokens) || 0;
+    if (!limit || (DEPTHS[pr.depth] && DEPTHS[pr.depth].unlimited)) return null;
     if (Date.now() - cache.at > 30000) {
       try { const db = getDb(); if (db) { cache = { at: Date.now(), total: usageToday(db).total }; db.close(); } } catch { /* 查不到就放行 */ }
     }

@@ -86,10 +86,19 @@ const now = new Date();
 const windowHours = Number(A["since-hours"] || A.window || 24);
 const hardMax = Number(A["max-items"] || 0);
 
+// 模型读页面得到的条目（「不限」档）：插件先读好，按源 id 存成 <dir>/<id>.json，这里照常走入库流程
+const PREFETCHED = (() => {
+  const dir = str(A.prefetched);
+  const out = {};
+  if (!dir) return out;
+  try { for (const f of fs.readdirSync(dir)) if (f.endsWith(".json")) { try { out[f.slice(0, -5)] = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); } catch (e) {} } } catch (e) {}
+  return out;
+})();
+
 function envFor(browse, writeRaw, onAttempt) {
   return {
     browse, windowHours, maxOverride: hardMax, retries: DEF.retries_per_channel || 1, backoffMs: DEF.backoff_ms || 800,
-    timeoutMs: DEF.timeout_ms || 30000, defaultChain: DEF.channels || DEFAULT_CHAIN, writeRaw, onAttempt,
+    timeoutMs: DEF.timeout_ms || 30000, defaultChain: DEF.channels || DEFAULT_CHAIN, writeRaw, onAttempt, prefetched: PREFETCHED,
   };
 }
 
@@ -101,6 +110,20 @@ async function preflight(sources) {
   return pre;
 }
 
+// ------------------------------------------------------------------ 页面全文快照（模型读页面用）
+if (MODE === "read") {
+  const url = str(A.url);
+  if (!url) { console.log("NEWSWIRE_JSON " + JSON.stringify({ ok: false, error: "url_required" })); process.exit(2); }
+  const pre = await preflight([Object.assign({}, DEF, { id: "read", url, channels: ["browse"] })]);
+  if (!pre.ok) { console.log("NEWSWIRE_JSON " + JSON.stringify({ ok: false, error: "browse_unavailable", reason: pre.reason || null })); process.exit(2); }
+  const res = await browseFetch("read", url, 1, { timeoutMs: 90000, waitFor: str(A["wait-for"]) || "" });
+  const d = (res && res.data) || {};
+  const v = (res && res.value) || {};
+  // 输出可能很大：等写完再退出，否则管道里会被截断
+  await new Promise((r) => process.stdout.write("NEWSWIRE_JSON " + JSON.stringify({ ok: Boolean(res.ok && d.text), url, page_url: v.page_url || null, title: v.doc_title || null, text: d.text || "", links: d.links || [], times: d.times || [], truncated: Boolean(d.truncated), error: res.ok ? null : res.error }) + "\n", r));
+  process.exit(res.ok ? 0 : 2);
+}
+
 // ------------------------------------------------------------------ 页面结构概要（给模型学解析规则用）
 if (MODE === "outline") {
   const url = str(A.url);
@@ -110,7 +133,8 @@ if (MODE === "outline") {
   const res = await browseFetch("outline", url, 1, { timeoutMs: 90000 });
   const d = (res && res.data) || {};
   const v = (res && res.value) || {};
-  console.log("NEWSWIRE_JSON " + JSON.stringify({ ok: Boolean(res.ok && d.outline), url, page_url: v.page_url || null, title: v.doc_title || null, outline: d.outline || "", truncated: Boolean(d.truncated), error: res.ok ? null : res.error }));
+  // 输出可能很大：等写完再退出，否则管道里会被截断
+  await new Promise((r) => process.stdout.write("NEWSWIRE_JSON " + JSON.stringify({ ok: Boolean(res.ok && d.outline), url, page_url: v.page_url || null, title: v.doc_title || null, outline: d.outline || "", truncated: Boolean(d.truncated), error: res.ok ? null : res.error }) + "\n", r));
   process.exit(res.ok ? 0 : 2);
 }
 

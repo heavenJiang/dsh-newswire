@@ -150,6 +150,9 @@ To add one: write the module → register it in `adapters/index.mjs` → save a 
 A source can carry `extract`: `{ item, link?, title?, time?, summary?, wait_for? }`, all CSS selectors. `item` selects each entry on the page and the rest are looked up inside it; entries without a separate headline (social posts) use the first line of their text. Sources with `extract` use browse's `select` mode (wait for `wait_for`, scroll three screens, then read).
 The rules are usually not hand-written: when the generic parser can't read a page, the plugin takes a page outline with `--mode outline --url <url>` (tags, a few classes, data-* attributes, link and time attributes, short text, at most three repeated siblings), has the model write selectors, and verifies them with a test fetch (at least 3 entries with distinct links and titles); if they fail, the model gets the results and tries once more. See `host/recipe.mjs`.
 
+## Model page reading (Unlimited)
+`--mode read --url <url>` takes a full-text snapshot of the page: text in reading order with each link numbered in place as 【n】 and time elements marked 〈时间 …〉, plus the link table and time list. The plugin has the model list `[title, link number, time]`, checks each entry (the number exists, the title is in the page text, the time comes from the page), saves them per source as `<dir>/<id>.json`, and passes `--prefetched <dir>` to fetch / cycle: sources with pre-read items use them (channel `llm`) and go through the usual ingest, dedup, continuity and event clustering; the others use their channels as usual. See `host/modelread.mjs`.
+
 ## CLI
 ```bash
 # One round (external command paths are detected when not given)

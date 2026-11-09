@@ -2,6 +2,15 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.2 (2026-11-09)
+
+- **Unlimited: the model reads every web page**:
+  - New "Unlimited" model effort on top of Deep: the model reads each web-page source directly every round, with no parsing rules, so site redesigns don't break anything.
+  - No invention: links reach the model as numbers and it can only point to them; titles and times are copied from the page and summaries are cut from the original text by the program; every item is checked and failures are dropped.
+  - No daily token budget applies. RSS, APIs and dedicated adapters stay with the program.
+  - Reading follows a time budget, and sources it can't reach or fails to read are fetched by the program as usual. Prewarming before scheduled pushes accounts for reading time.
+  - Runs → Model shows the latest reading: sources read, items found, items dropped by checks, and time taken.
+
 ## 1.1.1 (2026-11-09)
 
 - **Let the model learn a page**:
