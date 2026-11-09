@@ -156,7 +156,7 @@ Too many pushes? Say "push less" or "three times a day is enough" in chat, or ad
 | **Recap** | Daily digests, day by day |
 | **Follow & push** | Followed and muted keywords, topics and sources; push cadence, thresholds, daily cap, push history with useful / not useful |
 | Events · Timeline · Items | For digging deeper: filterable events with each outlet's report side by side, round-by-round history, every item with full-text search |
-| Sources · Runs | Each source's scorecard and on / trial / off; model, depth, usage, schedules, continuity and failures, version updates |
+| Sources · Runs | One-click add with a test fetch first, each source's scorecard and on / trial / off; model, depth, usage, schedules, continuity and failures, version updates |
 
 The panel follows the harness's light and dark themes and works at phone width.
 
@@ -172,6 +172,8 @@ The panel follows the harness's light and dark themes and works at phone width.
 | core | International | Reuters, AP World / Business, BBC, New York Times, The Guardian, FT, Dow Jones, Al Jazeera, DW Chinese, South China Morning Post |
 | study_abroad | China | CSCSE (notices, news), Ministry of Education, China Scholarship Council |
 | study_abroad | International | UK Visas and Immigration, IRCC Canada, USCIS, The PIE News, ICEF Monitor |
+
+**Want another source?** On the Sources tab, click "+ Add a source", enter a name and an RSS feed or news list page URL, test-fetch to see what comes back, then add it. Type (RSS or list page), region and id are worked out for you, and new sources start on trial.
 
 **Not sure a source is worth it?** The Sources tab gives each one a scorecard: front-page stories, first reports, exclusives, corroborations, share of low-value items, completeness and fetch success. It also recommends on, trial or off. A source on trial only corroborates others and never leads a story or a push on its own.
 
@@ -254,6 +256,7 @@ llmMaxItems: 150                # items the model reads per edition (overridden 
 llmStories: 16                  # stories written by the model
 llmBudgetMs: 1500000            # time budget per edition; remaining steps use rule results
 modelTimeoutMs: 180000          # timeout per model call
+cycleBudgetMs: 540000           # longest a scheduled push round may take (the harness waits at most 10 minutes for a tool call)
 browseBin: ''                   # empty = detect automatically; same for agentReachBin and mcporterBin
 ```
 
@@ -306,6 +309,7 @@ npm run preview -- --data <data dir>   # render the panel in a browser with real
 - Every cited item names its source and time. Financial analysis is model projection and **not investment advice**.
 - The model writes from headlines, summaries and fetched text, and can still be wrong. The panel says to check the original, and you can flag any sentence.
 - On a slow local model, the first full edition takes over ten minutes. A rule-built edition shows in the meantime, and stories are swapped in as they are written. Later rounds are incremental and usually take a few minutes. Hosted models run in parallel automatically and are much faster.
+- The harness waits at most 10 minutes for a tool call. With a slow model, the plugin **prepares the edition ahead of each scheduled push**, using how long recent editions actually took, so the push itself only adds the last few minutes. If time still runs short, it sends the edition the model has finished so far and keeps writing in the background for the next round.
 - AP can only be fetched through browse. Reuters article text needs a login and is skipped as paywalled. agent-reach's web backend returns no time or heat and is used only as a fallback.
 
 ## Data and privacy

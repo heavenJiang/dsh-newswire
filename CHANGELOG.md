@@ -2,6 +2,20 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.0 (2026-11-09)
+
+- **Scheduled pushes no longer time out**:
+  - The harness waits at most 10 minutes for a tool call, while a slow local model needs over ten minutes per edition, so pushes used to time out without model results.
+  - The plugin now prepares the edition ahead of each scheduled push, using how long recent editions actually took, so the push only adds the last few minutes.
+  - Each round has a time budget (`cycleBudgetMs`, 9 minutes by default). If time runs short, it sends the edition the model has finished so far and keeps writing in the background.
+  - Task prompts tell the agent to allow 10 minutes, and existing tasks are updated automatically.
+- **Add a source**: "+ Add a source" at the top of the Sources tab. Enter a name and URL, test-fetch to preview, then add it on trial. Type, region and id are worked out for you, and duplicate URLs are rejected.
+- **No more duplicate follows**: when you track a theme, its storylines show as one row under Following (e.g. "theme · AI与数据中心 · 6 storylines") and can be removed in one click.
+- **Look and feel**:
+  - A light page with content on cards, a masthead with a brand mark and stat chips, a marked top story, and a color for each section.
+  - Credibility as colored badges, a red dot on major stories, and the markets box colored by direction (up red, down green, as in Chinese markets) with arrows.
+  - Your follows in their own accented block; Tracking, Push and Sources pages use the full width.
+
 ## 1.0.0 (2026-11-09)
 
 First public release of 见微知著 (Newswire).

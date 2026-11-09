@@ -7,6 +7,8 @@
  *   topic    分类 id（如 study、macro.fx）  故事线的版块或标签等于它或以它开头
  *   source   源 id                          有这个源的报道（屏蔽时：这个源的新闻不进版面）
  *
+ * 追踪一条主线时，它挂上的每条故事线各记一项 story 关注，带 via="tracker:<id>"；面板把同一来源的合成一行显示。
+ *
  * 关注：版面里单列「我的关注」（不受上版门槛限制），推送门槛降到 min_follow，关注的故事线有新报道时再推一次。
  * 屏蔽：版面与推送里都不出现（屏蔽优先于关注）。
  */
@@ -27,7 +29,7 @@ export function normalizeFollows(raw) {
       const key = x.kind + ":" + value.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      out[list].push(Object.assign({ kind: x.kind, value }, typeof x.name === "string" && x.name.trim() ? { name: x.name.trim().slice(0, 80) } : {}, x.added_at ? { added_at: String(x.added_at) } : {}));
+      out[list].push(Object.assign({ kind: x.kind, value }, typeof x.name === "string" && x.name.trim() ? { name: x.name.trim().slice(0, 80) } : {}, typeof x.via === "string" && x.via ? { via: x.via.slice(0, 80) } : {}, x.added_at ? { added_at: String(x.added_at) } : {}));
     }
   }
   return out;
@@ -39,7 +41,7 @@ export function loadFollows(file) {
 }
 
 /** 增删一项。@returns 新的 follows */
-export function updateFollows(f, action, kind, value, name) {
+export function updateFollows(f, action, kind, value, name, via) {
   const cur = normalizeFollows(f);
   if (!KINDS.includes(kind) || typeof value !== "string" || !value.trim()) throw new Error("follow_invalid");
   const list = action === "follow" || action === "unfollow" ? "follow" : "mute";
@@ -47,7 +49,7 @@ export function updateFollows(f, action, kind, value, name) {
   const same = (x) => x.kind === kind && x.value.toLowerCase() === value.trim().toLowerCase();
   cur[list] = cur[list].filter((x) => !same(x));
   if (action === "follow" || action === "mute") {
-    cur[list].push(Object.assign({ kind, value: value.trim() }, name ? { name: String(name).slice(0, 80) } : {}, { added_at: new Date().toISOString() }));
+    cur[list].push(Object.assign({ kind, value: value.trim() }, name ? { name: String(name).slice(0, 80) } : {}, via ? { via: String(via).slice(0, 80) } : {}, { added_at: new Date().toISOString() }));
     cur[other] = cur[other].filter((x) => !same(x)); // 关注与屏蔽互斥
   }
   return cur;

@@ -59,6 +59,7 @@ const DEFAULTS = {
   llmStories: 16,
   llmBudgetMs: 1500000,
   modelTimeoutMs: 180000,
+  cycleBudgetMs: 540000,
 };
 
 export const Config = z.object({
@@ -79,6 +80,7 @@ export const Config = z.object({
   llmStories: z.number().min(3).max(40).step(1).default(DEFAULTS.llmStories),
   llmBudgetMs: z.number().min(60000).max(3600000).step(10000).default(DEFAULTS.llmBudgetMs),
   modelTimeoutMs: z.number().min(10000).max(600000).step(1000).default(DEFAULTS.modelTimeoutMs),
+  cycleBudgetMs: z.number().min(120000).max(3600000).step(10000).default(DEFAULTS.cycleBudgetMs),
 }).i18n({
   en: {
     engineDir: "Engine directory. Leave the default (the engine shipped in this package).",
@@ -98,6 +100,7 @@ export const Config = z.object({
     llmStories: "LLM mode: stories the model writes copy for per edition (front page and sections); the rest get program copy.",
     llmBudgetMs: "LLM mode: time budget for one edition, in milliseconds; steps past it fall back to rule results.",
     modelTimeoutMs: "Timeout for one model call, in milliseconds.",
+    cycleBudgetMs: "Longest a scheduled push round may take, in milliseconds. The harness stops a tool call after 10 minutes, so the default leaves a minute of margin. With a slow model the edition is prepared ahead of each scheduled push, and a round that runs out of time sends the edition the model has finished so far.",
   },
   zh: {
     engineDir: "抓取引擎目录。保持默认（本包自带的引擎）。",
@@ -117,6 +120,7 @@ export const Config = z.object({
     llmStories: "LLM 模式：每份版面由模型写稿的报道篇数（头版与各版块），其余用程序拼的稿。",
     llmBudgetMs: "LLM 模式：一份版面的时间预算（毫秒），超出后剩下的步骤用规则结果。",
     modelTimeoutMs: "单次模型调用的超时（毫秒）。",
+    cycleBudgetMs: "定时推送每轮最多用多久（毫秒）。宿主对一次工具调用最多等 10 分钟，默认留 1 分钟余量。模型慢时会在每次定时推送前提前编排；到点时间不够，就发模型已经写好的版面。",
   },
 });
 
@@ -143,11 +147,13 @@ function packSchedule(p, pack) {
 }
 
 const DAILY_CRON = "30 21 * * *";
+// 宿主 run_code 默认只等 2 分钟、最多 10 分钟；这两个工具会在 9 分钟内返回
+const SLOW_HINT = "这一步通常要几分钟：如果通过 run_code 调用，把 timeoutMs 设为 600000。";
 function dailyPrompt(pack) {
-  return "调用工具 newswire_daily（参数 pack=\"" + pack + "\"），把返回结果里 message 字段的文本原样作为你的回复：不要改写、不要补充、不要调用其他工具。工具报错时只回复一行错误原因。";
+  return "调用工具 newswire_daily（参数 pack=\"" + pack + "\"）。" + SLOW_HINT + "把返回结果里 message 字段的文本原样作为你的回复：不要改写、不要补充、不要调用其他工具。工具报错时只回复一行错误原因。";
 }
 function schedulePrompt(pack) {
-  return "调用工具 newswire_cycle（参数 pack=\"" + pack + "\"），把返回结果里 message 字段的文本原样作为你的回复：不要改写、不要补充、不要调用其他工具。工具报错时只回复一行错误原因。";
+  return "调用工具 newswire_cycle（参数 pack=\"" + pack + "\"）。" + SLOW_HINT + "把返回结果里 message 字段的文本原样作为你的回复：不要改写、不要补充、不要调用其他工具。工具报错时只回复一行错误原因。";
 }
 const CRED_TEXT = { single: "单源", corroborated: "已印证", confirmed: "权威确认", disputed: "存在分歧" };
 const CYCLE_WAIT_MS = 15 * 60000;
@@ -190,6 +196,7 @@ function settingsFrom(config) {
     llmStories: numSetting(raw, "llmStories", 3, 40),
     llmBudgetMs: numSetting(raw, "llmBudgetMs", 60000, 1500000),
     modelTimeoutMs: numSetting(raw, "modelTimeoutMs", 10000, 600000),
+    cycleBudgetMs: numSetting(raw, "cycleBudgetMs", 120000, 3600000),
   };
 }
 
@@ -560,6 +567,34 @@ async function upsertSourceInConfig(p, input) {
   return { ok: true, created: at < 0, source: clean };
 }
 
+/**
+ * 面板「添加数据源」：只填名称和地址，其余按地址推断——id 取域名，看起来像 feed 的按 RSS、否则按新闻列表页；
+ * 新加的源先「试用」（只帮别家印证，不单独上版或推送），攒够数据后在成绩单里决定开不开。
+ */
+export function draftSource(input, existing) {
+  const url = String(input.url || "").trim();
+  let host = "", segs = [];
+  try { const u = new URL(url); host = u.hostname.toLowerCase(); segs = u.pathname.split("/").map((x) => x.replace(/\.[a-z]+$/i, "").toLowerCase()).filter((x) => /^[a-z][a-z0-9-]{1,20}$/.test(x) && !/^(news|rss|feeds?|atom|xml|index|list|en|zh|cn|home|channel|api|v\d)$/.test(x)); } catch { host = ""; }
+  const bare = host.replace(/^(www|feeds?|rss|m|news|wap|en|cn)\./, "");
+  const core = bare.replace(/\.(com|net|org|gov|edu|co|ac|io|info)?\.?(cn|uk|hk|tw|jp|sg|de|fr|au|ca|us)?$/i, "").split(".").pop() || "source";
+  const base = [core].concat(segs.slice(0, 1)).join("_").replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 32) || "source";
+  const ids = new Set((existing || []).map((x) => x.id));
+  let id = /^[a-z0-9]/.test(base) && base.length >= 2 ? base : "s_" + base;
+  for (let n = 2; ids.has(id); n++) id = base.slice(0, 30) + "_" + n;
+  const feed = /(\brss\b|feed|atom|\.xml)(\b|$)/i.test(url);
+  const pack = input.pack === "study_abroad" ? "study_abroad" : "core";
+  // 地区：先看域名后缀；通用域名（.com 等）再看试抓到的标题是不是中文
+  const tld = (host.match(/\.([a-z]{2})$/) || [])[1];
+  const region = { cn: "CN", uk: "UK", hk: "HK", tw: "TW", jp: "JP", sg: "SG", de: "DE", fr: "FR", au: "AU", ca: "CA", us: "US" }[tld] || (input.cjk === true ? "CN" : "INTL");
+  const cnLike = region === "CN" || region === "HK" || region === "TW";
+  return {
+    id, name: String(input.name || bare || id).trim().slice(0, 80), url,
+    type: input.type === "rss" || input.type === "html_index" ? input.type : feed ? "rss" : "html_index",
+    category: String(input.category || (pack === "study_abroad" ? "留学与签证" : cnLike ? "国内财经与公告" : "国际宏观")).slice(0, 40),
+    region, pack, channels: ["browse", "http", "agent_reach"], max_items: 20, enabled: true, trial: true,
+  };
+}
+
 // ------------------------------------------------------------------ 渲染
 function signalText(sig) {
   if (!sig) return "";
@@ -872,7 +907,7 @@ export function apply(ctx, config) {
     const t = db.prepare("SELECT * FROM trackers WHERE id = ?").get(trackerId);
     if (!t) return;
     let f = loadFollows(p.follows);
-    if (t.kind === "theme") for (const sid of storyIds || []) f = updateFollows(f, "follow", "story", sid, t.name);
+    if (t.kind === "theme") for (const sid of storyIds || []) f = updateFollows(f, "follow", "story", sid, t.name, "tracker:" + t.id);
     else f = updateFollows(f, "follow", "keyword", JSON.parse(t.aliases || "[]").join("|") || t.name, t.name);
     await saveFollows(f);
   }
@@ -931,40 +966,51 @@ export function apply(ctx, config) {
     return names;
   }
 
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /**
+   * 定时推送的一轮。宿主对一次工具调用最多等 10 分钟（run_code 的上限），所以整轮有预算（cycleBudgetMs）：
+   * 抓取按剩余时间限时；版面在预算内编不完就不等了，发模型已经写好的那份（预编排的或边写边出的进度版），
+   * 没写完的继续在后台写，下一轮再推。模型慢时 prewarmTick 会在定时推送前提前抓取和编排，到点只补增量。
+   */
   async function runCycle(args) {
-    // 两个主题包的定时任务可能撞上：等前一轮结束（最多 15 分钟）再跑，而不是跳过这一轮
-    const deadline = Date.now() + CYCLE_WAIT_MS;
-    while (inflight.current !== null && Date.now() < deadline) await new Promise((r) => setTimeout(r, 5000));
-    const busy = inflight.current;
-    if (busy) return { ok: false, error: "run_in_progress", message: hhmmShanghai() + " 本轮跳过：上一轮（" + busy + "）超过 15 分钟仍未结束" };
+    const deadline = Date.now() + cfg.cycleBudgetMs;
+    const left = () => deadline - Date.now();
+    // 两个主题包的定时任务可能撞上，或预编排还在抓：等它结束，但给版面和发送留出时间
+    while (inflight.current !== null && left() > 240000) await sleep(3000);
+    if (inflight.current) return cycleFromLatest(args, "另一轮抓取（" + inflight.current + "）还没结束");
     const runId = newRunId("cycle");
     inflight.current = runId;
     try {
       await ensureData(p);
       // 两种模式都按版面推送（版面认得关注与屏蔽）：引擎只算规则候选、不记推送；版面编不出来时退回规则候选
       const wantLlm = modeNow() === "llm" && model.available();
-      const res = await runEngine(ctx, cfg, p, cycleFlags(p, cfg, Object.assign({}, args, { defer_push: !(args && args.dry_run === true) }), runId), cfg.timeoutMs + CYCLE_WAIT_MS);
+      const res = await runEngine(ctx, cfg, p, cycleFlags(p, cfg, Object.assign({}, args, { defer_push: !(args && args.dry_run === true) }), runId), Math.max(60000, Math.min(cfg.timeoutMs, left() - 120000)));
       const out = engineJson(res.stdout);
       if (out && out.run_id) {
-        // 手动抓取后的后台编排可能还在跑：最多等 5 分钟
-        const until = Date.now() + 300000;
-        while (modelState.busy && Date.now() < until) await new Promise((r) => setTimeout(r, 2000));
-        const ed = await makeEdition({ pack: out.pack || (args && args.pack) || "all", runId: out.run_id, wantLlm, minHours: out.lookback_hours });
-        out.edition = ed ? { id: ed.id, mode: ed.mode, model: ed.model, headline: ed.headline, stories: Object.keys(ed.stories || {}).length, items_read: ed.items_read, error: ed.error } : null;
+        const pack = out.pack || (args && args.pack) || "all";
+        const fresh = (async () => {
+          // 预编排或手动抓取后的模型编排还在跑：等它写完再在它的基础上补增量
+          while (modelState.busy && left() > 90000) await sleep(2000);
+          if (modelState.busy) return null;
+          return makeEdition({ pack, runId: out.run_id, wantLlm, minHours: out.lookback_hours });
+        })();
+        let timer = null;
+        const got = await Promise.race([fresh, new Promise((r) => { timer = setTimeout(() => r("timeout"), Math.max(5000, left() - 45000)); })]);
+        clearTimeout(timer);
+        let ed = got && got !== "timeout" ? got : null;
+        if (!ed) {
+          ed = latestContent(pack);
+          if (ed) out.edition_note = "模型还在写稿，本轮先发 " + bjHhmm(ed.created_at) + " 编好的版面";
+        }
+        out.edition = ed ? { id: ed.id, mode: ed.mode, model: ed.model, headline: ed.headline, stories: Object.keys(ed.stories || {}).length, items_read: ed.items_read, error: ed.error, waited: got === "timeout" ? "timeout" : undefined } : null;
         {
           const nowIso = new Date().toISOString().replace("T", " ").slice(0, 19);
           const db = openIfExists(p.db);
           try {
             if (ed && out.parts) {
-              // 推送偏好：门槛档位、每轮上限、按读者反馈调各版块门槛、每天上限
-              const pp = loadPush(p.pushPrefs);
-              const all = editionPicks(db, ed, rulesFor(Object.assign({}, DEFAULT_RULES, out.rules || {}), pp), { nowIso, lookbackHours: out.lookback_hours || 6, penalties: sectionPenalties(db) });
-              const cap = applyDailyCap(db, all, pp);
-              const picks = cap.send;
-              if (out.defer_push) recordEditionPushes(db, picks, out.run_id, nowIso, out.pack);
-              out.message = composeEditionMessage(out.parts, picks, ed, taxonomyNames()) + (cap.held ? "\n（今天已推 " + (cap.today + picks.length) + " 条，到了每天上限；另有 " + cap.held + " 条留在面板里）" : "");
-              out.held = cap.held;
-              out.picks = picks.map((x) => ({ story: x.id, event_id: x.lead_event_id, title: x.title, url: x.url, importance: x.importance, credibility: x.credibility, reason: x.reason, source_count: x.source_count, section: x.section, followed: x.followed || null }));
+              out.message = sendFromEdition(db, ed, out.parts, out.rules, out.run_id, out.lookback_hours || 6, out.defer_push, out);
+              if (out.edition_note) out.message += "\n（" + out.edition_note + "）";
             } else if (out.defer_push) {
               // 版面编不出来：按规则候选推送
               recordPushes(db, out.picks || [], out.run_id, nowIso);
@@ -984,6 +1030,97 @@ export function apply(ctx, config) {
     }
   }
 
+  /** 按版面选出要推的报道、记推送、拼消息（out 上顺带挂 picks 与 held）。 */
+  function sendFromEdition(db, ed, parts, rules, runId, lookbackHours, record, out) {
+    const nowIso = new Date().toISOString().replace("T", " ").slice(0, 19);
+    // 推送偏好：门槛档位、每轮上限、按读者反馈调各版块门槛、每天上限
+    const pp = loadPush(p.pushPrefs);
+    const all = editionPicks(db, ed, rulesFor(Object.assign({}, DEFAULT_RULES, rules || {}), pp), { nowIso, lookbackHours, penalties: sectionPenalties(db) });
+    const cap = applyDailyCap(db, all, pp);
+    const picks = cap.send;
+    if (record) recordEditionPushes(db, picks, runId, nowIso, out.pack || ed.pack);
+    out.held = cap.held;
+    out.picks = picks.map((x) => ({ story: x.id, event_id: x.lead_event_id, title: x.title, url: x.url, importance: x.importance, credibility: x.credibility, reason: x.reason, source_count: x.source_count, section: x.section, followed: x.followed || null }));
+    return composeEditionMessage(parts, picks, ed, taxonomyNames()) + (cap.held ? "\n（今天已推 " + (cap.today + picks.length) + " 条，到了每天上限；另有 " + cap.held + " 条留在面板里）" : "");
+  }
+
+  /** 来不及等时用哪份版面：近 3 小时内模型写的（含边写边出的进度版）优先，没有就用最新一份。 */
+  function latestContent(pack) {
+    return withDb(p, (db) => {
+      if (!db) return null;
+      const since = new Date(Date.now() - 3 * 3600000).toISOString().replace("T", " ").slice(0, 19);
+      const pick = db.prepare("SELECT id FROM editions WHERE pack IN (?, 'all') AND mode = 'llm' AND created_at >= ? ORDER BY (pack = ?) DESC, id DESC LIMIT 1").get(pack, since, pack)
+        || db.prepare("SELECT id FROM editions WHERE pack IN (?, 'all') ORDER BY (pack = ?) DESC, id DESC LIMIT 1").get(pack, pack);
+      const row = pick ? editionById(db, pick.id) : null;
+      return row && row.content ? Object.assign({}, row.content, { id: row.id, pack: row.pack, mode: row.mode, model: row.model, created_at: row.created_at, headline: row.headline || row.content.headline, error: row.error }) : null;
+    });
+  }
+
+  function bjHhmm(utc) { try { return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(String(utc).replace(" ", "T") + "Z")); } catch { return ""; } }
+
+  /** 抓不了（另一轮占着）时：按已有的最新版面推送，不抓取。 */
+  function cycleFromLatest(args, why) {
+    const pack = (args && args.pack) || "core";
+    const ed = latestContent(pack);
+    const now = new Date();
+    const bj = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
+    const parts = { hhmm: bj.slice(11, 16), md: bj.slice(5, 10), warnings: [], title: (packSchedule(p, pack).packs[pack] || {}).title || "要闻", overnight: false };
+    if (!ed) return { ok: false, error: "run_in_progress", message: parts.hhmm + " 本轮跳过：" + why };
+    const out = { ok: true, run_id: newRunId("cycle"), pack, skipped_fetch: why };
+    const db = openIfExists(p.db);
+    try { out.message = sendFromEdition(db, ed, parts, null, out.run_id, 6, !(args && args.dry_run === true), out) + "\n（" + why + "，本轮未抓取，按 " + bjHhmm(ed.created_at) + " 的版面推送）"; } finally { if (db) db.close(); }
+    return out;
+  }
+
+  // ---------------------------------------------------------------- 预编排
+  // 模型慢（一份版面要十几分钟）时，定时推送那一刻才开始编排一定超时。提前一段时间在后台抓取并编排，
+  // 到点的那一轮只补这几分钟的增量。提前量按最近几份模型版面的实际耗时估。
+  const prewarm = { running: false, done: new Map(), tasks: [], tasksAt: 0 };
+  function prewarmLeadMs() {
+    const ms = (withDb(p, (db) => (db ? db.prepare("SELECT ms FROM editions WHERE mode = 'llm' AND ms IS NOT NULL ORDER BY id DESC LIMIT 5").all() : [])) || []).map((r) => r.ms).sort((a, b) => a - b);
+    const typical = ms.length ? ms[Math.floor(ms.length / 2)] : 15 * 60000;
+    // 抓取约 2 分钟：模型在一轮预算里写得完就不用提前
+    if (typical + 3 * 60000 <= cfg.cycleBudgetMs) return 0;
+    return Math.min(45 * 60000, Math.max(8 * 60000, typical + 5 * 60000));
+  }
+  async function prewarmTick() {
+    if (prewarm.running || !optional.schedule || !(modeNow() === "llm" && llmReady())) return;
+    if (busyWith() || modelState.busy) return;
+    prewarm.running = true;
+    try {
+      if (Date.now() - prewarm.tasksAt > 5 * 60000) {
+        const all = (await optional.schedule.list({ limit: 500 })).items || [];
+        const packs = Object.keys(packSchedule(p, "core").packs);
+        prewarm.tasks = (packs.length ? packs : ["core"]).map((k) => ({ pack: k, task: all.find((x) => x.title === packSchedule(p, k).title) })).filter((x) => x.task && x.task.status === "active" && x.task.scheduledAt);
+        // 旧版本建的任务：指令里没有超时提示的，换成新指令（只改指令，不动时间）
+        if (!prewarm.upgraded) {
+          prewarm.upgraded = true;
+          for (const { pack, task } of prewarm.tasks) {
+            if (typeof task.prompt === "string" && task.prompt.startsWith("调用工具 newswire_cycle") && task.prompt !== schedulePrompt(pack)) {
+              try { await optional.schedule.edit({ id: task.id, action: "update", patch: { prompt: schedulePrompt(pack) } }); } catch { /* 用户在对话里重新设置一次也行 */ }
+            }
+          }
+        }
+        prewarm.tasksAt = Date.now();
+      }
+      const lead = prewarmLeadMs();
+      if (!lead) return;
+      for (const [k, at] of prewarm.done) if (at < Date.now() - 3600000) prewarm.done.delete(k);
+      for (const { pack, task } of prewarm.tasks) {
+        const at = Date.parse(task.scheduledAt);
+        const until = at - Date.now();
+        const key = pack + "@" + at;
+        if (!Number.isFinite(at) || until > lead || until < 4 * 60000 || prewarm.done.has(key)) continue;
+        prewarm.done.set(key, at);
+        const runId = newRunId("prep");
+        const res = await guardedRun({ packs: pack }, runId);
+        if (res.ok) await makeEdition({ pack, runId: res.run_id || runId, wantLlm: true });
+        prewarm.tasksAt = 0;
+        return;
+      }
+    } catch { /* 下一分钟再看 */ } finally { prewarm.running = false; }
+  }
+
   function newRunId(prefix) { return prefix + "-" + new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14) + "-" + Math.random().toString(36).slice(2, 6); }
 
   ctx.effect(() => {
@@ -996,6 +1133,8 @@ export function apply(ctx, config) {
       disposers.push(ctx.connection.fetch.register(Object.assign({ requestBody: "buffered" }, def)));
     };
     const tool = (def) => disposers.push(ctx.tools.register(def));
+    // 预编排：每分钟看一眼下一次定时推送还有多久
+    { const t = setInterval(() => { void prewarmTick(); }, 60000); disposers.push(() => clearInterval(t)); }
 
     // ---------------------------------------------------------------- 路由
     route({
@@ -1076,6 +1215,34 @@ export function apply(ctx, config) {
         await ensureData(p);
         const res = await testSource(ctx, cfg, p, body);
         return jsonResponse(res, res.problems ? 400 : 200);
+      },
+    });
+
+    // 添加数据源：{name, url, pack, category?, type?}；test=true 只试抓（RSS / 列表页都不行时换另一种再试），否则保存为试用源
+    route({
+      path: "/api/newswire/sources/add",
+      methods: ["POST"],
+      fetch: async (request) => {
+        const body = await bodyOf(request);
+        await ensureData(p);
+        const conf = await readConfigSources(p);
+        const list = conf.data.sources || [];
+        if (list.some((x) => String(x.url || "").replace(/\/+$/, "") === String(body.url || "").trim().replace(/\/+$/, ""))) return jsonResponse({ ok: false, error: "duplicate_url" }, 409);
+        let src = draftSource(body, list);
+        const problems = validateSources({ sources: [src] }, { allowSingle: true });
+        if (problems.length) return jsonResponse({ ok: false, error: "invalid_source", problems }, 400);
+        if (body.test === true) {
+          let res = await testSource(ctx, cfg, p, { source: src, max_items: 8 });
+          if (!body.type && !(res && res.kept)) {
+            const other = Object.assign({}, src, { type: src.type === "rss" ? "html_index" : "rss" });
+            const res2 = await testSource(ctx, cfg, p, { source: other, max_items: 8 });
+            if (res2 && res2.kept) { src = other; res = res2; }
+          }
+          return jsonResponse({ ok: Boolean(res && res.kept), source: src, test: res }, 200);
+        }
+        const out = await upsertSourceInConfig(p, src);
+        if (!out.ok) return jsonResponse(out, 400);
+        return jsonResponse(out, 200);
       },
     });
 
@@ -1534,8 +1701,12 @@ export function apply(ctx, config) {
       fetch: async (request) => {
         if (request.method === "POST") {
           const body = await bodyOf(request);
-          if (!["follow", "unfollow", "mute", "unmute"].includes(body.action) || !FOLLOW_KINDS.includes(body.kind) || !strOrNull(body.value)) return jsonResponse({ error: "follow_invalid", kinds: FOLLOW_KINDS }, 400);
-          await saveFollows(updateFollows(loadFollows(p.follows), body.action, body.kind, String(body.value), strOrNull(body.name)));
+          // values：一次取消一组（面板里合成一行的主线故事线）
+          const values = Array.isArray(body.values) ? body.values.map(strOrNull).filter(Boolean).slice(0, 200) : strOrNull(body.value) ? [String(body.value)] : [];
+          if (!["follow", "unfollow", "mute", "unmute"].includes(body.action) || !FOLLOW_KINDS.includes(body.kind) || !values.length) return jsonResponse({ error: "follow_invalid", kinds: FOLLOW_KINDS }, 400);
+          let f = loadFollows(p.follows);
+          for (const v of values) f = updateFollows(f, body.action, body.kind, v, strOrNull(body.name));
+          await saveFollows(f);
         }
         return jsonResponse(loadFollows(p.follows), 200);
       },

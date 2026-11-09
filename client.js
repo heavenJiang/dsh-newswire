@@ -41,6 +41,7 @@ window.__ModuleLoader__.load({
       track: '/api/newswire/track',
       trackItem: '/api/newswire/track/item',
       storyAnalyze: '/api/newswire/analyze',
+      sourceAdd: '/api/newswire/sources/add',
       onboard: '/api/newswire/onboard',
       ask: '/api/newswire/ask',
       push: '/api/newswire/push',
@@ -111,7 +112,7 @@ window.__ModuleLoader__.load({
         'rd.sinceH': '自你上次查看（{t}）', 'rd.sinceNew': '{n} 件新事', 'rd.sinceDev': '{n} 件有进展',
         'rd.about': '关于本期', 'rd.byModel': '由 {m} 阅读并编写', 'rd.byRules': '由程序按规则编排（节省 token 模式）', 'rd.read': '读入近 {h} 小时最重要的 {n} 条报道。', 'rd.checked': '模型写下的 {n} 句含数字或专名的话，{p} 句已与原文逐一核对。',
         'rd.past': '往期版面', 'rd.skim': '本期速览', 'rd.aboutDay': '关于这份回顾', 'rd.dayDek': '今天值得记住的 {n} 件事',
-        'nav.panel': '见微知著', 'tab.news': '要闻', 'tab.timeline': '时间线', 'tab.items': '条目', 'tab.sources': '数据源', 'tab.runs': '运行',
+        'nav.panel': '见微知著', 'nav.logo': '见', 'rd.top': '头条', 'rd.stStories': ' 件事', 'rd.stOutlets': ' 家媒体', 'rd.stHours': ' 小时内', 'rd.stAi': '模型读完并核对', 'tab.news': '要闻', 'tab.timeline': '时间线', 'tab.items': '条目', 'tab.sources': '数据源', 'tab.runs': '运行',
         'btn.run': '抓一轮', 'btn.running': '抓取中…', 'btn.reload': '刷新', 'btn.save': '保存数据源', 'btn.add': '新增源', 'btn.more': '加载更多',
         'btn.remove': '删除', 'btn.restore': '恢复', 'btn.test': '试抓', 'btn.testing': '试抓中…', 'btn.back': '← 返回', 'btn.today': '今天',
         'label.enabled': '启用', 'label.name': '名称', 'label.id': 'id', 'label.category': '分类', 'label.type': '类型', 'label.url': '地址',
@@ -168,7 +169,7 @@ window.__ModuleLoader__.load({
         'q.fb': '读者报错 {n} 条，已处理 {r} 条', 'q.re': '重组', 'sn.banner': '自你上次查看（{t}）以来：{n} 条新故事线，{m} 条有进展', 'sn.first': '这是你第一次打开版面：以后这里会告诉你自上次查看以来的变化。',
         'sn.new': '新', 'sn.added': '+{n} 自上次', 'sn.nothing': '自你上次查看（{t}）以来没有新进展。', 'up.label': '进展', 'sd.back': '‹ 返回', 'sd.timeline': '时间轴', 'sd.reports': '{n} 篇报道',
         'sd.pushed': '已推送到手机 · {r}', 'sd.merged': '并入了：{t}', 'sd.since': '始于 {t}', 'sd.copy': '当前稿件', 'view.follows': '关注', 'fl.section': '我的关注', 'fl.follow': '☆ 关注', 'fl.following': '★ 已关注', 'fl.mute': '屏蔽', 'fl.muted': '已屏蔽，下一份版面起不再出现',
-        'fl.saved': '已保存，下一份版面起生效', 'fl.kind.story': '故事线', 'fl.kind.keyword': '关键词', 'fl.kind.topic': '主题', 'fl.kind.source': '来源', 'fl.add': '关注', 'fl.addMute': '屏蔽',
+        'fl.saved': '已保存，下一份版面起生效', 'as.open': '添加数据源', 'as.title': '添加数据源', 'as.close': '收起', 'as.name': '名称，如 证券时报', 'as.url': 'RSS 地址或新闻列表页地址', 'as.test': '试抓', 'as.testing': '试抓中…（约半分钟）', 'as.save': '添加（先试用）', 'as.hint': '先试抓看看能抓到什么，满意再添加。新源先「试用」：照常抓取、帮别家印证，但不单独上版或推送；攒几天数据后，下面的成绩单会告诉你值不值得开。地址、通道、翻页等细节可以在最下方的「高级」里改。', 'as.got': '抓到 {n} 条（{k}，通道 {c}），最新几条：', 'as.list': '列表页', 'as.fail': '没抓到内容：', 'as.dup': '这个地址已经在数据源里了', 'as.added': '已添加「{n}」，处于试用中；下一轮抓取起生效', 'fl.kind.story': '故事线', 'fl.kind.theme': '主线', 'fl.storyCount': '{n} 条故事线', 'fl.kind.keyword': '关键词', 'fl.kind.topic': '主题', 'fl.kind.source': '来源', 'fl.add': '关注', 'fl.addMute': '屏蔽',
         'fl.ph': '人名、公司或词，别名用 | 分隔，如 英伟达|NVIDIA', 'fl.listFollow': '关注中', 'fl.listMute': '已屏蔽', 'fl.none': '还没有', 'fl.remove': '移除',
         'fl.hint': '关注的人、公司或话题会在「今日」最上方单独成栏，有新进展时优先推送给你；屏蔽的不再出现。也可以直接在对话里说「关注英伟达」。', 'ck.unverified': '待核', 'ck.missing': '材料里找不到：{m}', 'ck.more': '等 {n} 家', 'ck.summary': '核对 {p}/{n}', 'ck.dropped': '丢弃 {n} 句',
         'ck.hint': '模型写的每句话里，数字、外文专名、引号里的词都要在材料里找得到；要点与各方说法找不到的已丢弃，导语找不到的标「待核」。中文人名地名无法自动核对。', 'ed.new': '新', 'ed.updated': '有进展', 'model.incr': '新增 {f} 条 · 沿用 {r} 篇稿', 'model.last': '上次编排', 'model.calls': '{n} 次调用', 'model.busy': '正在编排…', 'model.pick': '使用的模型',
@@ -225,7 +226,7 @@ window.__ModuleLoader__.load({
         'rd.sinceH': 'Since you last looked ({t})', 'rd.sinceNew': '{n} new', 'rd.sinceDev': '{n} developing',
         'rd.about': 'About this edition', 'rd.byModel': 'Read and written by {m}', 'rd.byRules': 'Laid out by rules (save-tokens mode)', 'rd.read': 'Read the {n} most important reports of the last {h} hours. ', 'rd.checked': '{p} of {n} model sentences with numbers or names were checked against the sources.',
         'rd.past': 'Past editions', 'rd.skim': 'In this edition', 'rd.aboutDay': 'About this recap', 'rd.dayDek': '{n} things worth remembering today',
-        'nav.panel': 'Newswire', 'tab.news': 'Top', 'tab.timeline': 'Timeline', 'tab.items': 'Items', 'tab.sources': 'Sources', 'tab.runs': 'Runs',
+        'nav.panel': 'Newswire', 'nav.logo': '见', 'rd.top': 'Top story', 'rd.stStories': ' stories', 'rd.stOutlets': ' outlets', 'rd.stHours': ' hours', 'rd.stAi': 'Read and checked by the model', 'tab.news': 'Top', 'tab.timeline': 'Timeline', 'tab.items': 'Items', 'tab.sources': 'Sources', 'tab.runs': 'Runs',
         'btn.run': 'Fetch now', 'btn.running': 'Fetching…', 'btn.reload': 'Reload', 'btn.save': 'Save sources', 'btn.add': 'Add source', 'btn.more': 'Load more',
         'btn.remove': 'Remove', 'btn.restore': 'Restore', 'btn.test': 'Test', 'btn.testing': 'Testing…', 'btn.back': '← Back', 'btn.today': 'Today',
         'label.enabled': 'On', 'label.name': 'Name', 'label.id': 'id', 'label.category': 'Category', 'label.type': 'Type', 'label.url': 'URL',
@@ -282,7 +283,7 @@ window.__ModuleLoader__.load({
         'q.fb': '{n} reader reports, {r} handled', 'q.re': 'reflow', 'sn.banner': 'Since you last looked ({t}): {n} new storylines, {m} developing', 'sn.first': 'First visit: from now on this shows what changed since you last looked.',
         'sn.new': 'new', 'sn.added': '+{n} since last visit', 'sn.nothing': 'Nothing new since you last looked ({t}).', 'up.label': 'Update', 'sd.back': '‹ Back', 'sd.timeline': 'Timeline', 'sd.reports': '{n} reports',
         'sd.pushed': 'pushed ({r})', 'sd.merged': 'Merged in: {t}', 'sd.since': 'since {t}', 'sd.copy': 'Current copy', 'view.follows': 'Following', 'fl.section': 'Following', 'fl.follow': '☆ Follow', 'fl.following': '★ Following', 'fl.mute': 'Mute', 'fl.muted': 'Muted; gone from the next edition',
-        'fl.saved': 'Saved; takes effect from the next edition', 'fl.kind.story': 'storyline', 'fl.kind.keyword': 'keyword', 'fl.kind.topic': 'topic', 'fl.kind.source': 'source', 'fl.add': 'Follow', 'fl.addMute': 'Mute',
+        'fl.saved': 'Saved; takes effect from the next edition', 'as.open': 'Add a source', 'as.title': 'Add a source', 'as.close': 'Close', 'as.name': 'Name, e.g. Securities Times', 'as.url': 'RSS feed or news list page URL', 'as.test': 'Test fetch', 'as.testing': 'Testing… (about 30 s)', 'as.save': 'Add (on trial)', 'as.hint': 'Test-fetch first to see what comes back, then add it. New sources start on trial: fetched and used to corroborate others, but never leading a story or a push alone. After a few days the scorecard below tells you whether to keep it on. URL, channels and paging can be fine-tuned under Advanced at the bottom.', 'as.got': 'Got {n} items ({k}, via {c}). Latest:', 'as.list': 'list page', 'as.fail': 'Nothing fetched: ', 'as.dup': 'This URL is already a source', 'as.added': 'Added "{n}" on trial; it takes effect from the next round', 'fl.kind.story': 'storyline', 'fl.kind.theme': 'theme', 'fl.storyCount': '{n} storylines', 'fl.kind.keyword': 'keyword', 'fl.kind.topic': 'topic', 'fl.kind.source': 'source', 'fl.add': 'Follow', 'fl.addMute': 'Mute',
         'fl.ph': 'person, company, or term; aliases with |, e.g. 英伟达|NVIDIA', 'fl.listFollow': 'Following', 'fl.listMute': 'Muted', 'fl.none': 'none yet', 'fl.remove': 'Remove',
         'fl.hint': 'People, companies or topics you follow get their own section at the top of Today, and new developments are pushed to you first; muted ones disappear. You can also just say "follow Nvidia" in the chat.', 'ck.unverified': 'unverified', 'ck.missing': 'Not found in the sources: {m}', 'ck.more': '{n} outlets in all', 'ck.summary': 'checked {p}/{n}', 'ck.dropped': '{n} dropped',
         'ck.hint': 'Numbers, foreign names, and quoted terms in every sentence the model wrote must appear in the sources; points and views that fail were dropped, a lead that fails is marked unverified. Chinese names cannot be checked automatically.', 'ed.new': 'new', 'ed.updated': 'developing', 'model.incr': '{f} new items · {r} stories reused', 'model.last': 'Last layout', 'model.calls': '{n} calls', 'model.busy': 'Laying out…', 'model.pick': 'Model',
@@ -592,8 +593,9 @@ window.__ModuleLoader__.load({
       if (tm) parts.push(tm)
       if ((s.reposts || []).length) parts.push(t('rd.reposts', { n: s.reposts.length }))
       return h('span', { className: 'nw-byline', title: (s.reposts || []).length ? t('rd.repostsHint', { w: s.reposts.map(function (x) { return shortName(x) }).join('、') }) : undefined }, parts.join(' · '),
-        s.credibility === 'confirmed' ? h('span', { className: 'nw-cred-ok' }, ' · ' + t('cred.confirmed')) : null,
-        s.credibility === 'disputed' ? h('span', { className: 'nw-warn' }, ' · ' + t('cred.disputed')) : null)
+        s.credibility === 'confirmed' ? h('span', { className: 'nw-pill nw-pill-ok' }, t('cred.confirmed')) : null,
+        s.credibility === 'corroborated' && n > 1 ? h('span', { className: 'nw-pill nw-pill-info' }, t('cred.corroborated')) : null,
+        s.credibility === 'disputed' ? h('span', { className: 'nw-pill nw-pill-warn' }, t('cred.disputed')) : null)
     }
 
     // ------------------------------------------------------------------ 追踪
@@ -785,7 +787,8 @@ window.__ModuleLoader__.load({
         allOpen && mats.length ? h('ol', { key: 's', className: 'nw-rs-src' }, mats.map(function (m) { return h('li', { key: m.id }, h('a', { className: 'nw-link', href: m.url, target: '_blank', rel: 'noopener noreferrer' }, shortName({ name: m.name })), h('span', { className: 'nw-muted' }, ' ' + hhmm(m.t))) })) : null,
         allOpen && !mats.length && s.url ? h('a', { key: 'o', className: 'nw-link nw-xs', href: s.url, target: '_blank', rel: 'noopener noreferrer' }, t('ed.original') + ' ↗') : null,
         v === 'normal' && extra ? h('button', { key: 'm', className: 'nw-more-btn', onClick: function () { setMore(!more) } }, more ? t('rd.less') : t('rd.more')) : null]
-      return h('article', { id: 'nw-s-' + s.id, className: 'nw-rs nw-v-' + v },
+      return h('article', { id: 'nw-s-' + s.id, className: 'nw-rs nw-v-' + v + (s.importance >= 80 ? ' nw-imp-hi' : '') },
+        v === 'lead' ? h('div', { className: 'nw-kicker' }, h('span', { className: 'nw-kick' }, t('rd.top')), s.section && props.names && props.names[s.section] ? h('span', { className: 'nw-kick-sec' }, props.names[s.section]) : null) : null,
         h('div', { className: 'nw-rs-head' },
           tag ? h('span', { className: 'nw-rs-tag' + (tag === t('rd.developing') ? ' nw-rs-dev' : '') }, tag) : null,
           (s.followed || []).length ? h('span', { className: 'nw-rs-star', title: s.followed.join('、') }, '★') : null,
@@ -809,6 +812,17 @@ window.__ModuleLoader__.load({
           var ok = id && props.stories[id]
           return h('li', { key: i }, ok ? h('button', { className: 'nw-brief-link', onClick: function () { props.onOpen(id) } }, w.text) : w.text)
         })))
+    }
+
+    /** 行情一行的方向：涨红跌绿（A 股习惯）。先出现的那个词说了算（「涨跌不一」不标）。 */
+    function tickDir(text) {
+      var s = String(text || '')
+      if (/涨跌不一|持平|不变/.test(s)) return ''
+      var up = s.search(/涨|升|上扬|走高|拉升|反弹|飙|新高/)
+      var down = s.search(/跌|降|下挫|走低|回落|跳水|新低|下调/)
+      if (up < 0 && down < 0) return ''
+      if (down < 0 || (up >= 0 && up < down)) return 'up'
+      return 'down'
     }
 
     function jumpTo(id) {
@@ -1002,7 +1016,11 @@ window.__ModuleLoader__.load({
           packKeys.length > 1 && props.onPack ? h('select', { className: 'nw-in nw-mast-pack', value: props.pack || '', 'aria-label': t('rd.pack'), onChange: function (ev) { props.onPack(ev.target.value) } },
             [h('option', { key: '', value: '' }, t('rd.allPacks'))].concat(packKeys.map(function (k) { return h('option', { key: k, value: k }, (packs[k] && packs[k].title) || k) }))) : null),
         c.headline ? h('h1', { className: 'nw-mast-head' }, c.headline) : null,
-        h('div', { className: 'nw-mast-dek' }, t('rd.dek', { h: Math.round(c.hours || 12), n: nStories, o: Object.keys(outlets).length })))
+        h('div', { className: 'nw-mast-stats' },
+          h('span', { className: 'nw-stat' }, h('b', null, nStories), t('rd.stStories')),
+          h('span', { className: 'nw-stat' }, h('b', null, Object.keys(outlets).length), t('rd.stOutlets')),
+          h('span', { className: 'nw-stat' }, h('b', null, Math.round(c.hours || 12)), t('rd.stHours')),
+          ed.mode === 'llm' ? h('span', { className: 'nw-stat nw-stat-ai' }, '✦ ' + t('rd.stAi')) : null))
 
       var sinceBox = !snIds.length ? null : h('section', { className: 'nw-since' },
         h('div', { className: 'nw-since-h' }, t('rd.sinceH', { t: when(since.at) }), h('span', { className: 'nw-muted' }, ' ' + [snNew.length ? t('rd.sinceNew', { n: snNew.length }) : '', snDev.length ? t('rd.sinceDev', { n: snDev.length }) : ''].filter(Boolean).join('，'))),
@@ -1014,7 +1032,7 @@ window.__ModuleLoader__.load({
         })))
 
       var folEl = !folIds.length ? null : h('section', { className: 'nw-sec nw-sec-fol nw-fol-top' },
-        h('h2', { className: 'nw-sec-h' }, '★ ' + t('fl.section'), h('span', { className: 'nw-muted nw-xs' }, '  ' + t('fl.topHint', { n: folIds.length }))),
+        h('h2', { className: 'nw-sec-h' }, h('span', null, '★ ' + t('fl.section')), h('span', { className: 'nw-sec-hint' }, t('fl.topHint', { n: folIds.length }))),
         folIds.map(function (id, i) { return story(id, i < 3 ? 'normal' : 'brief') }))
 
       var frontEl = !front.length ? null : h('section', { className: 'nw-front' },
@@ -1023,8 +1041,8 @@ window.__ModuleLoader__.load({
 
       var body = h('div', { className: 'nw-sections' }, sections.map(function (sec) {
         var fol = sec.id === 'following'
-        return h('section', { key: sec.id, className: 'nw-sec' + (fol ? ' nw-sec-fol' : '') },
-          h('h2', { className: 'nw-sec-h' }, fol ? '★ ' + t('fl.section') : sec.name),
+        return h('section', { key: sec.id, className: 'nw-sec nw-c-' + String(sec.id).split('.')[0] + (fol ? ' nw-sec-fol' : '') },
+          h('h2', { className: 'nw-sec-h' }, h('span', null, fol ? '★ ' + t('fl.section') : sec.name), h('span', { className: 'nw-sec-n' }, sec.stories.length)),
           // 关注版块条目多且常常是同一话题：只放标题和导语
           sec.stories.map(function (id) { var x = st[id]; return story(id, fol || (ed.mode === 'llm' && x.by !== 'llm') ? 'brief' : 'normal') }))
       }))
@@ -1043,7 +1061,7 @@ window.__ModuleLoader__.load({
       var skim = skimSecs.length ? h('nav', { className: 'nw-rail-box nw-skim', 'aria-label': t('rd.skim') },
         h('h4', null, t('rd.skim')),
         skimSecs.map(function (sec) {
-          return h('div', { key: sec.id, className: 'nw-skim-sec' },
+          return h('div', { key: sec.id, className: 'nw-skim-sec nw-c-' + String(sec.id).split('.')[0] },
             h('div', { className: 'nw-skim-h' }, sec.id === 'following' ? '★ ' + t('fl.section') : sec.name),
             h('ul', null, sec.stories.map(function (id) { return h('li', { key: id }, h('button', { className: 'nw-brief-link', onClick: function () { jumpTo(id) } }, st[id].title)) })))
         })) : null
@@ -1055,7 +1073,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'nw-read-main' }, folEl, frontEl, body),
           h('aside', { className: 'nw-rail' },
             (c.tickers || []).length ? h('section', { className: 'nw-rail-box nw-ticks' }, h('h4', null, t('rd.ticks')),
-              h('ul', null, c.tickers.map(function (x) { return h('li', { key: x.instrument }, h('a', { className: 'nw-tick', href: x.url, target: '_blank', rel: 'noopener noreferrer', title: x.source }, h('b', null, x.instrument), h('span', null, x.rest || x.text), h('time', null, hhmm(x.t)))) }))) : null,
+              h('ul', null, c.tickers.map(function (x) { var d = tickDir(x.rest || x.text); return h('li', { key: x.instrument }, h('a', { className: 'nw-tick' + (d ? ' nw-tick-' + d : ''), href: x.url, target: '_blank', rel: 'noopener noreferrer', title: x.source }, h('b', null, x.instrument), h('span', null, d === 'up' ? '▲ ' : d === 'down' ? '▼ ' : '', x.rest || x.text), h('time', null, hhmm(x.t)))) }))) : null,
             h(NoteList, { title: t('head.watch'), items: c.watch, stories: st, onOpen: open }),
             h(NoteList, { title: t('head.verify'), items: c.verify, stories: st, onOpen: open, tone: 'warn' }),
             skim, about)),
@@ -1362,11 +1380,27 @@ window.__ModuleLoader__.load({
         var al = String(x.value).split('|')
         return al.length > 1 ? al[0] + '（' + al.slice(1).join('、') + '）' : x.value
       }
+      // 同一条主线（追踪）挂上的多条故事线合成一行：「AI与数据中心 · 6 条故事线」
+      var grouped = function (items) {
+        var out = []
+        var at = {}
+        ;(items || []).forEach(function (x) {
+          if (x.kind !== 'story') { out.push({ x: x, values: [x.value] }); return }
+          var key = x.via || ('name:' + (x.name || x.value))
+          if (at[key] != null) { out[at[key]].values.push(x.value); return }
+          at[key] = out.length
+          out.push({ x: x, values: [x.value], via: x.via })
+        })
+        return out
+      }
       var list = function (items, undo) {
         if (!items || !items.length) return Empty({ children: t('fl.none') })
-        return h('ul', { className: 'nw-fl-list' }, items.map(function (x) {
-          return h('li', { key: x.kind + x.value }, h(Chip, { tone: 'dim' }, t('fl.kind.' + x.kind)), h('span', { className: 'nw-fl-name' }, nameOf(x)),
-            h('button', { className: 'nw-mini', onClick: function () { act(undo, x.kind, x.value) } }, t('fl.remove')))
+        return h('ul', { className: 'nw-fl-list' }, grouped(items).map(function (g) {
+          var x = g.x
+          var many = g.values.length > 1
+          return h('li', { key: x.kind + x.value }, h(Chip, { tone: 'dim' }, many || g.via ? t('fl.kind.theme') : t('fl.kind.' + x.kind)), h('span', { className: 'nw-fl-name' }, nameOf(x)),
+            many ? h('span', { className: 'nw-muted nw-xs' }, t('fl.storyCount', { n: g.values.length })) : null,
+            h('button', { className: 'nw-mini', onClick: function () { postJson(API.follows, { action: undo, kind: x.kind, values: g.values }).then(function (res) { setF(res); setNote(t('fl.saved')) }).catch(function (e) { setNote((e.data && e.data.error) || e.message) }) } }, t('fl.remove')))
         }))
       }
       return h('div', { className: 'nw-follows' },
@@ -1634,12 +1668,76 @@ window.__ModuleLoader__.load({
         h('p', { className: 'nw-muted nw-xs' }, t('sb.foot')))
     }
 
+    /** 添加数据源：填名称和地址 → 试抓看看能抓到什么 → 添加为试用源。类型（RSS / 列表页）由试抓自动判断。 */
+    function AddSource(props) {
+      var oPair = useState(false)
+      var open = oPair[0]
+      var setOpen = oPair[1]
+      var nPair = useState('')
+      var name = nPair[0]
+      var setName = nPair[1]
+      var uPair = useState('')
+      var url = uPair[0]
+      var setUrl = uPair[1]
+      var kPair = useState('core')
+      var pack = kPair[0]
+      var setPack = kPair[1]
+      var phPair = useState('idle')
+      var phase = phPair[0]
+      var setPhase = phPair[1]
+      var rPair = useState(null)
+      var res = rPair[0]
+      var setRes = rPair[1]
+      var mPair = useState(null)
+      var msg = mPair[0]
+      var setMsg = mPair[1]
+      var valid = name.trim() && /^https?:\/\/\S+\.\S+/i.test(url.trim())
+      function errText(e) { var d = e && e.data; return d && d.error === 'duplicate_url' ? t('as.dup') : d && d.problems ? d.problems.join('；') : (e && e.message) || String(e) }
+      function test() {
+        setPhase('testing'); setRes(null); setMsg(null)
+        postJson(API.sourceAdd, { name: name.trim(), url: url.trim(), pack: pack, test: true })
+          .then(function (r) { setRes(r); setPhase('tested') })
+          .catch(function (e) { setMsg({ ok: false, text: errText(e) }); setPhase('idle') })
+      }
+      function save() {
+        setPhase('saving'); setMsg(null)
+        postJson(API.sourceAdd, { name: name.trim(), url: url.trim(), pack: pack, type: res && res.source ? res.source.type : undefined, cjk: ((res && res.test && res.test.items) || []).filter(function (it) { return /[\u4e00-\u9fa5]/.test(it.title || '') }).length * 2 > ((res && res.test && res.test.items) || []).length })
+          .then(function (r) { setMsg({ ok: true, text: t('as.added', { n: r.source.name }) }); setName(''); setUrl(''); setRes(null); setPhase('idle'); props.onAdded() })
+          .catch(function (e) { setMsg({ ok: false, text: errText(e) }); setPhase('tested') })
+      }
+      if (!open) return h('div', { className: 'nw-as-bar' },
+        h('button', { className: 'nw-btn nw-primary nw-sm', onClick: function () { setOpen(true) } }, '＋ ' + t('as.open')),
+        msg && msg.ok ? h('span', { className: 'nw-saved' }, msg.text) : null)
+      var tr = res && res.test
+      var items = (tr && tr.items) || []
+      var packs = Object.keys(props.packs || { core: 1 })
+      return h('div', { className: 'nw-card-static nw-as' },
+        h('div', { className: 'nw-as-h' }, h('b', null, t('as.title')), h('button', { className: 'nw-act', onClick: function () { setOpen(false); setRes(null); setMsg(null) } }, t('as.close'))),
+        h('div', { className: 'nw-as-form' },
+          h('input', { className: 'nw-in', value: name, placeholder: t('as.name'), onChange: function (e) { setName(e.target.value); setRes(null) } }),
+          h('input', { className: 'nw-in nw-as-url', value: url, placeholder: t('as.url'), onChange: function (e) { setUrl(e.target.value); setRes(null) } }),
+          packs.length > 1 ? h('select', { className: 'nw-in', value: pack, onChange: function (e) { setPack(e.target.value) } }, packs.map(function (k) { return h('option', { key: k, value: k }, ((props.packs || {})[k] || {}).title || k) })) : null,
+          h('button', { className: 'nw-btn nw-sm', disabled: !valid || phase === 'testing' || phase === 'saving', onClick: test }, phase === 'testing' ? t('as.testing') : t('as.test')),
+          h('button', { className: 'nw-btn nw-primary nw-sm', disabled: !valid || phase !== 'tested', onClick: save }, phase === 'saving' ? '…' : t('as.save'))),
+        h('div', { className: 'nw-muted nw-xs' }, t('as.hint')),
+        tr ? (res.ok
+          ? h('div', { className: 'nw-as-res' },
+              h('div', { className: 'nw-as-ok' }, '✓ ' + t('as.got', { n: tr.kept, c: tr.channel || '', k: res.source.type === 'rss' ? 'RSS' : t('as.list') })),
+              h('ul', { className: 'nw-as-items' }, items.slice(0, 6).map(function (it, i) { return h('li', { key: i }, h('span', { className: 'nw-muted nw-xs nw-as-t' }, it.published_at ? when(it.published_at) : '—'), h('a', { className: 'nw-link', href: it.url, target: '_blank', rel: 'noopener noreferrer' }, it.title)) })))
+          : h('div', { className: 'nw-error' }, t('as.fail') + ((tr.attempts || []).filter(function (a) { return !a.ok }).map(function (a) { return a.channel + '：' + (a.error_kind || a.error || '?') }).join('；') || tr.error || ''))) : null,
+        msg ? h('div', { className: msg.ok ? 'nw-saved' : 'nw-error' }, msg.text) : null)
+    }
+
     function SourcesTab(props) {
       var advPair = useState(false)
       var adv = advPair[0]
       var setAdv = advPair[1]
+      var stPair = useState(0)
+      var stamp = stPair[0]
+      var setStamp = stPair[1]
       return h('div', { className: 'nw-sources' },
-        h(SourceBoard, { stamp: props.stamp, onChanged: props.reload, packs: props.sources && props.sources.packs }),
+        h(AddSource, { packs: props.sources && props.sources.packs, onAdded: function () { setStamp(stamp + 1); if (props.reload) props.reload() } }),
+        h(SourceBoard, { stamp: String(props.stamp || '') + ':' + stamp, onChanged: props.reload, packs: props.sources && props.sources.packs }),
         h('button', { className: 'nw-act nw-adv-toggle', onClick: function () { setAdv(!adv) } }, (adv ? '▾ ' : '▸ ') + t('sb.advanced')),
         adv ? h(SourceEditor, props) : null)
     }
@@ -2072,7 +2170,7 @@ window.__ModuleLoader__.load({
       // 宿主的中间列不滚动：外层 .nw-scroll 撑满主面板并自己滚动，里面 .nw-root 居中限宽
       return h('div', { className: 'nw-scroll' }, h('div', { className: 'nw-root' },
         h('header', { className: 'nw-top' },
-          h('div', { className: 'nw-title-wrap' }, h('span', { className: 'nw-h1' }, t('nav.panel')), h(StatusLine, { summary: data.summary, schedule: data.schedule, onGo: function () { pick('runs') } })),
+          h('div', { className: 'nw-title-wrap' }, h('span', { className: 'nw-h1' }, h('span', { className: 'nw-logo', 'aria-hidden': true }, t('nav.logo')), t('nav.panel')), h(StatusLine, { summary: data.summary, schedule: data.schedule, onGo: function () { pick('runs') } })),
           h('div', { className: 'nw-actions' },
             h('button', { className: 'nw-btn nw-ghost nw-sm', onClick: runNow, disabled: busy, title: t('btn.runHint') }, busy ? t('btn.running') : t('btn.run')))),
         h(UpdateBanner, { onGo: function () { pick('runs') } }),
@@ -2217,7 +2315,7 @@ window.__ModuleLoader__.load({
       '.nw-follows{display:flex;flex-direction:column;gap:14px} .nw-fl-add{display:flex;flex-direction:column;gap:8px} .nw-fl-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px} .nw-fl-list li{display:flex;gap:8px;align-items:center;font-size:13px} .nw-fl-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}',
       '.nw-since{border:1px solid ' + C.line + ';border-left:3px solid ' + C.warn + ';background:' + C.bg + ';border-radius:10px;padding:10px 12px;font-size:13px;display:flex;flex-direction:column;gap:6px} .nw-since ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}',
       '.nw-ct-filtered{display:flex;flex-direction:column;gap:4px;margin-top:10px} .nw-ct-filtered ul{margin:0;padding:0;list-style:none} .nw-ct-li{display:block!important;padding:7px 0!important;border-top:1px solid ' + C.line1 + ';font-size:13px;line-height:1.6}',
-      '.nw-sources{display:flex;flex-direction:column;gap:14px;padding-top:4px} .nw-sb{display:flex;flex-direction:column;gap:10px;max-width:980px}',
+      '.nw-sources{display:flex;flex-direction:column;gap:14px;padding-top:4px} .nw-sb{display:flex;flex-direction:column;gap:10px}',
       '.nw-sb-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap} .nw-sb-title{margin:0 0 4px} .nw-sb-head p{margin:0;max-width:640px;line-height:1.6} .nw-sb-sum{display:flex;gap:10px;align-items:center;font-size:12px}',
       '.nw-sb-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}',
       '.nw-sb-row{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid ' + C.line1 + ';flex-wrap:wrap} .nw-sb-off .nw-sb-name b{color:' + C.l3 + '}',
@@ -2227,7 +2325,7 @@ window.__ModuleLoader__.load({
       '.nw-adv-toggle{align-self:flex-start;font-size:13px!important;color:' + C.l2 + '!important;padding-left:0!important}',
       '.nw-tl2-orig{font-size:11px;color:' + C.l3 + ';line-height:1.5}',
       '.nw-ticks ul{gap:6px!important} .nw-tick{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 8px;text-decoration:none;color:inherit;font-size:12px;line-height:1.5} .nw-tick b{font-weight:600;grid-column:1} .nw-tick span{grid-column:1;color:' + C.l2 + '} .nw-tick time{grid-column:2;grid-row:1;color:' + C.l3 + ';font-variant-numeric:tabular-nums} .nw-tick:hover b{color:' + C.link + '}',
-      '.nw-push{display:flex;flex-direction:column;gap:10px;margin-top:18px;max-width:980px} .nw-push p{margin:0}',
+      '.nw-push{display:flex;flex-direction:column;gap:10px;margin-top:18px} .nw-push p{margin:0}',
       '.nw-ps-grid{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px 14px;align-items:start;font-size:13px} .nw-ps-k{color:' + C.l3 + ';font-size:12px;padding-top:4px}',
       '.nw-ps-cad{display:flex;flex-direction:column;gap:4px} .nw-ps-opt{display:flex;gap:6px;align-items:center;cursor:pointer;color:' + C.l2 + '} .nw-ps-opt.nw-on{color:' + C.l1 + ';font-weight:600}',
       '.nw-ps-lim{display:flex;gap:16px;flex-wrap:wrap;align-items:center} .nw-ps-log{margin-top:14px} .nw-ps-vote{display:flex;gap:4px}',
@@ -2252,7 +2350,7 @@ window.__ModuleLoader__.load({
       '.nw-itlist{display:flex;flex-direction:column} .nw-itrow{display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;padding:9px 0;border-top:1px solid ' + C.line1 + ';font-size:13px;line-height:1.65} .nw-itrow-off{opacity:.6}',
       '.nw-itbody{min-width:0} .nw-itsum{color:' + C.l2 + ';font-size:12px;line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;margin-top:2px} .nw-itsum.nw-open{display:block}',
       '.nw-usage{display:flex;flex-direction:column;gap:2px;font-size:12px;padding:6px 0;border-top:1px dashed ' + C.line1 + '}',
-      '.nw-tracking{display:flex;flex-direction:column;gap:18px;max-width:980px;padding-top:4px} .nw-tksug{display:flex;flex-wrap:wrap;gap:8px} .nw-tksugbtn{border:1px solid ' + C.line + ';background:' + C.bg + ';color:inherit;font:inherit;font-size:13px;border-radius:999px;padding:4px 12px;cursor:pointer} .nw-tksugbtn:hover{border-color:' + C.accent + '}',
+      '.nw-tracking{display:flex;flex-direction:column;gap:18px;padding-top:4px} .nw-tksug{display:flex;flex-wrap:wrap;gap:8px} .nw-tksugbtn{border:1px solid ' + C.line + ';background:' + C.bg + ';color:inherit;font:inherit;font-size:13px;border-radius:999px;padding:4px 12px;cursor:pointer} .nw-tksugbtn:hover{border-color:' + C.accent + '}',
       '.nw-tkadd{display:flex;gap:8px;flex-wrap:wrap;align-items:center} .nw-tklist{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:minmax(0,1fr);gap:10px} @container (min-width: 820px){.nw-tklist{grid-template-columns:repeat(2,minmax(0,1fr))}}',
       '.nw-tkcard{width:100%;text-align:left;border:1px solid ' + C.line + ';background:' + C.bg + ';color:inherit;font:inherit;border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:6px} .nw-tkcard:hover{border-color:' + C.accent + '}',
       '.nw-tkhead{display:flex;align-items:center;gap:6px} .nw-tkhead b{font-size:15px} .nw-tkhead .nw-tkspark{margin-left:auto} .nw-tkstate{font-size:13px;line-height:1.6;color:' + C.l1 + '}',
@@ -2314,6 +2412,7 @@ window.__ModuleLoader__.load({
       '.nw-rs-star{flex:none;color:' + C.accent + ';font-size:12px}',
       '.nw-rs-meta{display:flex;align-items:center;gap:8px;min-height:20px;font-size:12px;color:' + C.l3 + ';font-variant-numeric:tabular-nums}',
       '.nw-byline{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .nw-cred-ok{color:' + C.ok + '}',
+      '.nw-as-bar{display:flex;align-items:center;gap:10px;margin:0 0 12px} .nw-as{margin:0 0 16px;display:flex;flex-direction:column;gap:8px} .nw-as-h{display:flex;justify-content:space-between;align-items:center} .nw-as-form{display:flex;flex-wrap:wrap;gap:8px} .nw-as-form .nw-in{flex:1 1 160px;min-width:0} .nw-as-form .nw-as-url{flex:2 1 260px} .nw-as-ok{font-size:13px;margin-bottom:4px} .nw-as-items{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:13px} .nw-as-items li{display:flex;gap:8px;min-width:0} .nw-as-items a{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .nw-as-t{flex:none;width:72px}',
       '.nw-acts{margin-left:auto;display:inline-flex;flex:none;white-space:nowrap;gap:2px;opacity:0;transition:opacity .15s} .nw-rs:hover .nw-acts, .nw-rs:focus-within .nw-acts, .nw-acts:has(.nw-on){opacity:1}',
       '@media (hover:none){.nw-acts{opacity:1}}',
       '.nw-act{border:0;background:transparent;color:' + C.l3 + ';font:inherit;font-size:12px;padding:1px 6px;border-radius:4px;cursor:pointer} .nw-act:hover{color:' + C.l1 + ';background:' + C.hover + '} .nw-act.nw-on{color:' + C.accent + '} .nw-act:disabled{opacity:.3;cursor:default}',
@@ -2362,6 +2461,40 @@ window.__ModuleLoader__.load({
       '.nw-saved{color:' + C.ok + ';font-size:12px}',
       '.nw-test{border-left:3px solid ' + C.ok + ';padding:4px 8px;font-size:12px;display:flex;flex-direction:column;gap:3px} .nw-test.nw-test-bad{border-left-color:' + C.err + '}',
       '.nw-test-items{margin:2px 0 0;padding-left:16px;display:flex;flex-direction:column;gap:2px} .nw-test-items a{color:' + C.l1 + '}',
+      // —— 视觉层次：页面浅底、内容成卡片、版块色标、可信度徽章、涨红跌绿 ——
+      '.nw-scroll{background:' + C.bg2 + '}',
+      '.nw-c-politics{--sec:#e5484d} .nw-c-macro{--sec:#12a594} .nw-c-markets{--sec:#e2780b} .nw-c-industry{--sec:#8e4ec6} .nw-c-tech{--sec:#3e63dd} .nw-c-study{--sec:#0588c6} .nw-c-society{--sec:#d6409f} .nw-c-world{--sec:#00a2c7} .nw-c-following{--sec:' + C.accent + '}',
+      '.nw-h1{display:inline-flex;align-items:center;gap:9px;font-size:18px;font-weight:700;letter-spacing:.04em}',
+      '.nw-logo{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,' + C.accent + ',#8e4ec6);color:#fff;font-family:\"Noto Serif SC\",\"Source Han Serif SC\",\"Songti SC\",\"STSong\",Georgia,serif;font-size:15px;font-weight:700;letter-spacing:0;box-shadow:0 2px 8px color-mix(in srgb,' + C.accent + ' 35%,transparent)}',
+      '.nw-tab.nw-cur{color:' + C.accent + '}',
+      '.nw-mast{position:relative;overflow:hidden;gap:8px;padding:20px 24px 18px;border:1px solid ' + C.line1 + ';border-radius:16px;background:linear-gradient(120deg,color-mix(in srgb,' + C.accent + ' 9%,' + C.bg + ') 0%,' + C.bg + ' 60%);box-shadow:0 1px 3px rgba(0,0,0,.05)}',
+      '.nw-mast::after{content:"";position:absolute;right:-60px;top:-70px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,#8e4ec6 13%,transparent),transparent 70%);pointer-events:none}',
+      '.nw-mast > *{position:relative;z-index:1} .nw-mast-head{font-size:clamp(24px,4.6cqi,34px);margin-top:4px}',
+      '.nw-mast-stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}',
+      '.nw-stat{display:inline-flex;align-items:baseline;gap:1px;padding:3px 11px;border-radius:999px;background:' + C.bg + ';border:1px solid ' + C.line1 + ';font-size:12px;color:' + C.l2 + '} .nw-stat b{font-size:14px;font-weight:700;color:' + C.l1 + ';font-variant-numeric:tabular-nums}',
+      '.nw-stat-ai{color:' + C.accent + ';background:' + C.accentBg + ';border-color:transparent;font-weight:600}',
+      '.nw-front,.nw-sec,.nw-rail-box,.nw-since{background:' + C.bg + ';border:1px solid ' + C.line1 + ';border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}',
+      '.nw-sec{padding:4px 22px 8px} .nw-front{padding:22px;border-bottom:1px solid ' + C.line1 + '} .nw-rail-box{padding:14px 16px} .nw-since{padding:12px 16px;border-left:4px solid ' + C.accent + '}',
+      '.nw-read-main{gap:18px;max-width:none} .nw-sections{gap:18px} .nw-rail{gap:14px} .nw-edition{gap:16px}',
+      '@container (min-width: 900px){.nw-read{grid-template-columns:minmax(0,1fr) 280px;gap:20px}}',
+      '.nw-rs-lead,.nw-rs-points{max-width:820px}',
+      '.nw-sec-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0 0;padding:0 0 12px;border-bottom:1px solid ' + C.line1 + ';font-size:15px;font-weight:700;letter-spacing:.06em;color:var(--sec,' + C.l1 + ')}',
+      '.nw-sec-h > span:first-child{display:inline-flex;align-items:center;gap:9px} .nw-sec-h > span:first-child::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--sec,' + C.l1 + ')}',
+      '.nw-sec-n{font-size:11px;font-weight:700;letter-spacing:0;color:var(--sec,' + C.l3 + ');background:color-mix(in srgb,var(--sec,#888) 12%,transparent);border-radius:999px;padding:1px 9px} .nw-sec-hint{font-size:11px;font-weight:400;letter-spacing:0;color:' + C.l3 + '}',
+      '.nw-sec-fol{--sec:' + C.accent + ';background:linear-gradient(180deg,color-mix(in srgb,' + C.accent + ' 7%,' + C.bg + ') 0,' + C.bg + ' 160px);border-color:color-mix(in srgb,' + C.accent + ' 28%,transparent)} .nw-sec-fol .nw-sec-h{border-bottom-color:color-mix(in srgb,' + C.accent + ' 22%,transparent)}',
+      '.nw-kicker{display:flex;align-items:center;gap:8px;margin-bottom:2px}',
+      '.nw-kick{font-size:11px;font-weight:700;letter-spacing:.14em;color:#fff;background:' + C.err + ';border-radius:4px;padding:2px 8px} .nw-kick-sec{font-size:12px;color:' + C.l3 + ';letter-spacing:.06em}',
+      '.nw-v-lead .nw-rs-title{font-size:clamp(22px,3.8cqi,30px)}',
+      '.nw-imp-hi:not(.nw-v-lead) .nw-rs-title::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:' + C.err + ';margin-right:8px;vertical-align:middle;transform:translateY(-2px)}',
+      '.nw-pill{display:inline-block;margin-left:8px;padding:0 7px;border-radius:999px;font-size:11px;line-height:18px;font-weight:600;vertical-align:1px}',
+      '.nw-pill-ok{color:' + C.ok + ';background:' + C.okBg + '} .nw-pill-warn{color:' + C.warn + ';background:' + C.warnBg + '} .nw-pill-info{color:' + C.accent + ';background:' + C.accentBg + '}',
+      '.nw-rail-box h4{display:flex;align-items:center;gap:7px;font-size:12px;letter-spacing:.06em;padding-bottom:8px;border-bottom:1px solid ' + C.line1 + '}',
+      '.nw-rail-box h4::before{content:"";flex:none;width:3px;height:12px;border-radius:2px;background:' + C.accent + '} .nw-rail-warn h4{border-bottom-color:' + C.line1 + '} .nw-rail-warn h4::before{background:' + C.warn + '}',
+      '.nw-ticks ul{gap:0!important} .nw-tick{padding:6px 0;border-bottom:1px dashed ' + C.line1 + '} .nw-ticks li:last-child .nw-tick{border-bottom:0}',
+      '.nw-tick-up span{color:' + C.err + '!important} .nw-tick-down span{color:' + C.ok + '!important}',
+      '.nw-skim-h{color:var(--sec,' + C.l3 + ');font-weight:600}',
+      '.nw-foot{text-align:center}',
+      '@container (max-width: 600px){.nw-sec{padding:2px 14px 6px} .nw-front{padding:16px} .nw-mast{padding:16px} .nw-rail-box{padding:12px 14px}}',
     ].join('\n')
     function ensureStyle() {
       if (typeof document === 'undefined') return
