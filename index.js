@@ -596,7 +596,9 @@ export function draftSource(input, existing) {
   try { const u = new URL(url); host = u.hostname.toLowerCase(); segs = u.pathname.split("/").map((x) => x.replace(/\.[a-z]+$/i, "").toLowerCase()).filter((x) => /^[a-z][a-z0-9-]{1,20}$/.test(x) && !/^(news|rss|feeds?|atom|xml|index|list|en|zh|cn|home|channel|api|v\d)$/.test(x)); } catch { host = ""; }
   const bare = host.replace(/^(www|feeds?|rss|m|news|wap|en|cn)\./, "");
   const core = bare.replace(/\.(com|net|org|gov|edu|co|ac|io|info)?\.?(cn|uk|hk|tw|jp|sg|de|fr|au|ca|us)?$/i, "").split(".").pop() || "source";
-  const base = [core].concat(segs.slice(0, 1)).join("_").replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 32) || "source";
+  // 主域名太短（x.com 的 x）时用完整域名：x_com
+  const head = core.length >= 2 ? core : bare.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
+  const base = [head].concat(segs.slice(0, 1)).join("_").replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 32) || "source";
   const ids = new Set((existing || []).map((x) => x.id));
   let id = /^[a-z0-9]/.test(base) && base.length >= 2 ? base : "s_" + base;
   for (let n = 2; ids.has(id); n++) id = base.slice(0, 30) + "_" + n;

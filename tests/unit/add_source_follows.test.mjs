@@ -24,7 +24,8 @@ test("添加数据源：id 取主域名加栏目，按后缀和标题判断地�
   assert.equal(draftSource({ name: "留学", url: "https://www.example.org/feed", pack: "study_abroad" }, []).category, "留学与签证");
   const bare = draftSource({ name: "X", url: "x.com" }, []);
   assert.equal(bare.url, "https://x.com", "只填域名时补上 https://");
-  assert.equal(bare.id, "x");
+  assert.equal(bare.id, "x_com", "主域名太短时用完整域名");
+  assert.equal(draftSource({ name: "X", url: "https://x.com/Reuters" }, []).id, "x_com_reuters");
   assert.equal(draftSource({ name: "快讯", url: "www.stcn.com/article/list/kx.html" }, []).url, "https://www.stcn.com/article/list/kx.html");
 });
 
