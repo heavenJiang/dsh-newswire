@@ -2,6 +2,14 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.3 (2026-11-09)
+
+- **Learning starts automatically when adding a source**: if the generic test fetch can't read the page and a model is available, the model is asked to learn parsing rules right away, with no extra click; "Let the model try again" retries.
+- **Bare domains work**: `x.com` or `www.stcn.com/...` get `https://` added, and duplicates are checked on the completed URL.
+- **Fixed learning the x.com home page**:
+  - The timeline loads late, so the page outline used to be taken before any posts appeared. Outlines, and the snapshots used for model page reading, now wait until the page text has been stable for two seconds (up to 15 seconds).
+  - The output limit for learning rules went from 3,000 to 8,000 tokens, so thinking models are no longer cut off.
+
 ## 1.1.2 (2026-11-09)
 
 - **Unlimited: the model reads every web page**:

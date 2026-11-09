@@ -69,7 +69,7 @@ export async function learnRecipe(deps, src, o) {
   let last = null;
   const maxTries = (o && o.tries) || 2;
   for (let i = 0; i < maxTries; i++) {
-    const text = await deps.model.complete(recipePrompt({ name: src.name, url: src.url, title: ol.title, outline: ol.outline, feedback }), { step: "recipe", maxTokens: 3000, timeoutMs: (o && o.timeoutMs) || 240000 });
+    const text = await deps.model.complete(recipePrompt({ name: src.name, url: src.url, title: ol.title, outline: ol.outline, feedback }), { step: "recipe", maxTokens: 8000, timeoutMs: (o && o.timeoutMs) || 240000 });
     const j = parseJsonLoose(text);
     const extract = cleanExtract(j);
     if (!extract) { feedback = "没有给出可用的 item 选择器。"; last = { ok: false, error: "bad_json", tries: i + 1 }; continue; }

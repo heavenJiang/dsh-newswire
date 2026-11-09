@@ -589,7 +589,9 @@ async function upsertSourceInConfig(p, input) {
  * 新加的源先「试用」（只帮别家印证，不单独上版或推送），攒够数据后在成绩单里决定开不开。
  */
 export function draftSource(input, existing) {
-  const url = String(input.url || "").trim();
+  // 只填了域名（x.com、www.stcn.com/kx）：补上 https://
+  const url0 = String(input.url || "").trim();
+  const url = /^https?:\/\//i.test(url0) || !/^[\w-]+(\.[\w-]+)+(\/|$)/.test(url0) ? url0 : "https://" + url0;
   let host = "", segs = [];
   try { const u = new URL(url); host = u.hostname.toLowerCase(); segs = u.pathname.split("/").map((x) => x.replace(/\.[a-z]+$/i, "").toLowerCase()).filter((x) => /^[a-z][a-z0-9-]{1,20}$/.test(x) && !/^(news|rss|feeds?|atom|xml|index|list|en|zh|cn|home|channel|api|v\d)$/.test(x)); } catch { host = ""; }
   const bare = host.replace(/^(www|feeds?|rss|m|news|wap|en|cn)\./, "");
@@ -1326,8 +1328,8 @@ export function apply(ctx, config) {
         await ensureData(p);
         const conf = await readConfigSources(p);
         const list = conf.data.sources || [];
-        if (list.some((x) => String(x.url || "").replace(/\/+$/, "") === String(body.url || "").trim().replace(/\/+$/, ""))) return jsonResponse({ ok: false, error: "duplicate_url" }, 409);
         let src = draftSource(body, list);
+        if (list.some((x) => String(x.url || "").replace(/\/+$/, "") === String(src.url || "").replace(/\/+$/, ""))) return jsonResponse({ ok: false, error: "duplicate_url" }, 409);
         const problems = validateSources({ sources: [src] }, { allowSingle: true });
         if (problems.length) return jsonResponse({ ok: false, error: "invalid_source", problems }, 400);
         // 通用解析认不出来时：让模型读页面结构、写出解析规则，程序试抓验证（不过关再改一次）
@@ -1347,7 +1349,7 @@ export function apply(ctx, config) {
             const v2 = judgeRecipe(res2);
             if (v2.ok || (res2 && res2.kept) > ((res && res.kept) || 0)) { src = other; res = res2; verdict = v2; }
           }
-          return jsonResponse({ ok: verdict.ok, why: verdict.why, source: src, test: res }, 200);
+          return jsonResponse({ ok: verdict.ok, why: verdict.why, source: src, test: res, can_learn: llmReady() }, 200);
         }
         const out = await upsertSourceInConfig(p, src);
         if (!out.ok) return jsonResponse(out, 400);

@@ -148,7 +148,8 @@ const SELECT_BODY = [
 // 页面结构概要：给模型看的骨架（标签、id、少量 class、data-* 、链接与时间属性、短文本），
 // 只有一个子元素又没有自己文字的层级压成一行，连续相同的兄弟只留前 3 个，总长有上限。
 const OUTLINE_BODY = [
-  "await new Promise((r) => setTimeout(r, 2500));",
+  "// 动态页面（如 x.com 的时间线）内容是后加载的：等页面文字连续两秒不再变化（最多 15 秒）再取",
+  "{ let last = -1, same = 0; for (let i = 0; i < 15; i++) { await new Promise((r) => setTimeout(r, 1000)); let n = 0; try { n = await page.evaluate(() => (document.body ? document.body.innerText.length : 0)); } catch (e) {} if (i >= 2 && n === last && n > 300) { if (++same >= 2) break; } else same = 0; last = n; } }",
   "for (let i = 0; i < 2; i++) { try { await page.mouse.wheel(0, 1800); } catch (e) {} await new Promise((r) => setTimeout(r, 900)); }",
   "const payload = await page.evaluate(() => {",
   "  const SKIP = new Set(['SCRIPT','STYLE','SVG','NOSCRIPT','IFRAME','PATH','G','LINK','META','TEMPLATE','CANVAS','VIDEO','IMG','PICTURE','SOURCE','BUTTON','INPUT','FORM','NAV','HEADER','FOOTER','ASIDE']);",
@@ -189,7 +190,8 @@ const OUTLINE_BODY = [
 // 模型读页面（「不限」档）：页面正文按阅读顺序给出，每个链接就地标号【n】，时间元素标成〈时间 …〉。
 // 模型只能用这些编号指链接，程序据此核对，模型编不出页面上没有的链接。
 const READ_BODY = [
-  "await new Promise((r) => setTimeout(r, 2500));",
+  "// 动态页面（如 x.com 的时间线）内容是后加载的：等页面文字连续两秒不再变化（最多 15 秒）再取",
+  "{ let last = -1, same = 0; for (let i = 0; i < 15; i++) { await new Promise((r) => setTimeout(r, 1000)); let n = 0; try { n = await page.evaluate(() => (document.body ? document.body.innerText.length : 0)); } catch (e) {} if (i >= 2 && n === last && n > 300) { if (++same >= 2) break; } else same = 0; last = n; } }",
   "for (let i = 0; i < 3; i++) { try { await page.mouse.wheel(0, 2000); } catch (e) {} await new Promise((r) => setTimeout(r, 900)); }",
   "const payload = await page.evaluate(() => {",
   "  const SKIP = new Set(['SCRIPT','STYLE','SVG','NOSCRIPT','IFRAME','TEMPLATE','CANVAS','BUTTON','INPUT','FORM','SELECT','NAV','HEADER','FOOTER','ASIDE']);",

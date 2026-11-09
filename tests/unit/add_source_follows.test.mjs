@@ -22,6 +22,10 @@ test("添加数据源：id 取主域名加栏目，按后缀和标题判断地�
   const dup = draftSource({ name: "x", url: "https://www.stcn.com/" }, [{ id: "stcn" }]);
   assert.equal(dup.id, "stcn_2", "id 撞了加序号");
   assert.equal(draftSource({ name: "留学", url: "https://www.example.org/feed", pack: "study_abroad" }, []).category, "留学与签证");
+  const bare = draftSource({ name: "X", url: "x.com" }, []);
+  assert.equal(bare.url, "https://x.com", "只填域名时补上 https://");
+  assert.equal(bare.id, "x");
+  assert.equal(draftSource({ name: "快讯", url: "www.stcn.com/article/list/kx.html" }, []).url, "https://www.stcn.com/article/list/kx.html");
 });
 
 test("主线关注：每条故事线一项，带来源标记，读写都保留", () => {
