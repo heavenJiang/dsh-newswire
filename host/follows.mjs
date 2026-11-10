@@ -12,7 +12,7 @@
  * 关注：版面里单列「我的关注」（不受上版门槛限制），推送门槛降到 min_follow，关注的故事线有新报道时再推一次。
  * 屏蔽：版面与推送里都不出现（屏蔽优先于关注）。
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, copyFileSync } from "node:fs";
 
 export const KINDS = ["story", "keyword", "topic", "source"];
 
@@ -37,7 +37,21 @@ export function normalizeFollows(raw) {
 
 export function loadFollows(file) {
   if (!file || !existsSync(file)) return emptyFollows();
-  try { return normalizeFollows(JSON.parse(readFileSync(file, "utf8"))); } catch { return emptyFollows(); }
+  let text;
+  try { text = readFileSync(file, "utf8"); } catch { return emptyFollows(); }
+  try { return normalizeFollows(JSON.parse(text)); } catch { /* 坏了：先备份，再尽量救回 */ }
+  try { const bak = file + ".corrupt"; if (!existsSync(bak)) copyFileSync(file, bak); } catch { /* 备份不了也照样读 */ }
+  const got = leadingJson(text);
+  return got ? normalizeFollows(got) : emptyFollows();
+}
+
+/** 1.1.7 及以前并发写同一个临时文件，可能在完整的 JSON 后面拖一截旧内容：取开头最长那段能解析的对象。 */
+export function leadingJson(text) {
+  let found = null;
+  for (let i = text.indexOf("}"); i >= 0; i = text.indexOf("}", i + 1)) {
+    try { const v = JSON.parse(text.slice(0, i + 1)); if (v && typeof v === "object") found = v; } catch { /* 继续往后找 */ }
+  }
+  return found;
 }
 
 /** 增删一项。@returns 新的 follows */

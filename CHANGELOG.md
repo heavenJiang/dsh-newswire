@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.9 (2026-11-10)
+
+- The same race could also leave `follows.json` damaged: a complete file followed by a leftover tail from the other write. Before, a damaged file read as "no follows", and the next save would wipe them all. Now the plugin backs it up once as `follows.json.corrupt`, keeps the complete part at the start, and the next save writes the file clean again.
+
 ## 1.1.8 (2026-11-10)
 
 - Fix a crash that stopped the whole host: `ENOENT: rename follows.json.tmp -> follows.json`. When several theme trackers picked up new stories in one round, each wrote `follows.json` at the same time through the same temp file. The first rename succeeded and the others failed, and the failure was not caught, so the host exited.
