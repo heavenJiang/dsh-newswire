@@ -2,6 +2,19 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.10 (2026-11-10)
+
+The model takes 9–19 minutes to write an edition, longer than the host's 10-minute limit for a scheduled task, so pushes often carried the previous round's edition. Two new push settings (panel → 关注与推送 → 推送, or `newswire_push_prefs`):
+
+- **Timing**
+  - `on_time` (default): push at the scheduled time, as before.
+  - `when_ready`: the scheduled call only fetches, starts the edition in the background and returns an empty message, so nothing is pushed yet. Once the edition is written, the plugin runs the same scheduled task again, and that call pushes this round's edition. Each round sends one message, usually 10–20 minutes after the scheduled time, and everything in it is from this round.
+  - If the edition fails or takes longer than 45 minutes, the latest written edition is pushed and the message says so. A pending push survives a host restart.
+- **Content**
+  - `picked` (default): stories over the bar, within the per-round and daily limits, as before.
+  - `full`: every new story this round, plus every pushed story that has new reports. The bar and the limits do not apply. The message opens with a count line, and leads are trimmed to 80 characters.
+- The scheduled task's instruction now says to reply nothing when `message` is empty. Existing tasks are updated automatically.
+
 ## 1.1.9 (2026-11-10)
 
 - The same race could also leave `follows.json` damaged: a complete file followed by a leftover tail from the other write. Before, a damaged file read as "no follows", and the next save would wipe them all. Now the plugin backs it up once as `follows.json.corrupt`, keeps the complete part at the start, and the next save writes the file clean again.

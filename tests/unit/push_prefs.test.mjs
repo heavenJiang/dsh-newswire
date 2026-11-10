@@ -12,7 +12,8 @@ const iso = (msAgo) => new Date(Date.now() - msAgo).toISOString().replace("T", "
 const tmpDb = () => openDb(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "nw-v23-")), "n.sqlite"));
 
 test("偏好：坏值退回默认、范围夹住；存取往返", () => {
-  assert.deepEqual(normalizePush({ cadence: "hourly", level: "max", per_round: 99, daily_max: 0 }), { version: 1, cadence: "every2h", level: "normal", per_round: 15, daily_max: 24 });
+  assert.deepEqual(normalizePush({ cadence: "hourly", level: "max", per_round: 99, daily_max: 0 }), { version: 1, cadence: "every2h", level: "normal", per_round: 15, daily_max: 24, timing: "on_time", scope: "picked" });
+  assert.deepEqual([normalizePush({ timing: "later", scope: "all" }).timing, normalizePush({ timing: "when_ready", scope: "full" }).scope], ["on_time", "full"]);
   const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "nw-p-")), "push.json");
   assert.equal(loadPush(f).cadence, "every2h", "没有文件用默认");
   savePush(f, { cadence: "thrice", level: "fewer" });
@@ -60,5 +61,24 @@ test("推送记录带上读者的最近一次反馈", () => {
   db.prepare("INSERT INTO feedback (at, kind, story_id, note) VALUES (?, 'push_up', 'st1', 'politics')").run(iso(0));
   const r = recentPushes(db, 10);
   assert.deepEqual([r[0].title, r[0].section, r[0].vote], ["沙特遇袭", "politics", "push_up"]);
+  db.close();
+});
+
+test("本轮新内容全推：不看门槛和条数上限；推过的有新报道加入推进展，没变化的和旧的不推", () => {
+  const db = tmpDb();
+  const st = (id, imp, extra) => Object.assign({ id, title: "报道" + id, section: "politics", importance: imp, source_count: 1, credibility: "single", first_seen_at: iso(600000), article_ids: [], event_ids: [], outlets: [{ name: "财联社" }] }, extra);
+  const stories = {};
+  for (let i = 0; i < 12; i++) stories["n" + i] = st("n" + i, 20 + i);
+  stories.dev = st("dev", 30, { updated: true, update_text: "新增 2 篇" });
+  stories.same = st("same", 70);
+  stories.old = st("old", 80, { first_seen_at: iso(10 * 3600000) });
+  for (const id of ["dev", "same"]) db.prepare("INSERT INTO pushes (run_id, article_id, story_id, pushed_at, score, reason) VALUES ('r', ?, ?, ?, ?, 'new')").run("a" + id, id, iso(3 * 3600000), stories[id].importance);
+  const rules = { min_corroborated: 50, min_single: 36, max: 6 };
+  const o = { nowIso: iso(0), lookbackHours: 6 };
+  assert.equal(editionPicks(db, { stories }, rules, o).length, 0, "挑重点：都没过门槛");
+  const full = editionPicks(db, { stories }, rules, Object.assign({ full: true }, o));
+  assert.equal(full.length, 13);
+  assert.equal(full.find((x) => x.id === "dev").reason, "followup");
+  assert.ok(!full.some((x) => x.id === "same" || x.id === "old"));
   db.close();
 });

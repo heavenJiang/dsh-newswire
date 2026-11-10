@@ -6,7 +6,10 @@
  * 每一轮里：门槛档位（少而精 / 适中 / 多一些）、每轮条数上限、每天条数上限；
  * 读者在面板里对推送点「有用 / 没用」，同一版块近 14 天「没用」比「有用」多 3 次以上，这个版块的门槛自动提高。
  *
- * 偏好存 dataDir/push.json：{ version, cadence, level, per_round, daily_max }
+ * 推送时机 timing：on_time 到点推（来不及就先推已编好的版面）/ when_ready 到点只抓取，本轮版面写完再推一条。
+ * 推送内容 scope：picked 按门槛和上限挑重点 / full 本轮所有新报道和有进展的报道都推（不受门槛和上限限制）。
+ *
+ * 偏好存 dataDir/push.json：{ version, cadence, level, per_round, daily_max, timing, scope }
  */
 import fs from "node:fs";
 
@@ -17,7 +20,9 @@ export const CADENCES = {
   daily_only: { cron: null, label: "只看晚间日报（不推送每轮要闻）" },
 };
 export const LEVELS = { fewer: 12, normal: 0, more: -8 };
-export const PUSH_DEFAULTS = { version: 1, cadence: "every2h", level: "normal", per_round: 6, daily_max: 24 };
+export const TIMINGS = ["on_time", "when_ready"];
+export const SCOPES = ["picked", "full"];
+export const PUSH_DEFAULTS = { version: 1, cadence: "every2h", level: "normal", per_round: 6, daily_max: 24, timing: "on_time", scope: "picked" };
 
 export function normalizePush(p) {
   const x = Object.assign({}, PUSH_DEFAULTS, p && typeof p === "object" ? p : {});
@@ -25,7 +30,9 @@ export function normalizePush(p) {
   if (!(x.level in LEVELS)) x.level = PUSH_DEFAULTS.level;
   x.per_round = Math.max(1, Math.min(15, Math.round(Number(x.per_round) || PUSH_DEFAULTS.per_round)));
   x.daily_max = Math.max(1, Math.min(100, Math.round(Number(x.daily_max) || PUSH_DEFAULTS.daily_max)));
-  return { version: 1, cadence: x.cadence, level: x.level, per_round: x.per_round, daily_max: x.daily_max };
+  if (!TIMINGS.includes(x.timing)) x.timing = PUSH_DEFAULTS.timing;
+  if (!SCOPES.includes(x.scope)) x.scope = PUSH_DEFAULTS.scope;
+  return { version: 1, cadence: x.cadence, level: x.level, per_round: x.per_round, daily_max: x.daily_max, timing: x.timing, scope: x.scope };
 }
 
 export function loadPush(file) {

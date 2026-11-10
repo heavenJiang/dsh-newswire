@@ -1049,8 +1049,10 @@ export function notesFromEdition(db, ed) {
 }
 
 // ------------------------------------------------------------------ 推送
-/** 版面里要推的报道：新报道过门槛，或已推过但可信度升级 / 重要度大涨。规则与 select.mjs 一致。 */
+/** 版面里要推的报道：新报道过门槛，或已推过但可信度升级 / 重要度大涨。规则与 select.mjs 一致。
+ * o.full：本轮新内容全推——没推过的新报道都推，推过的有新报道加入就推进展；不看门槛和条数上限。 */
 export function editionPicks(db, ed, rules, o) {
+  const full = Boolean(o.full);
   const now = Date.parse(o.nowIso.replace(" ", "T") + "Z");
   const iso = (ms) => new Date(ms).toISOString().replace("T", " ").slice(0, 19);
   const since = iso(now - o.lookbackHours * 3600000);
@@ -1062,7 +1064,7 @@ export function editionPicks(db, ed, rules, o) {
     const followed = Boolean(s.followed && s.followed.length);
     // 读者对某版块的推送多次说「没用」：这个版块门槛提高（关注的不受影响）
     const min = followed ? (rules.min_follow ?? 20) : (s.source_count >= 2 ? rules.min_corroborated : rules.min_single) + ((o.penalties && o.penalties[s.section]) || 0);
-    if (s.importance < min) continue;
+    if (!full && s.importance < min) continue;
     if (req && !followed && !req.some((p) => s.section === p || (s.labels || []).some((l) => l === p || l.startsWith(p + ".")))) continue;
     if (s.published_at && s.published_at < staleBefore) continue;
     // 推过与否按故事线（及其规则事件）判断：同一条故事线不因换了规则事件而重复推
@@ -1074,10 +1076,10 @@ export function editionPicks(db, ed, rules, o) {
       if ((CRED_RANK[s.credibility] ?? 0) > (CRED_RANK[last.credibility] ?? 0)) reason = "upgraded";
       else if (s.importance - (last.score || 0) >= (rules.upgrade_jump || 20)) reason = "jumped";
       // 关注的故事线有新报道加入：再推一次
-      else if (followed && s.updated) reason = "followup";
+      else if ((followed || full) && s.updated) reason = "followup";
     }
     if (reason) picks.push(Object.assign({}, s, { reason, heat: heatOf(db, s.article_ids || []) }));
-    if (picks.length >= (rules.max || 8)) break;
+    if (!full && picks.length >= (rules.max || 8)) break;
   }
   return picks;
 }
@@ -1106,18 +1108,23 @@ export function composeEditionMessage(parts, picks, ed, names) {
   const md = String(parts.md || "").split("-").map(Number);
   const L = ["📰 " + head + " · " + (md.length === 2 && md[0] ? md[0] + "月" + md[1] + "日 " : "") + parts.hhmm];
   if (ed.headline) L.push(ed.headline);
+  if (parts.full) {
+    const nNew = picks.filter((x) => x.reason === "new").length;
+    L.push("本轮新报道 " + nNew + " 件" + (picks.length > nNew ? "，有进展 " + (picks.length - nNew) + " 件" : ""));
+  }
   let markets = false;
   picks.forEach((s, i) => {
     const again = s.reason !== "new";
     const tag = s.reason === "followup" ? "【进展】" : s.reason === "upgraded" || s.reason === "jumped" ? "【升级】" : "";
     L.push("", (i + 1) + ". " + tag + s.title + (s.followed && s.followed.length ? " ★" : ""));
     // 已推过的故事线再推：写进展，不重复导语
-    if (again && s.update_text) L.push("进展：" + clip(s.update_text, 100));
+    const cut = parts.full ? 80 : 100;
+    if (again && s.update_text) L.push("进展：" + clip(s.update_text, cut));
     else {
       // 程序稿的导语常常就是标题本身：一样就不重复
       const lead = s.push_lead || s.lead;
       const same = (x) => String(x || "").replace(/[\s，。、：:,.!！?？“”"'‘’《》（）()]/g, "");
-      if (lead && same(lead) !== same(s.title)) L.push(clip(lead, 100));
+      if (lead && same(lead) !== same(s.title)) L.push(clip(lead, cut));
     }
     const who = s.outlets.map((x) => String(x.name || x.source_id).replace(/·.*$/, ""));
     const h = s.heat || {};

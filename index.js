@@ -14,7 +14,7 @@ import { DEPTHS, depthOf, depthParams, recordCall, usageToday, makeGate } from "
 import { searchNews, answerNews } from "./host/ask.mjs";
 import { analysisMaterials, analyzeStory, saveAnalysis, latestAnalysis, analysisBrief, autoAnalyzeTargets } from "./host/analysis.mjs";
 import { listTrackers, addTracker, removeTracker, unlinkStory, linkAll, trackerDetail, synthesize, suggestions as trackSuggestions, synthTargets } from "./host/tracking.mjs";
-import { CADENCES, LEVELS, loadPush, savePush, normalizePush, sectionPenalties, rulesFor, applyDailyCap, recentPushes as pushHistory } from "./host/push.mjs";
+import { CADENCES, LEVELS, TIMINGS, SCOPES, loadPush, savePush, normalizePush, sectionPenalties, rulesFor, applyDailyCap, recentPushes as pushHistory } from "./host/push.mjs";
 import { markKind } from "./engine/pipeline/quality.mjs";
 import os from "node:os";
 import path from "node:path";
@@ -155,8 +155,10 @@ function dailyPrompt(pack) {
   return "调用工具 newswire_daily（参数 pack=\"" + pack + "\"）。" + SLOW_HINT + "把返回结果里 message 字段的文本原样作为你的回复：不要改写、不要补充、不要调用其他工具。工具报错时只回复一行错误原因。";
 }
 function schedulePrompt(pack) {
-  return "调用工具 newswire_cycle（参数 pack=\"" + pack + "\"）。" + SLOW_HINT + "把返回结果里 message 字段的文本原样作为你的回复：不要改写、不要补充、不要调用其他工具。工具报错时只回复一行错误原因。";
+  return "调用工具 newswire_cycle（参数 pack=\"" + pack + "\"）。" + SLOW_HINT + "把返回结果里 message 字段的文本原样作为你的回复：不要改写、不要补充、不要调用其他工具。message 为空时不要回复任何文字，直接结束。工具报错时只回复一行错误原因。";
 }
+// 「写完再推」：本轮版面最多等这么久；过了就按已有的最新版面推
+const PENDING_MAX_MS = 45 * 60000;
 const CRED_TEXT = { single: "单源", corroborated: "已印证", confirmed: "权威确认", disputed: "存在分歧" };
 const CYCLE_WAIT_MS = 15 * 60000;
 const DISCLAIMER = "来源与数据时间已在每条行内标注；标题/摘要来自列表页或 feed，未逐条核原文；热度信号为源头原值；财经内容非投资建议。";
@@ -1110,6 +1112,14 @@ export function apply(ctx, config) {
   async function runCycle(args) {
     const deadline = Date.now() + cfg.cycleBudgetMs;
     const left = () => deadline - Date.now();
+    // 「写完再推」：到点只抓取、在后台编版面，写完后插件再触发一次同一个定时任务，那一次只推送
+    const packKey = (args && args.pack) || "core";
+    const deferring = loadPush(p.pushPrefs).timing === "when_ready" && !(args && args.dry_run === true);
+    if (deferring) {
+      const pend = readPending(packKey);
+      if (pend && pend.ready) return deliverPending(pend);
+      if (pend && Date.now() - Date.parse(pend.at) < PENDING_MAX_MS) return { ok: true, deferred: true, run_id: pend.run_id, message: "", note: "本轮版面还在写，写完自动推送" };
+    }
     // 两个主题包的定时任务可能撞上，或预编排还在抓：等它结束，但给版面和发送留出时间
     while (inflight.current !== null && left() > 240000) await sleep(3000);
     if (inflight.current) return cycleFromLatest(args, "另一轮抓取（" + inflight.current + "）还没结束");
@@ -1126,6 +1136,13 @@ export function apply(ctx, config) {
         res = await runEngine(ctx, cfg, p, cycleFlags(p, cfg, Object.assign({}, args, { defer_push: !(args && args.dry_run === true) }), runId).concat(pf ? ["--prefetched", pf.dir] : []), Math.max(60000, Math.min(cfg.timeoutMs, left() - 120000)));
       } finally { if (pf) await rm(pf.dir, { recursive: true, force: true }).catch(() => {}); }
       const out = engineJson(res.stdout);
+      if (out && out.run_id && deferring && out.parts) {
+        const pend = { pack: packKey, ed_pack: out.pack || (args && args.pack) || "all", run_id: out.run_id, at: new Date().toISOString(), parts: out.parts, rules: out.rules || null, lookback: out.lookback_hours || 6, want_llm: modeNow() === "llm" && model.available(), ready: false, edition_id: null };
+        writePending(pend);
+        void background(composeThenDeliver(pend), "deferred push");
+        delete out.parts;
+        return Object.assign(out, { deferred: true, message: "", note: "本轮已抓取，版面写完后推送" });
+      }
       if (out && out.run_id) {
         const pack = out.pack || (args && args.pack) || "all";
         const fresh = (async () => {
@@ -1169,13 +1186,103 @@ export function apply(ctx, config) {
     }
   }
 
+  // ---------------------------------------------------------------- 写完再推
+  const pendingKey = (pack) => "push_pending:" + pack;
+  const composing = new Set();
+  function readPending(pack) {
+    try { const r = withDb(p, (db) => (db ? db.prepare("SELECT value FROM kv WHERE key = ?").get(pendingKey(pack)) : null)); return r ? JSON.parse(r.value) : null; } catch { return null; }
+  }
+  function writePending(pend) {
+    withDb(p, (db) => { if (db) db.prepare("INSERT INTO kv (key, value, updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").run(pendingKey(pend.pack), JSON.stringify(pend), new Date().toISOString().replace("T", " ").slice(0, 19)); });
+  }
+  function clearPending(pack) {
+    withDb(p, (db) => { if (db) db.prepare("DELETE FROM kv WHERE key = ?").run(pendingKey(pack)); });
+  }
+  /** 在后台编本轮版面（前一份还在写就等它），写完记下来并触发推送。 */
+  async function composeThenDeliver(pend) {
+    composing.add(pend.pack);
+    try {
+      const t0 = Date.now();
+      while (modelState.busy && Date.now() - t0 < PENDING_MAX_MS - 15 * 60000) await sleep(5000);
+      let ed = null;
+      if (!modelState.busy) { try { ed = await makeEdition({ pack: pend.ed_pack, runId: pend.run_id, wantLlm: pend.want_llm, minHours: pend.lookback }); } catch { ed = null; } }
+      if (!ed) {
+        ed = latestContent(pend.ed_pack);
+        if (ed) pend.note = "本轮版面没编出来，按 " + bjHhmm(ed.created_at) + " 的版面推送";
+      }
+      pend.edition_id = ed ? ed.id : null;
+      pend.ready = true;
+      pend.ready_at = new Date().toISOString();
+      writePending(pend);
+    } finally { composing.delete(pend.pack); }
+    await triggerDelivery(pend.pack);
+  }
+  /** 触发这个主题包的定时任务一次（它调 newswire_cycle，取到写好的版面就推送）。宿主忙时隔一分钟再试。 */
+  const triggering = new Set();
+  async function triggerDelivery(pack) {
+    if (triggering.has(pack)) return false;
+    triggering.add(pack);
+    try { return await triggerOnce(pack); } finally { triggering.delete(pack); }
+  }
+  async function triggerOnce(pack) {
+    for (let i = 0; i < 15; i++) {
+      const svc = optional.schedule;
+      if (!svc) return false;
+      try {
+        const all = (await svc.list({ limit: 500 })).items || [];
+        const task = all.find((x) => x.title === packSchedule(p, pack).title);
+        if (!task) return false; // 没有定时任务：等下次有人调用 newswire_cycle 时推
+        const r = await svc.run({ id: task.id });
+        if (r && r.code === "schedule_not_found") return false;
+        if (!(r && r.code)) return true;
+      } catch { /* 下一分钟再试 */ }
+      await sleep(60000);
+    }
+    return false;
+  }
+  /** 宿主重启等原因丢了后台编排：等太久的待推送按已有的最新版面推出去。 */
+  async function checkPending() {
+    for (const pack of Object.keys(packSchedule(p, "core").packs).concat("core")) {
+      const pend = readPending(pack);
+      if (!pend || composing.has(pack) || triggering.has(pack)) continue;
+      const age = Date.now() - Date.parse(pend.at);
+      if (pend.ready ? Date.now() - Date.parse(pend.ready_at || pend.at) > 5 * 60000 : age > PENDING_MAX_MS) {
+        if (!pend.ready) {
+          const ed = latestContent(pend.ed_pack);
+          Object.assign(pend, { ready: true, ready_at: new Date().toISOString(), edition_id: ed ? ed.id : null, note: ed ? "本轮版面没编完，按 " + bjHhmm(ed.created_at) + " 的版面推送" : null });
+          writePending(pend);
+        }
+        if (age > 3 * 3600000) { clearPending(pack); continue; } // 太旧了，交给下一轮
+        await triggerDelivery(pack);
+      }
+    }
+  }
+  function deliverPending(pend) {
+    clearPending(pend.pack);
+    const ed = pend.edition_id ? withDb(p, (db) => (db ? edContent(editionById(db, pend.edition_id)) : null)) : null;
+    const out = { ok: true, run_id: pend.run_id, pack: pend.pack, fetched_at: pend.at };
+    const db = openIfExists(p.db);
+    try {
+      // 推送时离抓取已过了一阵：判断「本轮新」的时间窗口往前补上这段
+      const lookback = pend.lookback + (Date.now() - Date.parse(pend.at)) / 3600000;
+      if (ed) {
+        out.message = sendFromEdition(db, ed, pend.parts, pend.rules, pend.run_id, lookback, true, out);
+        if (pend.note) out.message += "\n（" + pend.note + "）";
+      } else out.message = pend.parts.hhmm + " 本轮版面没编出来，详情见新闻面板";
+    } finally { if (db) db.close(); }
+    out.edition = ed ? { id: ed.id, mode: ed.mode, model: ed.model, headline: ed.headline, stories: Object.keys(ed.stories || {}).length, items_read: ed.items_read } : null;
+    return out;
+  }
+
   /** 按版面选出要推的报道、记推送、拼消息（out 上顺带挂 picks 与 held）。 */
   function sendFromEdition(db, ed, parts, rules, runId, lookbackHours, record, out) {
     const nowIso = new Date().toISOString().replace("T", " ").slice(0, 19);
-    // 推送偏好：门槛档位、每轮上限、按读者反馈调各版块门槛、每天上限
+    // 推送偏好：门槛档位、每轮上限、按读者反馈调各版块门槛、每天上限；「全推」不看门槛和上限
     const pp = loadPush(p.pushPrefs);
-    const all = editionPicks(db, ed, rulesFor(Object.assign({}, DEFAULT_RULES, rules || {}), pp), { nowIso, lookbackHours, penalties: sectionPenalties(db) });
-    const cap = applyDailyCap(db, all, pp);
+    const full = pp.scope === "full";
+    parts = Object.assign({}, parts, { full });
+    const all = editionPicks(db, ed, rulesFor(Object.assign({}, DEFAULT_RULES, rules || {}), pp), { nowIso, lookbackHours, penalties: sectionPenalties(db), full });
+    const cap = full ? { send: all, held: 0, today: 0 } : applyDailyCap(db, all, pp);
     const picks = cap.send;
     if (record) recordEditionPushes(db, picks, runId, nowIso, out.pack || ed.pack);
     out.held = cap.held;
@@ -1190,9 +1297,11 @@ export function apply(ctx, config) {
       const since = new Date(Date.now() - 3 * 3600000).toISOString().replace("T", " ").slice(0, 19);
       const pick = db.prepare("SELECT id FROM editions WHERE pack IN (?, 'all') AND mode = 'llm' AND created_at >= ? ORDER BY (pack = ?) DESC, id DESC LIMIT 1").get(pack, since, pack)
         || db.prepare("SELECT id FROM editions WHERE pack IN (?, 'all') ORDER BY (pack = ?) DESC, id DESC LIMIT 1").get(pack, pack);
-      const row = pick ? editionById(db, pick.id) : null;
-      return row && row.content ? Object.assign({}, row.content, { id: row.id, pack: row.pack, mode: row.mode, model: row.model, created_at: row.created_at, headline: row.headline || row.content.headline, error: row.error }) : null;
+      return edContent(pick ? editionById(db, pick.id) : null);
     });
+  }
+  function edContent(row) {
+    return row && row.content ? Object.assign({}, row.content, { id: row.id, pack: row.pack, mode: row.mode, model: row.model, created_at: row.created_at, headline: row.headline || row.content.headline, error: row.error }) : null;
   }
 
   function bjHhmm(utc) { try { return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(String(utc).replace(" ", "T") + "Z")); } catch { return ""; } }
@@ -1277,7 +1386,7 @@ export function apply(ctx, config) {
     // 而这时推送已经记下、消息却回不去）。所有工具的返回统一过一遍 JSON 往返。
     const tool = (def) => disposers.push(ctx.tools.register(Object.assign({}, def, { execute: async (...a) => losslessJson(await def.execute(...a)) })));
     // 预编排：每分钟看一眼下一次定时推送还有多久
-    { const t = setInterval(() => { void background(prewarmTick(), "prewarm"); }, 60000); disposers.push(() => clearInterval(t)); }
+    { const t = setInterval(() => { void background(prewarmTick(), "prewarm"); void background(checkPending(), "pending push"); }, 60000); disposers.push(() => clearInterval(t)); }
 
     // ---------------------------------------------------------------- 路由
     route({
@@ -1986,7 +2095,7 @@ export function apply(ctx, config) {
 
     tool({
       name: "newswire_cycle",
-      description: "Run one full cycle (used by the scheduled task): fetch every enabled source from its continuity checkpoint (gaps are recovered by paging or search; 6 hours or more since the last cycle, or before 08:00, runs in overnight mode and fetches more) → classify, cluster cross-source events and score them → write the digest → lay out the edition (in LLM mode a model reads the news, groups, ranks and writes it; in economy mode the program does) → pick the new or upgraded top stories → return `message`, the text to send to the phone (one line when nothing qualifies, with open gaps and repeatedly failing sources appended). In a scheduled task, reply with `message` verbatim.",
+      description: "Run one full cycle (used by the scheduled task): fetch every enabled source from its continuity checkpoint (gaps are recovered by paging or search; 6 hours or more since the last cycle, or before 08:00, runs in overnight mode and fetches more) → classify, cluster cross-source events and score them → write the digest → lay out the edition (in LLM mode a model reads the news, groups, ranks and writes it; in economy mode the program does) → pick the new or upgraded top stories → return `message`, the text to send to the phone (one line when nothing qualifies, with open gaps and repeatedly failing sources appended). With the push timing set to when_ready, the scheduled call only fetches and returns an empty `message`; the plugin runs the same task again once the edition is written, and that call returns the push. In a scheduled task, reply with `message` verbatim, and reply nothing when it is empty.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -2249,18 +2358,18 @@ export function apply(ctx, config) {
 
     tool({
       name: "newswire_push_prefs",
-      description: "Read or change how often and how much news is pushed to the phone. cadence: every2h (07–21) / every4h (8, 12, 16, 20) / thrice (8, 12, 18) / daily_only (no rounds, only the evening recap) — changing it updates the scheduled task if one exists. level: fewer (higher bar) / normal / more. per_round: max stories per push (1–15). daily_max: max stories per day (1–100). With no arguments, returns the current settings, recent pushes and per-section adjustments learned from the reader's feedback.",
+      description: "Read or change how often and how much news is pushed to the phone. cadence: every2h (07–21) / every4h (8, 12, 16, 20) / thrice (8, 12, 18) / daily_only (no rounds, only the evening recap) — changing it updates the scheduled task if one exists. level: fewer (higher bar) / normal / more. per_round: max stories per push (1–15). daily_max: max stories per day (1–100). timing: on_time (push at the scheduled time; if the model has not finished, push the latest written edition) / when_ready (fetch at the scheduled time, push once this round's edition is written, usually 10–20 minutes later). scope: picked (stories over the bar, within the limits) / full (every new story and every story with new reports this round, ignoring the bar and limits). With no arguments, returns the current settings, recent pushes and per-section adjustments learned from the reader's feedback.",
       parameters: { type: "object", additionalProperties: false, properties: {
         cadence: { type: "string", enum: Object.keys(CADENCES) }, level: { type: "string", enum: Object.keys(LEVELS) },
-        per_round: { type: "number" }, daily_max: { type: "number" } } },
+        per_round: { type: "number" }, daily_max: { type: "number" }, timing: { type: "string", enum: TIMINGS }, scope: { type: "string", enum: SCOPES } } },
       timeoutMs: 30000,
       output: {
         schema: { type: "object", additionalProperties: true, required: ["prefs"], properties: { prefs: { type: "object" } } },
-        render: (_a, v) => [{ type: "text", text: "推送节奏：" + (CADENCES[v.prefs.cadence] || {}).label + "｜档位：" + v.prefs.level + "｜每轮最多 " + v.prefs.per_round + " 条｜每天最多 " + v.prefs.daily_max + " 条" + (v.schedule_note ? "\n" + v.schedule_note : "") }],
+        render: (_a, v) => [{ type: "text", text: "推送节奏：" + (CADENCES[v.prefs.cadence] || {}).label + "｜档位：" + v.prefs.level + "｜每轮最多 " + v.prefs.per_round + " 条｜每天最多 " + v.prefs.daily_max + " 条｜" + (v.prefs.timing === "when_ready" ? "写完再推" : "到点推送") + "｜" + (v.prefs.scope === "full" ? "本轮新内容全推" : "挑重点") + (v.schedule_note ? "\n" + v.schedule_note : "") }],
       },
       async execute(args) {
         const a = args || {};
-        const changed = ["cadence", "level", "per_round", "daily_max"].some((k) => a[k] !== undefined);
+        const changed = ["cadence", "level", "per_round", "daily_max", "timing", "scope"].some((k) => a[k] !== undefined);
         if (!changed) { const v = await pushView(); return { prefs: v.prefs, penalties: v.penalties, task: v.task }; }
         const r = await applyPush(a);
         return { prefs: r.prefs, schedule_note: r.schedule ? r.schedule.note : null };

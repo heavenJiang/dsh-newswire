@@ -38,6 +38,7 @@ const fakeSchedule = {
     if (req.patch.prompt) t.prompt = req.patch.prompt;
     return t;
   },
+  async run(req) { scheduleCalls.push(["run", req]); const t = fakeTasks.get(req.id); return t || { id: req.id, code: "schedule_not_found" }; },
 };
 
 // 假的宿主模型服务：简报提示回简报 JSON，其它回事件解读 JSON
@@ -388,6 +389,23 @@ const lbl = await callRoute("/api/newswire/items", "POST", { hours: 24, label: "
 if (!lbl || lbl.status !== 200) bad++;
 const ran = await callRoute("/api/newswire/run", "POST", { sources: "bbc_world", window_hours: 6, max_items: 4, export: "none" });
 if (!ran || ran.status !== 200 || ran.value.ok !== true) bad++;
+
+// 写完再推：到点只抓取、消息为空；版面写完后插件触发同一个定时任务，那一次推本轮全部新内容
+await callTool("newswire_schedule_setup", {});
+const ppW = await callTool("newswire_push_prefs", { timing: "when_ready", scope: "full" });
+if (!ppW || ppW.prefs.timing !== "when_ready" || ppW.prefs.scope !== "full") { bad++; console.log("推送时机 / 内容没存上", ppW && ppW.prefs); }
+const runsBefore = scheduleCalls.filter((c) => c[0] === "run").length;
+const d1 = await callTool("newswire_cycle", { sources: "bbc_world,jiemian,wallstreetcn" });
+if (!d1 || d1.deferred !== true || d1.message !== "") { bad++; console.log("写完再推：到点那次应只抓取、消息为空", d1 && d1.message); }
+const d2 = await callTool("newswire_cycle", {});
+if (!d2 || d2.message !== "" ) { bad++; console.log("版面没写完时再调用也应为空", d2 && d2.message); }
+for (let i = 0; i < 240 && scheduleCalls.filter((c) => c[0] === "run").length === runsBefore; i++) await new Promise((r) => setTimeout(r, 500));
+if (scheduleCalls.filter((c) => c[0] === "run").length === runsBefore) { bad++; console.log("版面写完后没有触发定时任务"); }
+const d3 = await callTool("newswire_cycle", {});
+console.log("  deferred push:", d3 && d3.message && d3.message.split("\n").slice(0, 3).join(" / "), "picks:", d3 && (d3.picks || []).length);
+if (!d3 || !d3.message || !d3.edition || d3.run_id !== d1.run_id) { bad++; console.log("触发后的那次应推本轮版面", d3); }
+if (d3 && (d3.picks || []).length && !/本轮新报道 \d+ 件/.test(d3.message)) { bad++; console.log("全推消息没有本轮统计行"); }
+await callTool("newswire_push_prefs", { timing: "on_time", scope: "picked" });
 
 for (const d of ctx._disposers) if (typeof d === "function") d();
 console.log("\nSMOKE " + (bad === 0 ? "PASS" : "FAIL(" + bad + ")") + "  dataDir=" + DATA);
