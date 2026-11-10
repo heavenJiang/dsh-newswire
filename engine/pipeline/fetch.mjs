@@ -84,7 +84,7 @@ export async function fetchSource(src, env) {
           record({ channel: ch, ok: false, error: reason, error_kind: "browser_unavailable", hint: reason === "browse_not_found" ? "未找到 browse：运行 curl -fsSL https://raw.githubusercontent.com/heavenJiang/dsh-newswire/main/scripts/setup.sh | bash 一键安装，或在插件设置里填 browseBin" : "browse 扩展没连上：在终端运行 browse install 完成配对，或在 Chrome 工具栏点 browse 按钮重连", latency_ms: 0 });
           break;
         }
-        const res = await browseFetch(browseModeOf(src, adapter), src.url, max, { timeoutMs, sinceHours: src.since_hours || env.windowHours || 24, until: src.until || null, pages: Number(src.pages || Math.ceil(max / 20) + 2), category: src.category_src || "", waitFor: (adapter && adapter.waitFor) || src.wait_for || "", extract: src.extract || null });
+        const res = await browseFetch(browseModeOf(src, adapter), src.url, max, { timeoutMs, sinceHours: src.since_hours || env.windowHours || 24, until: src.until || null, pages: Number(src.pages || Math.ceil(max / 20) + 2), category: src.category_src || "", waitFor: (adapter && adapter.waitFor) || src.wait_for || "", extract: src.extract || null, known: src.known_links || [] });
         if (res.ok) {
           const v = res.value || {};
           const payload = res.data || {};
@@ -96,7 +96,7 @@ export async function fetchSource(src, env) {
             items = payload.items || [];
             if (!items.length && payload.xml_text) items = parseRss(payload.xml_text, max);
             parsedBy = "browse:" + (v.mode || "?");
-            rawPath = env.writeRaw(src.id + ".browse.json", JSON.stringify({ source: src.id, url: src.url, meta: { page_url: v.page_url, doc_title: v.doc_title, count: v.count, pages: v.pages, stop: v.stop }, payload }, null, 1));
+            rawPath = env.writeRaw(src.id + ".browse.json", JSON.stringify({ source: src.id, url: src.url, meta: { page_url: v.page_url, doc_title: v.doc_title, count: v.count, pages: v.pages, stop: v.stop, scroll: payload.scroll || null }, payload }, null, 1));
           }
           bytes = v.bytes || null;
           if (items.length) { ok = true; note = "count=" + items.length + (v.pages != null ? " pages=" + v.pages : "") + (v.stop ? " stop=" + v.stop : ""); }

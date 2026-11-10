@@ -42,7 +42,12 @@ export function evaluate(prev, records, src) {
   const times = records.filter(trusted).map((r) => r.published_at).sort();
   const oldest = times[0] || null;
   const newest = times[times.length - 1] || null;
-  if (!isStream(src)) return { status: "snapshot", overlap: 0, gap_from: null, gap_to: null, oldest, newest };
+  // 快照源（首页、列表页）不判缺口，但记下和上一轮重叠了几条：0 条说明两轮之间页面整个翻过去了，中间可能有漏
+  if (!isStream(src)) {
+    const keys = new Set((prev && prev.head_keys) || []);
+    const overlap = keys.size ? records.filter((r) => keys.has(r.id)).length : 0;
+    return { status: "snapshot", overlap, gap_from: null, gap_to: null, oldest, newest, note: prev && prev.last_ok_at && keys.size && !overlap ? "与上一轮无重叠，中间可能有漏" : null };
+  }
   if (!prev || !prev.last_ok_at) return { status: "first", overlap: 0, gap_from: null, gap_to: null, oldest, newest };
   const keys = new Set(prev.head_keys || []);
   const overlap = records.filter((r) => keys.has(r.id)).length;

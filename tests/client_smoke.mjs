@@ -84,7 +84,7 @@ const sandbox = {
     json: () => Promise.resolve(String(url).indexOf("summary") >= 0 ? SUMMARY : String(url).indexOf("sources") >= 0 ? SOURCES : String(url).indexOf("items") >= 0 ? ITEMS : String(url).indexOf("taxonomy") >= 0 ? TAXONOMY : ATTEMPTS),
     text: () => Promise.resolve("# 汇总\n- 样例"),
   }),
-  Promise, Date, Math, JSON, Object, Array, String, Number, Boolean, Error, RegExp, isFinite, console, setTimeout, clearTimeout,
+  Promise, Date, Math, JSON, Object, Array, String, Number, Boolean, Error, RegExp, isFinite, console, setTimeout, clearTimeout, setInterval: () => 0, clearInterval: () => {},
 };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);

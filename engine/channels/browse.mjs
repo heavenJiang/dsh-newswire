@@ -68,6 +68,8 @@ const RSS_BODY = [
 ];
 
 const INDEX_BODY = [
+  ...scrollUntilSettled("() => document.querySelectorAll('a[href]').length", 5, 4,
+    "(k) => { const ks = new Set(k); let n = 0; for (const a of document.querySelectorAll('a[href]')) if (ks.has(a.href.split('#')[0])) n++; return n; }, KNOWNLINKS"),
   "const payload = await page.evaluate((max) => {",
   "  const origin = location.origin; const out = []; const seen = new Set();",
   "  const skip = /(login|register|signup|about|help|service|privacy|terms|download|tag|topic|rss|sitemap|search|\\/page\\/|\\?page=)/i;",
@@ -97,7 +99,8 @@ const INDEX_BODY = [
   "    if (out.length >= max) break;",
   "  }",
   "  return { items: out };",
-  "}, MAXN);"
+  "}, MAXN);",
+  "payload.scroll = SCROLL;"
 ];
 
 const ARTICLE_BODY = [
@@ -111,13 +114,39 @@ const ARTICLE_BODY = [
   "}, MAXN);"
 ];
 
+// 往下滚并等懒加载的内容真的出来：每滚一屏轮询（每 0.5 秒，最多 6 秒）直到条数/文字变多，再多等 0.8 秒让这一批落定；
+// 连续两屏没长出新内容就停（到底了）；最多 ROUNDS 屏。原来固定滚 3 下、每下等 0.9 秒就读，
+// 同花顺这类加载慢的页面，新内容还没出来就切到下一个源了。
+// count 在页面里求值，返回当前条数（或文字长度）；step 是算「长了」的最小增量；
+// KNOWN 是这个源上一轮已经有的链接：页面上已经出现 5 条以上，说明翻过了上一轮的位置（接上了），不必再滚。
+function scrollUntilSettled(countJs, step, rounds, knownJs) {
+  return [
+    "const __count = async () => { try { return await page.evaluate(" + countJs + "); } catch (e) { return 0; } };",
+    "const __known = async () => { " + (knownJs ? "try { return await page.evaluate(" + knownJs + "); } catch (e) { return 0; }" : "return 0;") + " };",
+    "const SCROLL = { rounds: 0, grew: 0, known: 0, stop: 'max' };",
+    "{ let n = await __count(); let stale = 0;",
+    "  for (let i = 0; i < " + rounds + "; i++) {",
+    "    const k = await __known(); if (k >= 5) { SCROLL.known = k; SCROLL.stop = 'known'; break; }",
+    "    try { await page.mouse.wheel(0, 2000); } catch (e) {}",
+    "    SCROLL.rounds++;",
+    "    let grew = false;",
+    "    for (let w = 0; w < 12; w++) { await new Promise((r) => setTimeout(r, 500)); const m = await __count(); if (m >= n + " + step + ") { grew = true; break; } }",
+    "    if (grew) { await new Promise((r) => setTimeout(r, 800)); n = await __count(); SCROLL.grew++; stale = 0; }",
+    "    else if (++stale >= 2) { SCROLL.stop = 'end'; break; }",
+    "  }",
+    "  SCROLL.known = Math.max(SCROLL.known, await __known());",
+    "}",
+  ];
+}
+
 // 按解析规则提取（规则通常由模型看过页面结构后生成，见 host/recipe.mjs）：
 // extract = { item, link?, title?, time?, summary?, wait_for? }，都是 CSS 选择器；item 选出每一条，其余在每条内部找。
 // 没有单独标题的（社交平台的帖子）取正文第一行作标题，全文作摘要。往下滚几屏，让懒加载的列表多出一些。
 const SELECT_BODY = [
   "const EX = EXTRACT;",
   "try { await page.waitForSelector(EX.wait_for || EX.item, { state: 'attached', timeout: 15000 }); } catch (e) {}",
-  "for (let i = 0; i < 3; i++) { try { await page.mouse.wheel(0, 2200); } catch (e) {} await new Promise((r) => setTimeout(r, 900)); }",
+  ...scrollUntilSettled("(sel) => document.querySelectorAll(sel).length, EX.item", 1, 6,
+    "(a) => { const ks = new Set(a.k); let n = 0; const q = (el, sel) => { if (!sel) return null; try { return el.matches(sel) ? el : el.querySelector(sel); } catch (e) { return null; } }; try { for (const it of document.querySelectorAll(a.sel)) { const l = q(it, a.link) || (it.matches('a[href]') ? it : it.querySelector('a[href]')); if (l && l.href && ks.has(l.href.split('#')[0])) n++; } } catch (e) {} return n; }, { sel: EX.item, link: EX.link || '', k: KNOWNLINKS }"),
   "const payload = await page.evaluate((a) => {",
   "  const ex = a.ex, max = a.max; const out = []; const seen = new Set();",
   "  const flat = (t) => String(t || '').replace(/\\s+/g, ' ').trim();",
@@ -142,7 +171,8 @@ const SELECT_BODY = [
   "    if (out.length >= max) break;",
   "  }",
   "  return { items: out, found: list.length };",
-  "}, { ex: EX, max: MAXN });"
+  "}, { ex: EX, max: MAXN });",
+  "payload.scroll = SCROLL;"
 ];
 
 // 页面结构概要：给模型看的骨架（标签、id、少量 class、data-* 、链接与时间属性、短文本），
@@ -150,7 +180,7 @@ const SELECT_BODY = [
 const OUTLINE_BODY = [
   "// 动态页面（如 x.com 的时间线）内容是后加载的：等页面文字连续两秒不再变化（最多 15 秒）再取",
   "{ let last = -1, same = 0; for (let i = 0; i < 15; i++) { await new Promise((r) => setTimeout(r, 1000)); let n = 0; try { n = await page.evaluate(() => (document.body ? document.body.innerText.length : 0)); } catch (e) {} if (i >= 2 && n === last && n > 300) { if (++same >= 2) break; } else same = 0; last = n; } }",
-  "for (let i = 0; i < 2; i++) { try { await page.mouse.wheel(0, 1800); } catch (e) {} await new Promise((r) => setTimeout(r, 900)); }",
+  ...scrollUntilSettled("() => (document.body ? document.body.innerText.length : 0)", 200, 3, ""),
   "const payload = await page.evaluate(() => {",
   "  const SKIP = new Set(['SCRIPT','STYLE','SVG','NOSCRIPT','IFRAME','PATH','G','LINK','META','TEMPLATE','CANVAS','VIDEO','IMG','PICTURE','SOURCE','BUTTON','INPUT','FORM','NAV','HEADER','FOOTER','ASIDE']);",
   "  const lines = []; let size = 0; const LIMIT = 24000;",
@@ -192,7 +222,7 @@ const OUTLINE_BODY = [
 const READ_BODY = [
   "// 动态页面（如 x.com 的时间线）内容是后加载的：等页面文字连续两秒不再变化（最多 15 秒）再取",
   "{ let last = -1, same = 0; for (let i = 0; i < 15; i++) { await new Promise((r) => setTimeout(r, 1000)); let n = 0; try { n = await page.evaluate(() => (document.body ? document.body.innerText.length : 0)); } catch (e) {} if (i >= 2 && n === last && n > 300) { if (++same >= 2) break; } else same = 0; last = n; } }",
-  "for (let i = 0; i < 3; i++) { try { await page.mouse.wheel(0, 2000); } catch (e) {} await new Promise((r) => setTimeout(r, 900)); }",
+  ...scrollUntilSettled("() => (document.body ? document.body.innerText.length : 0)", 200, 4, ""),
   "const payload = await page.evaluate(() => {",
   "  const SKIP = new Set(['SCRIPT','STYLE','SVG','NOSCRIPT','IFRAME','TEMPLATE','CANVAS','BUTTON','INPUT','FORM','SELECT','NAV','HEADER','FOOTER','ASIDE']);",
   "  const root = document.querySelector('main, [role=main]') || document.body;",
@@ -216,7 +246,8 @@ const READ_BODY = [
   "  walk(root);",
   "  const text = out.join('').replace(/[ \\t]+\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').slice(0, LIMIT);",
   "  return { items: [], text, links, times, truncated: size > LIMIT };",
-  "});"
+  "});",
+  "payload.scroll = SCROLL;"
 ];
 
 // 站点适配器用：把渲染后的整页 HTML 交回 Node 侧，由 engine/adapters/<id>.mjs 解析（与 http 通道共用同一解析器）。
@@ -259,6 +290,7 @@ export function renderJob(mode, url, max, opts) {
   const pre = mode === "cls_api" ? [] : head(url);
   const fill = (l) => l.replaceAll("WAITFOR", JSON.stringify(m.waitFor || ""));
   if (mode === "select") body = body.map((l) => l.replaceAll("EXTRACT", JSON.stringify(m.extract || {})));
+  body = body.map((l) => l.replaceAll("KNOWNLINKS", JSON.stringify((m.known || []).slice(0, 80))));
   const src = pre.map(fill).concat(body.map((l) => l.replaceAll("MAXN", String(max || 20)).replaceAll("SINCE", String(m.sinceHours || 24)).replaceAll("PAGES", String(m.pages || 8)).replaceAll("UNTIL", String(m.until ? Math.floor(Date.parse(String(m.until).replace(" ", "T") + (String(m.until).includes("T") ? "" : "Z")) / 1000) || 0 : 0)).replaceAll("CATEGORY", JSON.stringify(m.category || "")).replaceAll("WAITFOR", JSON.stringify(m.waitFor || "")))).concat(tail(mode, token));
   return "'use strict';\n" + src.join("\n");
 }

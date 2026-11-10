@@ -27,7 +27,7 @@ import { readLock } from "./engine/lock.mjs";
 import { createModel, analyzeEvents } from "./host/model.mjs";
 import { cleanExtract, learnRecipe, judgeRecipe } from "./host/recipe.mjs";
 import { readSource, readTargets } from "./host/modelread.mjs";
-import { loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, storyDetail, sinceSeen, reassemble, scrubStory, qualityRows, editionById, editionList, tickerBoard, updateEditionContent, bodiesFor } from "./host/edition.mjs";
+import { loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, storyDetail, sinceSeen, editionDiff, reassemble, scrubStory, qualityRows, editionById, editionList, tickerBoard, updateEditionContent, bodiesFor } from "./host/edition.mjs";
 import { buildDaily, saveDaily, latestDaily, dailyDates, composeDailyMessage, todayBj } from "./host/daily.mjs";
 import { recordPushes, DEFAULT_RULES } from "./engine/pipeline/select.mjs";
 import { loadFollows, updateFollows, KINDS as FOLLOW_KINDS } from "./host/follows.mjs";
@@ -401,6 +401,12 @@ function engineJson(stdout) {
   const line = String(stdout || "").split("\n").reverse().find((l) => l.startsWith("NEWSWIRE_JSON "));
   if (!line) return null;
   try { return JSON.parse(line.slice("NEWSWIRE_JSON ".length)); } catch { return null; }
+}
+
+/** 工具返回值转成宿主收的无损 JSON：去掉 undefined，NaN/Infinity 变 null，-0 变 0，Date 变字符串。 */
+export function losslessJson(v) {
+  if (v === undefined) return null;
+  return JSON.parse(JSON.stringify(v, (_k, x) => (typeof x === "number" ? (Number.isFinite(x) ? (Object.is(x, -0) ? 0 : x) : null) : typeof x === "bigint" ? String(x) : x)));
 }
 
 function hhmmShanghai() { return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()); }
@@ -1235,7 +1241,9 @@ export function apply(ctx, config) {
       routePaths.add(def.path);
       disposers.push(ctx.connection.fetch.register(Object.assign({ requestBody: "buffered" }, def)));
     };
-    const tool = (def) => disposers.push(ctx.tools.register(def));
+    // 宿主只收「无损 JSON」：值里有 undefined、NaN、-0、Date 之类整个结果会被拒（报 value is not lossless JSON，
+    // 而这时推送已经记下、消息却回不去）。所有工具的返回统一过一遍 JSON 往返。
+    const tool = (def) => disposers.push(ctx.tools.register(Object.assign({}, def, { execute: async (...a) => losslessJson(await def.execute(...a)) })));
     // 预编排：每分钟看一眼下一次定时推送还有多久
     { const t = setInterval(() => { void prewarmTick(); }, 60000); disposers.push(() => clearInterval(t)); }
 
@@ -1507,6 +1515,11 @@ export function apply(ctx, config) {
       fetch: async (request) => {
         const body = request.method === "POST" ? await bodyOf(request) : {};
         const pack = strOrNull(body.pack) || "all";
+        // 面板开着时每分钟问一次：有没有更新的版面（定时任务、后台编排写完都会出新版面），只回 id 与时间
+        if (body.head === true) {
+          const head = withDb(p, (db) => (db ? db.prepare("SELECT id, created_at, mode FROM editions WHERE pack = ? ORDER BY id DESC LIMIT 1").get(pack) || null : null));
+          return jsonResponse({ ok: true, head, model: modelView(), run: busyWith() || null }, 200);
+        }
         if (body.refresh === true) {
           if (modelState.busy) return jsonResponse({ ok: false, error: "model_busy", model: modelView() }, 409);
           await ensureData(p);
@@ -1530,7 +1543,10 @@ export function apply(ctx, config) {
           }
           // 影响与走势：各故事线最新一次分析的摘要
           const analyses = db && edition && edition.content ? analysisBrief(db, Object.keys(edition.content.stories || {})) : {};
-          return { edition, since, analyses };
+          // 和上一轮的版面比：新、有进展、沿用
+          let diff = null;
+          try { diff = db && edition ? editionDiff(db, edition) : null; } catch { diff = null; }
+          return { edition, since, analyses, diff };
         });
         return jsonResponse(Object.assign({ ok: true, model: modelView(), can_analyze: modeNow() === "llm" && llmReady() }, out), 200);
       },

@@ -120,7 +120,7 @@ if (MODE === "read") {
   const d = (res && res.data) || {};
   const v = (res && res.value) || {};
   // 输出可能很大：等写完再退出，否则管道里会被截断
-  await new Promise((r) => process.stdout.write("NEWSWIRE_JSON " + JSON.stringify({ ok: Boolean(res.ok && d.text), url, page_url: v.page_url || null, title: v.doc_title || null, text: d.text || "", links: d.links || [], times: d.times || [], truncated: Boolean(d.truncated), error: res.ok ? null : res.error }) + "\n", r));
+  await new Promise((r) => process.stdout.write("NEWSWIRE_JSON " + JSON.stringify({ ok: Boolean(res.ok && d.text), url, page_url: v.page_url || null, title: v.doc_title || null, text: d.text || "", links: d.links || [], times: d.times || [], truncated: Boolean(d.truncated), scroll: d.scroll || null, error: res.ok ? null : res.error }) + "\n", r));
   process.exit(res.ok ? 0 : 2);
 }
 

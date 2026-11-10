@@ -2,6 +2,32 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.7 (2026-11-10)
+
+Four problems from trial use:
+
+- **Scheduled push failed with `value is not lossless JSON`**:
+  - Cause: `newswire_cycle` returned fields whose value was `undefined` (`edition.waited` is `undefined` whenever the wait does not time out). The host accepts only lossless JSON, so it rejected the whole result.
+  - By then the pushes were already recorded, but the message never reached the phone.
+  - Every tool's result is now converted to lossless JSON. The smoke test checks all 22 tools with the host's own rule.
+- **Hard to tell this round from earlier content**:
+  - The masthead adds a line: "Since the last edition (time): N new · M developing · K unchanged", with a "Changes only" filter.
+  - Every story is tagged new or developing. Unchanged stories have grey titles.
+  - The previous edition is counted per fetch round: a round's program preview, progress versions and re-layouts after follow changes count as one edition.
+  - While the panel is open it checks for a newer edition every minute. When a scheduled round or a background layout finishes, a banner offers it. A program preview is replaced at once.
+  - The past-editions list shows one edition per round, not a run of duplicates with the same headline.
+- **Key stories did not stand out**:
+  - A "Key stories" box at the top lists the most important stories, one line of title and one sentence each.
+  - Stories with importance 70 or more get a red "Key" tag.
+  - Section stories are tiered by weight: 60 or more get the full card, 45–59 get the title and two lines, below 45 only the title.
+  - The masthead story count counts only the stories laid out on the page.
+- **Web-page sources moved on before more content loaded**:
+  - The browser used to scroll 3 screens with a 0.9 s wait each, then read. The 同花顺 home page takes over 2 s per batch, so the next source started before new items appeared.
+  - Now each scroll waits until new content actually appears (up to 6 s). Scrolling stops after two screens with nothing new.
+  - Scrolling also stops once 5 links from the previous round are on the page, because the round has connected with the last one.
+  - Home-page and list sources now record how many items overlap the previous round. Zero overlap is noted as a possible gap. After the first round they read up to 60 items (was 20).
+- Items with only a date in the link (such as 同花顺) all showed "00:00" and were listed as a story's first source. Items first fetched on that same day now use the first-fetch time.
+
 ## 1.1.6 (2026-11-10)
 
 Fixes from checking original pages for all 44 sources, including removed ones:

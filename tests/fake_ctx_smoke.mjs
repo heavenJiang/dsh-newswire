@@ -122,6 +122,18 @@ async function callTool(name, args) {
   if (!t) return null;
   try {
     const value = await t.execute(args ?? {});
+    // 宿主的无损 JSON 规则（@dsh/values snapshotJsonValue）：undefined、非有限数、-0、非普通对象都不行
+    const lossy = (v, at) => {
+      if (v === null || typeof v === "string" || typeof v === "boolean") return null;
+      if (typeof v === "number") return Number.isFinite(v) && !Object.is(v, -0) ? null : at;
+      if (typeof v !== "object") return at + " (" + typeof v + ")";
+      if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) { const r = lossy(v[i], at + "[" + i + "]"); if (r) return r; } return null; }
+      if (Object.getPrototypeOf(v) !== Object.prototype && Object.getPrototypeOf(v) !== null) return at + " (non-plain)";
+      for (const k of Object.keys(v)) { const r = lossy(v[k], at + "." + k); if (r) return r; }
+      return null;
+    };
+    const bad1 = lossy(value, "value");
+    if (bad1) { bad++; console.log("tool " + name + " returned non-lossless JSON at " + bad1); }
     const text = (t.output?.render ? t.output.render(args ?? {}, value) : []).map((x) => x.text).join("\n");
     console.log("tool " + name + " ok, render " + text.length + " chars");
     return value;
@@ -213,9 +225,12 @@ const dlr = await callRoute("/api/newswire/daily", "POST", {});
 if (!dlr || !dlr.value.daily || !dlr.value.dates.length) { bad++; console.log("日报接口异常"); }
 const hist = await callRoute("/api/newswire/editions", "POST", {});
 if (!hist || hist.value.editions.length < 2) { bad++; console.log("历史版面异常"); }
-const old = await callRoute("/api/newswire/edition", "POST", { id: hist.value.editions.at(-1).id });
+// 历史列表每轮只列最新一份（同一轮的预览、进度版不重复出现）；冷启动的预览版仍是第一份存下的
+const old = await callRoute("/api/newswire/edition", "POST", { id: 1 });
 if (!old || !old.value.edition.content.stats.preview) { bad++; console.log("冷启动应先存一份预览版面", old && old.value.edition.content.stats); }
-if (!old || old.value.edition.id !== hist.value.editions.at(-1).id) { bad++; console.log("取历史版面异常"); }
+const old2 = await callRoute("/api/newswire/edition", "POST", { id: hist.value.editions.at(-1).id });
+if (!old || old.value.edition.id !== 1 || !old2 || old2.value.edition.id !== hist.value.editions.at(-1).id) { bad++; console.log("取历史版面异常"); }
+if (!old2 || !("diff" in old2.value)) { bad++; console.log("版面应带上与上一版的对比字段 diff"); }
 const fbBad = await callRoute("/api/newswire/feedback", "POST", { kind: "error", story_id: firstStory });
 if (!fbBad || fbBad.status !== 400) bad++;
 const fbOk = await callRoute("/api/newswire/feedback", "POST", { kind: "error", story_id: firstStory, text: "烟测错句" });

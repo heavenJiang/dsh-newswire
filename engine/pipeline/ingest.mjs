@@ -7,7 +7,7 @@ import { presentSignals } from "./signals.mjs";
 import { morePages, missingIds } from "./paging.mjs";
 import { exaBackfill } from "../channels/exa.mjs";
 import { upsertArticle, hasArticle, insertObservation, touchSignals, logAttempt } from "../store/db.mjs";
-import { loadCursor, saveCursor, evaluate, nextCursor, sinceHoursFor, recordContinuity, recordGap, numericId } from "../cursor.mjs";
+import { loadCursor, saveCursor, evaluate, nextCursor, sinceHoursFor, recordContinuity, recordGap, numericId, isStream } from "../cursor.mjs";
 import { isoUtc } from "../util/text.mjs";
 import { assess } from "./quality.mjs";
 
@@ -30,9 +30,14 @@ export async function processSource(src0, env) {
   const src = Object.assign({}, src0, {
     since_hours: sinceH,
     until: hasCursor ? prev.head_time : null,
-    max_items: hasCursor ? Math.max(300, src0.max_items || 20) : Math.min(300, Math.round((src0.max_items || 20) * scale)),
+    // 快照源（首页、列表页）多半没有可信时间、不会有 head_time：抓过一轮后每轮读到 60 条，页面上更多的内容也收进来
+    max_items: hasCursor ? Math.max(300, src0.max_items || 20) : prev && prev.last_ok_at && !isStream(src0) ? Math.max(60, src0.max_items || 20) : Math.min(300, Math.round((src0.max_items || 20) * scale)),
     pages: src0.type === "cls_api" ? (hasCursor ? 60 : Math.min(20, Math.max(Number(src0.pages || 2), Math.ceil(sinceH * 1.5) + 1))) : src0.pages,
   });
+  // 快照类网页源（首页、列表页）没有翻页接口：把上一轮抓到的链接交给 browse，往下滚到看见其中一条（接上了）为止
+  if (!isStream(src0)) {
+    try { src.known_links = db.prepare("SELECT url FROM articles WHERE source_id = ? ORDER BY first_seen_at DESC LIMIT 80").all(src0.id).map((r) => r.url); } catch { src.known_links = []; }
+  }
   // 翻得多时给足时间（隔夜可能要翻二三十页）
   if (src0.type === "cls_api" && hasCursor) src.timeout_ms = Math.max(Number(src0.timeout_ms) || 30000, 90000);
 
@@ -110,7 +115,7 @@ export async function processSource(src0, env) {
       if (isNew) fresh++; else dup++;
     }
     touchSignals(db, src.id, sigSeen, nowIso);
-    recordContinuity(db, runId, src.id, { status, overlap: cont.overlap, pages, backfilled, gap_from: firstGap && firstGap.from, gap_to: firstGap && firstGap.to, note: method });
+    recordContinuity(db, runId, src.id, { status, overlap: cont.overlap, pages, backfilled, gap_from: firstGap && firstGap.from, gap_to: firstGap && firstGap.to, note: method || cont.note || null });
     if (firstGap) recordGap(db, { source_id: src.id, run_id: runId, gap_from: firstGap.from, gap_to: firstGap.to, status: status === "gap_filled" ? "backfilled" : status === "gap_partial" ? "partial" : "open", method: method || "none", recovered: backfilled, updated_at: nowIso });
     saveCursor(db, nextCursor(prev, records, src, runId, nowIso));
     db.exec("COMMIT");

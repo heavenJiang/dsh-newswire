@@ -46,6 +46,11 @@ export const DEFAULT_LAYOUT = {
   style: "客观、准确、简洁；用简体中文写，外文报道译成中文；数字、人名、机构名照录原文；不加评论性形容词；材料里没有的不写；各家说法不一致时如实并列。",
 };
 
+/**
+ * 版面里用的发布时间：链接里只有日期的（url_date，记成北京时间零点）当天首次抓到时用首见时间，
+ * 不然同花顺这类首页源每条都显示「00:00」，还会因为「最早」被排成主条目。
+ */
+const PUB = "(CASE WHEN a.time_confidence = 'url_date' AND a.first_seen_at >= a.published_at AND a.first_seen_at < datetime(a.published_at, '+1 day') THEN a.first_seen_at ELSE a.published_at END)";
 const staleBefore = (since) => new Date(Date.parse(String(since).replace(" ", "T") + "Z") - 24 * 3600000).toISOString().replace("T", " ").slice(0, 19);
 const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
 
@@ -100,7 +105,7 @@ export function gatherItems(db, o) {
   const where = ["a.first_seen_at >= ?", "(a.published_at IS NULL OR a.published_at >= ?)"];
   const args = [o.since, staleBefore(o.since)];
   if (o.pack && o.pack !== "all") { where.push("a.pack = ?"); args.push(o.pack); }
-  const rows = db.prepare(`SELECT a.id, a.title, a.summary, a.url, a.published_at, a.first_seen_at, a.source_id, a.pack, a.completeness, a.kind, a.parent_id, COALESCE(s.trial, 0) AS trial,
+  const rows = db.prepare(`SELECT a.id, a.title, a.summary, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.pack, a.completeness, a.kind, a.parent_id, COALESCE(s.trial, 0) AS trial,
       s.name AS source_name, COALESCE(s.grp, a.source_id) AS grp, m.event_id, e.importance AS ev_importance, e.credibility AS ev_cred, e.labels AS ev_labels, e.dispute AS ev_dispute
     FROM articles a LEFT JOIN sources s ON s.id = a.source_id LEFT JOIN event_members m ON m.article_id = a.id LEFT JOIN events e ON e.event_id = m.event_id
     WHERE ${where.join(" AND ")} AND a.title IS NOT NULL AND a.title != '' AND COALESCE(a.kind, 'news') NOT IN ('promo', 'digest', 'ticker')
@@ -220,7 +225,7 @@ const matView = (it) => ({ id: it.id, name: it.source_name || it.source_id, url:
 
 function loadArticles(db, ids) {
   if (!ids.length) return [];
-  return db.prepare(`SELECT a.id, a.title, a.summary, a.url, a.published_at, a.first_seen_at, a.source_id, s.name AS source_name, COALESCE(s.grp, a.source_id) AS grp
+  return db.prepare(`SELECT a.id, a.title, a.summary, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, s.name AS source_name, COALESCE(s.grp, a.source_id) AS grp
     FROM articles a LEFT JOIN sources s ON s.id = a.source_id WHERE a.id IN (` + ids.map(() => "?").join(",") + ")").all(...ids);
 }
 
@@ -329,7 +334,7 @@ export function ruleEdition(db, o) {
   const args = [o.since, Math.min(layout.min_importance, layout.verify.min_importance), staleBefore(o.since)];
   if (o.pack && o.pack !== "all") { where.push("e.pack = ?"); args.push(o.pack); }
   const events = db.prepare("SELECT e.* FROM events e WHERE " + where.join(" AND ") + " ORDER BY e.importance DESC LIMIT 80").all(...args);
-  const memQ = db.prepare(`SELECT a.id, a.title, a.summary, a.url, a.published_at, a.first_seen_at, a.source_id, a.completeness, COALESCE(s.trial, 0) AS trial, s.name AS source_name, COALESCE(m.grp, a.source_id) AS grp, m.event_id
+  const memQ = db.prepare(`SELECT a.id, a.title, a.summary, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.completeness, COALESCE(s.trial, 0) AS trial, s.name AS source_name, COALESCE(m.grp, a.source_id) AS grp, m.event_id
     FROM event_members m JOIN articles a ON a.id = m.article_id LEFT JOIN sources s ON s.id = a.source_id WHERE m.event_id = ? ORDER BY COALESCE(a.published_at, a.first_seen_at) LIMIT 10`);
   // 每个规则事件对应一条故事线：成员已归入的沿用那条（模型模式下起的标题、写的稿都能接着用），否则新起
   const byId = new Map();
@@ -916,7 +921,7 @@ export function storyDetail(db, id) {
   let row = db.prepare("SELECT * FROM stories WHERE story_id = ?").get(id);
   for (let k = 0; row && row.status === "merged" && row.merged_into && k < 5; k++) row = db.prepare("SELECT * FROM stories WHERE story_id = ?").get(row.merged_into);
   if (!row) return null;
-  const items = db.prepare(`SELECT a.id, a.title, a.summary, a.url, a.published_at, a.first_seen_at, a.time_confidence, a.source_id, a.kind, a.kind_note, a.title_zh, s.name AS source_name, i.joined_at, i.event_id
+  const items = db.prepare(`SELECT a.id, a.title, a.summary, a.url, ${PUB} AS published_at, a.first_seen_at, a.time_confidence, a.source_id, a.kind, a.kind_note, a.title_zh, s.name AS source_name, i.joined_at, i.event_id
     FROM story_items i JOIN articles a ON a.id = i.article_id LEFT JOIN sources s ON s.id = a.source_id WHERE i.story_id = ? ORDER BY COALESCE(a.published_at, a.first_seen_at)`).all(row.story_id);
   const updates = db.prepare("SELECT at, text, items, by, edition_id FROM story_updates WHERE story_id = ? ORDER BY at").all(row.story_id);
   const pushes = db.prepare("SELECT pushed_at, reason, credibility, score FROM pushes WHERE story_id = ? ORDER BY id").all(row.story_id);
@@ -965,12 +970,59 @@ export function editionById(db, id) {
 }
 
 export function editionList(db, pack, limit) {
-  return db.prepare("SELECT id, pack, created_at, mode, model, headline FROM editions" + (pack && pack !== "all" ? " WHERE pack = ?" : "") + " ORDER BY id DESC LIMIT ?").all(...(pack && pack !== "all" ? [pack] : []), limit || 40);
+  // 同一轮抓取的程序预览、进度版、重排都算一版，只列这一轮最新的那份（列表里不再是一串同标题的重复项）
+  const rows = db.prepare("SELECT id, pack, run_id, created_at, mode, model, headline FROM editions" + (pack && pack !== "all" ? " WHERE pack = ?" : "") + " ORDER BY id DESC LIMIT ?").all(...(pack && pack !== "all" ? [pack] : []), (limit || 40) * 5);
+  const round = new Map();
+  let run = null;
+  for (let i = rows.length - 1; i >= 0; i--) { if (rows[i].run_id) run = rows[i].pack + ":" + rows[i].run_id; round.set(rows[i].id, run || rows[i].pack + ":#" + rows[i].id); }
+  const seen = new Set();
+  const out = [];
+  for (const r of rows) {
+    const k = round.get(r.id);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ id: r.id, pack: r.pack, created_at: r.created_at, mode: r.mode, model: r.model, headline: r.headline });
+    if (out.length >= (limit || 40)) break;
+  }
+  return out;
 }
 
 export function editionRow(r) {
   if (!r) return null;
   return { id: r.id, pack: r.pack, run_id: r.run_id, created_at: r.created_at, mode: r.mode, model: r.model, hours: r.hours, items_read: r.items_read, headline: r.headline, error: r.error, ms: r.ms, calls: r.calls, content: parseJ(r.content, null) };
+}
+
+/**
+ * 这一版和上一轮抓取的版面比：哪些故事线是新的、哪些有新报道、哪些原样沿用，上一版有、这一版没了的有几条。
+ * 「上一轮」按抓取轮次算：同一轮的程序预览、边写边出的进度版、改关注后的重排（run_id 为空）都算同一版，
+ * 对照的是这一轮第一份版面之前的最后一份。
+ * @returns { base_id, base_at, base_mode, stories:{id:"new"|"dev"|"same"}, counts:{new,dev,same,gone} } 或 null（没有上一版）
+ */
+export function editionDiff(db, row) {
+  if (!db || !row || !row.content) return null;
+  const runRow = row.run_id ? row : db.prepare("SELECT id, run_id FROM editions WHERE id < ? AND pack = ? AND run_id IS NOT NULL ORDER BY id DESC LIMIT 1").get(row.id, row.pack);
+  const first = runRow && runRow.run_id ? db.prepare("SELECT MIN(id) id FROM editions WHERE run_id = ? AND pack = ?").get(runRow.run_id, row.pack) : null;
+  const before = first && first.id ? first.id : row.id;
+  const b = db.prepare("SELECT id, created_at, mode, content FROM editions WHERE id < ? AND pack = ? ORDER BY id DESC LIMIT 1").get(before, row.pack);
+  const base = b ? parseJ(b.content, null) : null;
+  if (!base || !base.stories) return null;
+  const old = base.stories;
+  const stories = {};
+  const counts = { new: 0, dev: 0, same: 0, gone: 0 };
+  const cur = row.content.stories || {};
+  for (const [id, s] of Object.entries(cur)) {
+    const o = old[id];
+    let k = "same";
+    if (!o) k = "new";
+    else {
+      const had = new Set(o.article_ids || []);
+      if ((s.article_ids || []).some((a) => !had.has(a))) k = "dev";
+    }
+    stories[id] = k;
+    counts[k]++;
+  }
+  for (const id of Object.keys(old)) if (!cur[id]) counts.gone++;
+  return { base_id: b.id, base_at: b.created_at, base_mode: b.mode, stories, counts };
 }
 
 /** 某个包最新的一份；没有时取任意包最新的一份。 */
@@ -1100,7 +1152,7 @@ export function tickerBoard(db, o) {
   const where = ["a.kind = 'ticker'", "a.first_seen_at >= ?"];
   const args = [o.since];
   if (o.pack && o.pack !== "all") { where.push("a.pack = ?"); args.push(o.pack); }
-  const rows = db.prepare(`SELECT a.id, a.title, a.url, a.first_seen_at, a.published_at, a.source_id, s.name AS source_name FROM articles a LEFT JOIN sources s ON s.id = a.source_id
+  const rows = db.prepare(`SELECT a.id, a.title, a.url, a.first_seen_at, ${PUB} AS published_at, a.source_id, s.name AS source_name FROM articles a LEFT JOIN sources s ON s.id = a.source_id
     WHERE ${where.join(" AND ")} ORDER BY COALESCE(a.published_at, a.first_seen_at) DESC`).all(...args);
   const seen = new Set();
   const out = [];
