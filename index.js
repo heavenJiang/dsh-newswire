@@ -247,10 +247,24 @@ async function readConfigSources(p) {
   return { text, data: JSON.parse(text) };
 }
 
-async function writeFileAtomic(file, text) {
-  const tmpFile = file + ".tmp";
-  await writeFile(tmpFile, text);
-  await rename(tmpFile, file);
+// 同一个文件的写入排队，临时文件名各不相同：并发写同一个文件时不会互相改名失败
+const writeQueues = new Map();
+let tmpSeq = 0;
+export function writeFileAtomic(file, text) {
+  const prev = writeQueues.get(file) || Promise.resolve();
+  const next = prev.catch(() => {}).then(async () => {
+    const tmpFile = `${file}.${process.pid}.${++tmpSeq}.tmp`;
+    try {
+      await writeFile(tmpFile, text);
+      await rename(tmpFile, file);
+    } catch (err) {
+      await rm(tmpFile, { force: true }).catch(() => {});
+      throw err;
+    }
+  });
+  writeQueues.set(file, next);
+  next.catch(() => {}).then(() => { if (writeQueues.get(file) === next) writeQueues.delete(file); });
+  return next;
 }
 
 async function writeConfigSources(p, data) {
@@ -693,10 +707,16 @@ export function apply(ctx, config) {
     return prefsCache.value;
   }
   /** 改 model.json 里的几个字段（合并写回）。 */
-  async function savePrefs(patch) {
-    const next = Object.assign({}, prefs(), patch, { updated_at: new Date().toISOString() });
-    await mkdir(path.dirname(p.modelPrefs), { recursive: true });
-    await writeFileAtomic(p.modelPrefs, JSON.stringify(next, null, 2) + "\n");
+  // 读-改-写排队：同时改设置时不丢改动
+  let prefsQ = Promise.resolve();
+  function savePrefs(patch) {
+    const run = prefsQ.catch(() => {}).then(async () => {
+      const next = Object.assign({}, prefs(), patch, { updated_at: new Date().toISOString() });
+      await mkdir(path.dirname(p.modelPrefs), { recursive: true });
+      await writeFileAtomic(p.modelPrefs, JSON.stringify(next, null, 2) + "\n");
+    });
+    prefsQ = run;
+    return run;
   }
   const modeNow = () => (prefs().mode === "llm" || prefs().mode === "economy" ? prefs().mode : cfg.modelMode);
   // 宿主的模型服务与默认模型（可选）：LLM 模式下有它们才调用模型；没有就退回程序编排
@@ -876,7 +896,7 @@ export function apply(ctx, config) {
           progressCleanup = () => { if (progressId != null) try { db.prepare("DELETE FROM editions WHERE id = ?").run(progressId); } catch { /* 留着也是一份完整版面 */ } };
           ed = await llmEdition(db, model, Object.assign({}, base, { onProgress, taxonomy: taxonomyLabels(), maxItems: depthParams(prefs()).maxItems, maxStories: depthParams(prefs()).maxStories, budgetMs: cfg.llmBudgetMs, callTimeoutMs: cfg.modelTimeoutMs, prev, deepRead: makeDeepRead(db, { runId: o.runId || null }),
             // 并发由实测决定：还没测过就让第一次有两批稿时并行试一次，结果记进 model.json
-            concurrency: Number(prefs().concurrency) || 1, probe: !prefs().concurrency, onProbe: (r) => { void savePrefs({ concurrency: r.concurrency, probe: Object.assign({ at: new Date().toISOString() }, r) }); } }));
+            concurrency: Number(prefs().concurrency) || 1, probe: !prefs().concurrency, onProbe: (r) => { void background(savePrefs({ concurrency: r.concurrency, probe: Object.assign({ at: new Date().toISOString() }, r) }), "save prefs"); } }));
           if (ed && ed.fallback) { error = ed.fallback; ed = null; }
           if (ed && split) ed.stats = Object.assign({}, ed.stats, { split });
           if (ed && tr) ed.stats = Object.assign({}, ed.stats, { translate: tr });
@@ -902,11 +922,21 @@ export function apply(ctx, config) {
     }
   }
 
-  async function saveFollows(f) {
-    await mkdir(path.dirname(p.follows), { recursive: true });
-    await writeFileAtomic(p.follows, JSON.stringify(f, null, 2) + "\n");
-    reflowEdition(f);
+  // 关注的读-改-写排队：几处同时改关注（比如一轮里几条主线同时挂上新故事线）时不丢改动、不撞文件
+  let followsQ = Promise.resolve();
+  function editFollows(fn) {
+    const run = followsQ.catch(() => {}).then(async () => {
+      const f = fn(loadFollows(p.follows));
+      await mkdir(path.dirname(p.follows), { recursive: true });
+      await writeFileAtomic(p.follows, JSON.stringify(f, null, 2) + "\n");
+      reflowEdition(f);
+      return f;
+    });
+    followsQ = run;
+    return run;
   }
+  /** 后台顺手做的事出错只记一笔，不能变成未处理的拒绝把宿主整个带崩。 */
+  const background = (pr, what) => Promise.resolve(pr).catch((err) => { try { console.error(`[newswire] ${what} failed:`, errText(err)); } catch { /* ignore */ } });
 
   /** 改了关注或屏蔽：按最新一份版面立即重新组版（不调用模型），存成新的一份。 */
   /** 配置改了状态后同步到库里的 sources 表（版面按它判断试用源），不必等下一轮抓取。 */
@@ -973,19 +1003,21 @@ export function apply(ctx, config) {
   async function syncTrackerFollows(db, trackerId, storyIds) {
     const t = db.prepare("SELECT * FROM trackers WHERE id = ?").get(trackerId);
     if (!t) return;
-    let f = loadFollows(p.follows);
-    if (t.kind === "theme") for (const sid of storyIds || []) f = updateFollows(f, "follow", "story", sid, t.name, "tracker:" + t.id);
-    else f = updateFollows(f, "follow", "keyword", JSON.parse(t.aliases || "[]").join("|") || t.name, t.name);
-    await saveFollows(f);
+    await editFollows((f) => {
+      if (t.kind === "theme") for (const sid of storyIds || []) f = updateFollows(f, "follow", "story", sid, t.name, "tracker:" + t.id);
+      else f = updateFollows(f, "follow", "keyword", JSON.parse(t.aliases || "[]").join("|") || t.name, t.name);
+      return f;
+    });
   }
 
   /** 删掉追踪对象时撤掉它加的关注（别名关键词 / 主线的故事线）。 */
   async function dropTrackerFollows(t) {
     if (!t) return;
-    let f = loadFollows(p.follows);
-    if (t.kind === "theme") for (const sid of t.stories || []) f = updateFollows(f, "unfollow", "story", sid);
-    else f = updateFollows(f, "unfollow", "keyword", (t.aliases || []).join("|") || t.name);
-    await saveFollows(f);
+    await editFollows((f) => {
+      if (t.kind === "theme") for (const sid of t.stories || []) f = updateFollows(f, "unfollow", "story", sid);
+      else f = updateFollows(f, "unfollow", "keyword", (t.aliases || []).join("|") || t.name);
+      return f;
+    });
   }
 
   /** 版面出来后的后台工作（不挡推送）：头版里重要的报道分析影响；追踪对象挂上新的故事线，新动态够多的重写综述。 */
@@ -993,7 +1025,7 @@ export function apply(ctx, config) {
     // 挂故事线不调用模型，两种模式都做
     let linked = {};
     try { linked = withDb(p, (db) => (db ? linkAll(db, ed.themes || []) : {})) || {}; } catch { linked = {}; }
-    for (const [tid, sids] of Object.entries(linked)) withDb(p, (db) => { if (db) { const t = db.prepare("SELECT kind FROM trackers WHERE id = ?").get(tid); if (t && t.kind === "theme") void syncTrackerFollows(db, tid, sids); } });
+    for (const [tid, sids] of Object.entries(linked)) withDb(p, (db) => { if (db) { const t = db.prepare("SELECT kind FROM trackers WHERE id = ?").get(tid); if (t && t.kind === "theme") void background(syncTrackerFollows(db, tid, sids), "tracker follows"); } });
     if (!(modeNow() === "llm" && llmReady())) return;
     const dp = depthParams(prefs());
     setTimeout(async () => {
@@ -1057,7 +1089,7 @@ export function apply(ctx, config) {
 
   function backgroundEdition(runId, pack) {
     if (modelState.busy) return;
-    void makeEdition({ pack, runId, wantLlm: modeNow() === "llm" });
+    void background(makeEdition({ pack, runId, wantLlm: modeNow() === "llm" }), "edition");
   }
 
   function taxonomyNames() {
@@ -1245,7 +1277,7 @@ export function apply(ctx, config) {
     // 而这时推送已经记下、消息却回不去）。所有工具的返回统一过一遍 JSON 往返。
     const tool = (def) => disposers.push(ctx.tools.register(Object.assign({}, def, { execute: async (...a) => losslessJson(await def.execute(...a)) })));
     // 预编排：每分钟看一眼下一次定时推送还有多久
-    { const t = setInterval(() => { void prewarmTick(); }, 60000); disposers.push(() => clearInterval(t)); }
+    { const t = setInterval(() => { void background(prewarmTick(), "prewarm"); }, 60000); disposers.push(() => clearInterval(t)); }
 
     // ---------------------------------------------------------------- 路由
     route({
@@ -1524,7 +1556,7 @@ export function apply(ctx, config) {
           if (modelState.busy) return jsonResponse({ ok: false, error: "model_busy", model: modelView() }, 409);
           await ensureData(p);
           if (modeNow() === "llm" && model.available()) {
-            void makeEdition({ pack, wantLlm: true });
+            void background(makeEdition({ pack, wantLlm: true }), "edition");
             return jsonResponse({ ok: true, started: true, model: modelView() }, 202);
           }
           await makeEdition({ pack, wantLlm: false });
@@ -1573,7 +1605,7 @@ export function apply(ctx, config) {
         if (body.refresh === true) {
           if (modelState.busy) return jsonResponse({ ok: false, error: "model_busy", model: modelView() }, 409);
           await ensureData(p);
-          if (modeNow() === "llm" && model.available()) { void makeDaily({ pack, date }); return jsonResponse({ ok: true, started: true, model: modelView() }, 202); }
+          if (modeNow() === "llm" && model.available()) { void background(makeDaily({ pack, date }), "daily"); return jsonResponse({ ok: true, started: true, model: modelView() }, 202); }
           await makeDaily({ pack, date });
         }
         return jsonResponse(withDb(p, (db) => ({ ok: true, model: modelView(), date, daily: db ? latestDaily(db, pack, date) : null, dates: db ? dailyDates(db, pack, 60) : [] })), 200);
@@ -1726,10 +1758,11 @@ export function apply(ctx, config) {
         const body = await bodyOf(request);
         await ensureData(p);
         const tops = new Set(taxonomyLabels().map((l) => l.id));
-        let f = loadFollows(p.follows);
-        for (const t of Array.isArray(body.mute_topics) ? body.mute_topics : []) if (tops.has(String(t))) f = updateFollows(f, "mute", "topic", String(t));
-        for (const k of (Array.isArray(body.keywords) ? body.keywords : []).map((x) => String(x).trim()).filter(Boolean).slice(0, 20)) f = updateFollows(f, "follow", "keyword", k);
-        await saveFollows(f);
+        await editFollows((f) => {
+          for (const t of Array.isArray(body.mute_topics) ? body.mute_topics : []) if (tops.has(String(t))) f = updateFollows(f, "mute", "topic", String(t));
+          for (const k of (Array.isArray(body.keywords) ? body.keywords : []).map((x) => String(x).trim()).filter(Boolean).slice(0, 20)) f = updateFollows(f, "follow", "keyword", k);
+          return f;
+        });
         if (typeof body.study === "boolean") {
           const conf = await readConfigSources(p);
           if (conf.data.packs && conf.data.packs.study_abroad) { conf.data.packs.study_abroad.enabled = body.study; await writeConfigSources(p, conf.data); }
@@ -1769,11 +1802,11 @@ export function apply(ctx, config) {
               return { id, stories: db.prepare("SELECT story_id FROM tracker_stories WHERE tracker_id = ?").all(id).map((x) => x.story_id) };
             });
             if (!r) return jsonResponse({ error: "no_data" }, 409);
-            withDb(p, (db) => { if (db) void syncTrackerFollows(db, r.id, r.stories); });
+            withDb(p, (db) => { if (db) void background(syncTrackerFollows(db, r.id, r.stories), "tracker follows"); });
             return jsonResponse({ ok: true, id: r.id }, 200);
           }
           if (action === "remove") { const t = withDb(p, (db) => (db ? removeTracker(db, String(body.id)) : null)); await dropTrackerFollows(t); return jsonResponse({ ok: Boolean(t) }, t ? 200 : 404); }
-          if (action === "unlink") { withDb(p, (db) => db && unlinkStory(db, String(body.id), String(body.story_id))); await saveFollows(updateFollows(loadFollows(p.follows), "unfollow", "story", String(body.story_id))); return jsonResponse({ ok: true }, 200); }
+          if (action === "unlink") { withDb(p, (db) => db && unlinkStory(db, String(body.id), String(body.story_id))); await editFollows((f) => updateFollows(f, "unfollow", "story", String(body.story_id))); return jsonResponse({ ok: true }, 200); }
           if (action === "synth") {
             if (!(modeNow() === "llm" && llmReady())) return jsonResponse({ error: "no_model" }, 409);
             try { return jsonResponse({ ok: true, synthesis: await runSynthesis(String(body.id)) }, 200); } catch (err) { return jsonResponse({ error: errText(err) }, 502); }
@@ -1833,9 +1866,7 @@ export function apply(ctx, config) {
           // values：一次取消一组（面板里合成一行的主线故事线）
           const values = Array.isArray(body.values) ? body.values.map(strOrNull).filter(Boolean).slice(0, 200) : strOrNull(body.value) ? [String(body.value)] : [];
           if (!["follow", "unfollow", "mute", "unmute"].includes(body.action) || !FOLLOW_KINDS.includes(body.kind) || !values.length) return jsonResponse({ error: "follow_invalid", kinds: FOLLOW_KINDS }, 400);
-          let f = loadFollows(p.follows);
-          for (const v of values) f = updateFollows(f, body.action, body.kind, v, strOrNull(body.name));
-          await saveFollows(f);
+          await editFollows((f) => { for (const v of values) f = updateFollows(f, body.action, body.kind, v, strOrNull(body.name)); return f; });
         }
         return jsonResponse(loadFollows(p.follows), 200);
       },
@@ -2098,7 +2129,7 @@ export function apply(ctx, config) {
         if (a.action !== "list") {
           if (!FOLLOW_KINDS.includes(a.kind) || !strOrNull(a.value)) throw new Error("kind and value are required for " + a.action);
           await ensureData(p);
-          await saveFollows(updateFollows(loadFollows(p.follows), a.action, a.kind, String(a.value), strOrNull(a.name)));
+          await editFollows((f) => updateFollows(f, a.action, a.kind, String(a.value), strOrNull(a.name)));
         }
         return loadFollows(p.follows);
       },
@@ -2206,7 +2237,7 @@ export function apply(ctx, config) {
         if (act === "add") {
           const r = withDb(p, (db) => { if (!db) return null; const id = addTracker(db, { name: a.name, kind: a.kind, ticker: a.ticker, aliases: a.aliases, origin: "agent", entities: taxEntities() }); return { id, stories: db.prepare("SELECT story_id FROM tracker_stories WHERE tracker_id = ?").all(id).map((x) => x.story_id) }; });
           if (!r) return { ok: false, error: "no_data" };
-          withDb(p, (db) => { if (db) void syncTrackerFollows(db, r.id, r.stories); });
+          withDb(p, (db) => { if (db) void background(syncTrackerFollows(db, r.id, r.stories), "tracker follows"); });
           return { ok: true, id: r.id, detail: withDb(p, (db) => trackerDetail(db, r.id)) };
         }
         if (act === "get") { const d = withDb(p, (db) => (db ? trackerDetail(db, String(a.id)) : null)); return d ? { ok: true, synthesis: d.synthesis, detail: d } : { ok: false, error: "not_found" }; }

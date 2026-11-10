@@ -2,6 +2,13 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.8 (2026-11-10)
+
+- Fix a crash that stopped the whole host: `ENOENT: rename follows.json.tmp -> follows.json`. When several theme trackers picked up new stories in one round, each wrote `follows.json` at the same time through the same temp file. The first rename succeeded and the others failed, and the failure was not caught, so the host exited.
+  - Writes to the same file now queue up, and each write uses its own temp file.
+  - Changes to follows and settings are now read, changed and saved one at a time. Before, two changes made at the same moment could overwrite each other.
+  - Background work (tracker follows, editions, daily digests, prewarm, saving settings) now logs its errors instead of crashing the host.
+
 ## 1.1.7 (2026-11-10)
 
 Four problems from trial use:
