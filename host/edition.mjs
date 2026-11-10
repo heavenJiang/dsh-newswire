@@ -1111,17 +1111,16 @@ export function recordEditionPushes(db, picks, runId, nowIso, pack) {
   for (const p of picks) st.run(runId, p.lead_article_id, p.lead_event_id, pack && pack !== "all" ? pack : "core", p.importance, p.reason, p.credibility, nowIso, p.id);
 }
 
-/** 推送消息分组：重点在前（科技、产业的门槛低一点），其余按领域。 */
+/** 推送消息分组：重点在前，其余按领域。 */
 export const PUSH_GROUPS = [
   { id: "tech", title: "💻 科技与产业", sections: ["tech", "industry"] },
   { id: "markets", title: "📈 市场与宏观", sections: ["markets", "macro"] },
   { id: "politics", title: "🌐 时政与国际", sections: ["politics"] },
   { id: "other", title: "📌 其他", sections: null },
 ];
+/** 重点：模型给的重要度 60 以上（不按领域加减，轻重交给模型判断）。 */
 export function isKeyStory(s) {
-  // 科技、产业和关注的报道门槛低一点
-  const low = s.section === "tech" || s.section === "industry" || Boolean(s.followed && s.followed.length);
-  return s.importance >= (low ? 55 : 60);
+  return s.importance >= 60;
 }
 // 导语开头的「11月10日，」在推送里是多余的（标题行已有日期）
 // 还有快讯原文常带的「17:49 」「ChainCatcher 消息，」

@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.13 (2026-11-10)
+
+- A story is a key story (🔴 重点) when the model rates its importance 60 or more. Tech, industry and followed stories no longer get a lower bar, so the model alone decides how much a story matters.
+
 ## 1.1.12 (2026-11-10)
 
 The push message has a new layout. It is Markdown, which Telegram and Feishu both render.
