@@ -406,6 +406,24 @@ console.log("  deferred push:", d3 && d3.message && d3.message.split("\n").slice
 if (!d3 || !d3.message || !d3.edition || d3.run_id !== d1.run_id) { bad++; console.log("触发后的那次应推本轮版面", d3); }
 if (d3 && (d3.picks || []).length && !/本轮新报道 \d+ 件/.test(d3.message)) { bad++; console.log("全推消息没有本轮统计行"); }
 await callTool("newswire_push_prefs", { timing: "on_time", scope: "picked" });
+// 面板「推送」：按最新版面立即触发一次；手动抓取写完版面后也触发一次
+const runsN = () => scheduleCalls.filter((c) => c[0] === "run").length;
+let r0 = runsN();
+const pn = await callRoute("/api/newswire/push/now", "POST", {});
+if (!pn || pn.status !== 200 || pn.value.ok !== true) { bad++; console.log("推送按钮失败", pn && pn.value); }
+for (let i = 0; i < 20 && runsN() === r0; i++) await new Promise((r) => setTimeout(r, 250));
+if (runsN() === r0) { bad++; console.log("推送按钮没有触发定时任务"); }
+const pn2 = await callTool("newswire_cycle", {});
+console.log("  push now:", pn2 && JSON.stringify(String(pn2.message).split("\n")[0]));
+if (!pn2 || typeof pn2.message !== "string" || pn2.message === "" || pn2.run_id.indexOf("push-") !== 0) { bad++; console.log("推送按钮那次应推送当前版面", pn2 && pn2.message); }
+r0 = runsN();
+const mf = await callRoute("/api/newswire/run", "POST", { sources: "bbc_world,jiemian", window_hours: 6, max_items: 4, export: "none" });
+if (!mf || mf.status !== 200) { bad++; console.log("手动抓取失败"); }
+for (let i = 0; i < 240 && runsN() === r0; i++) await new Promise((r) => setTimeout(r, 500));
+if (runsN() === r0) { bad++; console.log("手动抓取写完版面后没有触发推送"); }
+const mf2 = await callTool("newswire_cycle", {});
+console.log("  manual fetch push:", mf2 && JSON.stringify(String(mf2.message).split("\n")[0]), "picks:", mf2 && (mf2.picks || []).length);
+if (!mf2 || typeof mf2.message !== "string" || (!(mf2.picks || []).length && mf2.message !== "")) { bad++; console.log("手动抓取的推送：没有新内容时应为空", mf2 && mf2.message); }
 
 for (const d of ctx._disposers) if (typeof d === "function") d();
 console.log("\nSMOKE " + (bad === 0 ? "PASS" : "FAIL(" + bad + ")") + "  dataDir=" + DATA);

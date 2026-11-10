@@ -1115,10 +1115,11 @@ export function apply(ctx, config) {
     // 「写完再推」：到点只抓取、在后台编版面，写完后插件再触发一次同一个定时任务，那一次只推送
     const packKey = (args && args.pack) || "core";
     const deferring = loadPush(p.pushPrefs).timing === "when_ready" && !(args && args.dry_run === true);
-    if (deferring) {
+    if (!(args && args.dry_run === true)) {
+      // 待推送的（写完再推、手动抓取写完、面板上点「推送」）已备好：这一次只推送
       const pend = readPending(packKey);
       if (pend && pend.ready) return deliverPending(pend);
-      if (pend && Date.now() - Date.parse(pend.at) < PENDING_MAX_MS) return { ok: true, deferred: true, run_id: pend.run_id, message: "", note: "本轮版面还在写，写完自动推送" };
+      if (deferring && pend && pend.source === "cycle" && Date.now() - Date.parse(pend.at) < PENDING_MAX_MS) return { ok: true, deferred: true, run_id: pend.run_id, message: "", note: "本轮版面还在写，写完自动推送" };
     }
     // 两个主题包的定时任务可能撞上，或预编排还在抓：等它结束，但给版面和发送留出时间
     while (inflight.current !== null && left() > 240000) await sleep(3000);
@@ -1137,7 +1138,7 @@ export function apply(ctx, config) {
       } finally { if (pf) await rm(pf.dir, { recursive: true, force: true }).catch(() => {}); }
       const out = engineJson(res.stdout);
       if (out && out.run_id && deferring && out.parts) {
-        const pend = { pack: packKey, ed_pack: out.pack || (args && args.pack) || "all", run_id: out.run_id, at: new Date().toISOString(), parts: out.parts, rules: out.rules || null, lookback: out.lookback_hours || 6, want_llm: modeNow() === "llm" && model.available(), ready: false, edition_id: null };
+        const pend = { source: "cycle", pack: packKey, ed_pack: out.pack || (args && args.pack) || "all", run_id: out.run_id, at: new Date().toISOString(), parts: out.parts, rules: out.rules || null, lookback: out.lookback_hours || 6, want_llm: modeNow() === "llm" && model.available(), ready: false, edition_id: null };
         writePending(pend);
         void background(composeThenDeliver(pend), "deferred push");
         delete out.parts;
@@ -1257,6 +1258,44 @@ export function apply(ctx, config) {
       }
     }
   }
+  /** 推送消息的固定部分（不经引擎时用）：此刻的北京时间、主题包标题。 */
+  function partsNow(pack) {
+    const bj = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+    return { hhmm: bj.slice(11, 16), md: bj.slice(5, 10), warnings: [], title: (packSchedule(p, pack).packs[pack] || {}).title || "要闻", overnight: false };
+  }
+  /** 「本轮新」从上一次推送算起（多算半小时），2～14 小时。 */
+  function hoursSinceLastPush() {
+    const r = withDb(p, (db) => (db ? db.prepare("SELECT MAX(pushed_at) t FROM pushes").get() : null));
+    if (!r || !r.t) return 6;
+    return Math.min(14, Math.max(2, (Date.now() - Date.parse(r.t.replace(" ", "T") + "Z")) / 3600000 + 0.5));
+  }
+  /** 能推到手机吗：要有宿主的定时服务和这个主题包的定时任务（推送靠触发它）。 */
+  async function pushTask(pack) {
+    if (!optional.schedule) return null;
+    try { return ((await optional.schedule.list({ limit: 500 })).items || []).find((x) => x.title === packSchedule(p, pack).title) || null; } catch { return null; }
+  }
+  /** 手动抓取完：编版面，写完推一条（只推没推过的；没有就不推）。推不了时照旧只编版面。 */
+  async function afterManualFetch(runId, edPack) {
+    const pack = "core";
+    const cur = readPending(pack);
+    if (loadPush(p.pushPrefs).cadence === "daily_only" || (cur && !cur.ready) || !(await pushTask(pack))) { backgroundEdition(runId, edPack); return; }
+    const pend = { source: "manual", pack, ed_pack: edPack, run_id: runId, at: new Date().toISOString(), parts: partsNow(pack), rules: null, lookback: hoursSinceLastPush(), want_llm: llmReady(), ready: false, edition_id: null, quiet_if_empty: true };
+    writePending(pend);
+    void background(composeThenDeliver(pend), "manual push");
+  }
+  /** 面板上点「推送」：按现有的最新版面立即推一条。 */
+  async function pushNow() {
+    const pack = "core";
+    if (!(await pushTask(pack))) return { ok: false, error: "no_task", note: "还没有定时推送任务：先在「推送」里设置节奏（会创建定时任务），手机端才收得到。" };
+    const ed = latestContent("all");
+    if (!ed) return { ok: false, error: "no_edition", note: "还没有版面，先抓一轮。" };
+    const now = new Date().toISOString();
+    const cur = readPending(pack);
+    writePending({ source: "button", pack, ed_pack: "all", run_id: newRunId("push"), at: now, ready: true, ready_at: now, edition_id: ed.id, parts: partsNow(pack), rules: null, lookback: hoursSinceLastPush(), quiet_if_empty: false });
+    // 正在后台写的那一轮写完会自己再存一份、再触发，不受影响
+    void background(triggerDelivery(pack), "push now");
+    return { ok: true, edition: { id: ed.id, created_at: ed.created_at, mode: ed.mode }, replaced: Boolean(cur && cur.ready), note: "已发起推送（按 " + bjHhmm(ed.created_at) + " 的版面，只推还没推过的），稍后到手机。" };
+  }
   function deliverPending(pend) {
     clearPending(pend.pack);
     const ed = pend.edition_id ? withDb(p, (db) => (db ? edContent(editionById(db, pend.edition_id)) : null)) : null;
@@ -1268,7 +1307,10 @@ export function apply(ctx, config) {
       if (ed) {
         out.message = sendFromEdition(db, ed, pend.parts, pend.rules, pend.run_id, lookback, true, out);
         if (pend.note) out.message += "\n（" + pend.note + "）";
-      } else out.message = pend.parts.hhmm + " 本轮版面没编出来，详情见新闻面板";
+        // 手动抓取后自动推的：没有没推过的新内容就不打扰
+        if (pend.quiet_if_empty && !(out.picks || []).length) out.message = "";
+        else if (pend.source === "button" && !(out.picks || []).length) out.message = pend.parts.hhmm + " " + pend.parts.title + "：当前版面（" + bjHhmm(ed.created_at) + "）里的内容都推过了";
+      } else out.message = pend.quiet_if_empty ? "" : pend.parts.hhmm + " 本轮版面没编出来，详情见新闻面板";
     } finally { if (db) db.close(); }
     out.edition = ed ? { id: ed.id, mode: ed.mode, model: ed.model, headline: ed.headline, stories: Object.keys(ed.stories || {}).length, items_read: ed.items_read } : null;
     return out;
@@ -1643,7 +1685,7 @@ export function apply(ctx, config) {
         const body = await bodyOf(request);
         if (busyWith()) return jsonResponse({ ok: false, error: "run_in_progress", run_id: busyWith() }, 409);
         const res = await guardedRun(body, newRunId("web"));
-        if (res.ok && res.run_id) backgroundEdition(res.run_id, body.packs || "all");
+        if (res.ok && res.run_id) await afterManualFetch(res.run_id, body.packs || "all");
         const snap = await snapshotOf(cfg, p);
         return jsonResponse({ ok: res.ok, stage: res.stage, run_id: res.run_id, tail: res.tail, snapshot: { window_hours: snap.window_hours, latest_run: snap.latest_run, categories: snap.categories, failed: snap.failed, digest_path: snap.digest_path } }, res.ok === true ? 200 : 502);
       },
@@ -1821,6 +1863,11 @@ export function apply(ctx, config) {
       }
       return { prefs, schedule };
     }
+    route({
+      path: "/api/newswire/push/now",
+      methods: ["POST"],
+      fetch: async () => { await ensureData(p); const r = await pushNow(); return jsonResponse(r, r.ok ? 200 : 409); },
+    });
     route({
       path: "/api/newswire/push",
       methods: ["GET", "HEAD", "POST"],
@@ -2087,7 +2134,7 @@ export function apply(ctx, config) {
       },
       async execute(args) {
         const res = await guardedRun(args || {}, newRunId("tool"));
-        if (res.ok && res.run_id) backgroundEdition(res.run_id, (args && args.packs) || "all");
+        if (res.ok && res.run_id) await afterManualFetch(res.run_id, (args && args.packs) || "all");
         const snap = await snapshotOf(cfg, p);
         return { ok: res.ok, stage: res.stage, run_id: res.run_id, tail: res.tail, snapshot: { window_hours: snap.window_hours, latest_run: snap.latest_run, categories: snap.categories, failed: snap.failed.map((f) => ({ source_id: f.source_id, error_kind: f.error_kind, hint: f.hint })), digest_path: snap.digest_path } };
       },

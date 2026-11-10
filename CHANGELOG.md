@@ -2,6 +2,12 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.11 (2026-11-10)
+
+- **A manual fetch now pushes too.** After 抓一轮 in the panel, or `newswire_run`, the plugin writes the edition and then sends one push, the same way 写完再推 does. It only pushes stories that have not been pushed yet, and it sends nothing when there are none. It needs the push scheduled task. With the cadence set to 只看晚间日报, a manual fetch still pushes nothing.
+- **A 推送 button next to 抓一轮** pushes the latest written edition right away. It only pushes what has not been pushed yet, and when everything has been pushed it says so. It does not affect a round that is still being written.
+- A pending push that is ready is now delivered whatever the push timing is.
+
 ## 1.1.10 (2026-11-10)
 
 The model takes 9–19 minutes to write an edition, longer than the host's 10-minute limit for a scheduled task, so pushes often carried the previous round's edition. Two new push settings (panel → 关注与推送 → 推送, or `newswire_push_prefs`):

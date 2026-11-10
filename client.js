@@ -45,6 +45,7 @@ window.__ModuleLoader__.load({
       onboard: '/api/newswire/onboard',
       ask: '/api/newswire/ask',
       push: '/api/newswire/push',
+      pushNow: '/api/newswire/push/now',
       scores: '/api/newswire/sources/scores',
       state: '/api/newswire/sources/state',
       analyze: '/api/newswire/event/analyze',
@@ -113,7 +114,7 @@ window.__ModuleLoader__.load({
         'rd.about': '关于本期', 'rd.byModel': '由 {m} 阅读并编写', 'rd.byRules': '由程序按规则编排（节省 token 模式）', 'rd.read': '读入近 {h} 小时最重要的 {n} 条报道。', 'rd.checked': '模型写下的 {n} 句含数字或专名的话，{p} 句已与原文逐一核对。',
         'rd.past': '往期版面', 'rd.skim': '本期速览', 'rd.aboutDay': '关于这份回顾', 'rd.dayDek': '今天值得记住的 {n} 件事',
         'nav.panel': '见微知著', 'nav.logo': '见', 'rd.top': '头条', 'rd.stStories': ' 件事', 'rd.stOutlets': ' 家媒体', 'rd.stHours': ' 小时内', 'rd.stAi': '模型读完并核对', 'tab.news': '要闻', 'tab.timeline': '时间线', 'tab.items': '条目', 'tab.sources': '数据源', 'tab.runs': '运行',
-        'btn.run': '抓一轮', 'btn.running': '抓取中…', 'btn.reload': '刷新', 'btn.save': '保存数据源', 'btn.add': '新增源', 'btn.more': '加载更多',
+        'btn.run': '抓一轮', 'btn.running': '抓取中…', 'btn.push': '推送', 'btn.pushing': '推送中…', 'btn.pushHint': '把当前最新版面里还没推过的内容推到手机（抓一轮写完版面后也会自动推一条）', 'btn.reload': '刷新', 'btn.save': '保存数据源', 'btn.add': '新增源', 'btn.more': '加载更多',
         'btn.remove': '删除', 'btn.restore': '恢复', 'btn.test': '试抓', 'btn.testing': '试抓中…', 'btn.back': '← 返回', 'btn.today': '今天',
         'label.enabled': '启用', 'label.name': '名称', 'label.id': 'id', 'label.category': '分类', 'label.type': '类型', 'label.url': '地址',
         'label.channels': '通道', 'label.max': '首轮条数', 'label.note': '备注', 'label.adapter': '适配器', 'label.region': '地区', 'label.weight': '权重',
@@ -227,7 +228,7 @@ window.__ModuleLoader__.load({
         'rd.about': 'About this edition', 'rd.byModel': 'Read and written by {m}', 'rd.byRules': 'Laid out by rules (save-tokens mode)', 'rd.read': 'Read the {n} most important reports of the last {h} hours. ', 'rd.checked': '{p} of {n} model sentences with numbers or names were checked against the sources.',
         'rd.past': 'Past editions', 'rd.skim': 'In this edition', 'rd.aboutDay': 'About this recap', 'rd.dayDek': '{n} things worth remembering today',
         'nav.panel': 'Newswire', 'nav.logo': '见', 'rd.top': 'Top story', 'rd.stStories': ' stories', 'rd.stOutlets': ' outlets', 'rd.stHours': ' hours', 'rd.stAi': 'Read and checked by the model', 'tab.news': 'Top', 'tab.timeline': 'Timeline', 'tab.items': 'Items', 'tab.sources': 'Sources', 'tab.runs': 'Runs',
-        'btn.run': 'Fetch now', 'btn.running': 'Fetching…', 'btn.reload': 'Reload', 'btn.save': 'Save sources', 'btn.add': 'Add source', 'btn.more': 'Load more',
+        'btn.run': 'Fetch now', 'btn.running': 'Fetching…', 'btn.push': 'Push', 'btn.pushing': 'Pushing…', 'btn.pushHint': 'Push what is new in the latest edition to the phone (a fetch also pushes once its edition is written)', 'btn.reload': 'Reload', 'btn.save': 'Save sources', 'btn.add': 'Add source', 'btn.more': 'Load more',
         'btn.remove': 'Remove', 'btn.restore': 'Restore', 'btn.test': 'Test', 'btn.testing': 'Testing…', 'btn.back': '← Back', 'btn.today': 'Today',
         'label.enabled': 'On', 'label.name': 'Name', 'label.id': 'id', 'label.category': 'Category', 'label.type': 'Type', 'label.url': 'URL',
         'label.channels': 'Channels', 'label.max': 'First round', 'label.note': 'Note', 'label.adapter': 'Adapter', 'label.region': 'Region', 'label.weight': 'Weight',
@@ -2236,6 +2237,15 @@ window.__ModuleLoader__.load({
       useEffect(function () { reload() }, [reload])
 
       function pick(id) { setTab(id); store('tab', id) }
+      var pb = useState(false), pushing = pb[0], setPushing = pb[1]
+      function pushNow() {
+        setPushing(true)
+        setNote('')
+        return postJson(API.pushNow, {})
+          .then(function (res) { setNote('✓ ' + ((res && res.note) || '')) })
+          .catch(function (e) { setNote((e.data && e.data.note) || String(e.message)) })
+          .then(function () { setPushing(false) })
+      }
       function runNow() {
         setBusy(true)
         setNote('')
@@ -2253,6 +2263,7 @@ window.__ModuleLoader__.load({
         h('header', { className: 'nw-top' },
           h('div', { className: 'nw-title-wrap' }, h('span', { className: 'nw-h1' }, h('span', { className: 'nw-logo', 'aria-hidden': true }, t('nav.logo')), t('nav.panel')), h(StatusLine, { summary: data.summary, schedule: data.schedule, onGo: function () { pick('runs') } })),
           h('div', { className: 'nw-actions' },
+            h('button', { className: 'nw-btn nw-ghost nw-sm', onClick: pushNow, disabled: pushing, title: t('btn.pushHint') }, pushing ? t('btn.pushing') : t('btn.push')),
             h('button', { className: 'nw-btn nw-ghost nw-sm', onClick: runNow, disabled: busy, title: t('btn.runHint') }, busy ? t('btn.running') : t('btn.run')))),
         h(UpdateBanner, { onGo: function () { pick('runs') } }),
         note ? h('div', { className: 'nw-note' }, note) : null,
