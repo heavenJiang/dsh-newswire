@@ -2,6 +2,15 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.12 (2026-11-10)
+
+The push message has a new layout. It is Markdown, which Telegram and Feishu both render.
+- **Header**: date and time, then "汇总 HH:MM–HH:MM" (the period it covers) with the number of new stories and stories with new reports. The headline follows as a quote.
+- **🔴 重点 first**, with more detail: a full lead (up to about 200 characters, cut at a sentence), up to 2 key points and the impact. A story counts as key at importance 60, or 55 for tech, industry and followed stories.
+- **The rest by area**, briefly (one or two complete sentences): 💻 科技与产业 → 📈 市场与宏观 → 🌐 时政与国际 → 📌 其他.
+- **Each story**: a numbered bold title, the text, then the source line. Outlet names are links to their own article, so the URL is not shown. Up to 3 outlets are listed, and an aggregator that reposts the same article is listed once.
+- Leads drop the leading date and wire prefixes such as "17:49" and "ChainCatcher 消息，".
+
 ## 1.1.11 (2026-11-10)
 
 - **A manual fetch now pushes too.** After 抓一轮 in the panel, or `newswire_run`, the plugin writes the edition and then sends one push, the same way 写完再推 does. It only pushes stories that have not been pushed yet, and it sends nothing when there are none. It needs the push scheduled task. With the cadence set to 只看晚间日报, a manual fetch still pushes nothing.

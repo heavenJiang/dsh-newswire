@@ -1078,12 +1078,25 @@ export function editionPicks(db, ed, rules, o) {
       // 关注的故事线有新报道加入：再推一次
       else if ((followed || full) && s.updated) reason = "followup";
     }
-    if (reason) picks.push(Object.assign({}, s, { reason, heat: heatOf(db, s.article_ids || []) }));
+    if (reason) picks.push(Object.assign({}, s, { reason, heat: heatOf(db, s.article_ids || []), links: linksOf(db, s) }));
     if (!full && picks.length >= (rules.max || 8)) break;
   }
   return picks;
 }
 
+/** 各家媒体的原文链接（每家取这条故事线里最早的一篇）：推送里媒体名就是链接。 */
+function linksOf(db, s) {
+  const ids = (s.article_ids || []).slice(0, 60);
+  if (!ids.length) return [];
+  const rows = db.prepare("SELECT source_id, url FROM articles WHERE id IN (" + ids.map(() => "?").join(",") + ") AND url IS NOT NULL ORDER BY first_seen_at").all(...ids);
+  const first = new Map();
+  for (const r of rows) if (!first.has(r.source_id)) first.set(r.source_id, r.url);
+  const lead = (s.outlets || []).map((o) => ({ name: o.name || o.source_id, url: first.get(o.source_id) || null }));
+  if (lead.length && s.url) lead[0].url = s.url;
+  // 聚合站转的是同一篇原文：同一个链接只列一次
+  const seen = new Set();
+  return lead.filter((x) => !x.url || (!seen.has(x.url) && seen.add(x.url)));
+}
 /** 推送消息里的源头热度：这条故事线各篇最新一次观测里阅读数最高的那篇（阅读、评论、级别）。 */
 function heatOf(db, ids) {
   if (!ids.length) return null;
@@ -1098,7 +1111,45 @@ export function recordEditionPushes(db, picks, runId, nowIso, pack) {
   for (const p of picks) st.run(runId, p.lead_article_id, p.lead_event_id, pack && pack !== "all" ? pack : "core", p.importance, p.reason, p.credibility, nowIso, p.id);
 }
 
-/** 版面模式的推送消息：标题行与统计、总括、每篇报道（标题、导语、媒体与链接）、缺口提醒、依据。 */
+/** 推送消息分组：重点在前（科技、产业的门槛低一点），其余按领域。 */
+export const PUSH_GROUPS = [
+  { id: "tech", title: "💻 科技与产业", sections: ["tech", "industry"] },
+  { id: "markets", title: "📈 市场与宏观", sections: ["markets", "macro"] },
+  { id: "politics", title: "🌐 时政与国际", sections: ["politics"] },
+  { id: "other", title: "📌 其他", sections: null },
+];
+export function isKeyStory(s) {
+  // 科技、产业和关注的报道门槛低一点
+  const low = s.section === "tech" || s.section === "industry" || Boolean(s.followed && s.followed.length);
+  return s.importance >= (low ? 55 : 60);
+}
+// 导语开头的「11月10日，」在推送里是多余的（标题行已有日期）
+// 还有快讯原文常带的「17:49 」「ChainCatcher 消息，」
+const dropDate = (t) => {
+  let x = String(t || "").replace(/\s+/g, " ").trim();
+  for (let k = 0; k < 3; k++) {
+    const y = x.replace(/^\d{1,2}:\d{2}\s*/, "").replace(/^[A-Za-z][\w ]{1,20}\s*消息[，,]\s*/, "").replace(/^(\d{4}\s*年\s*)?\d{1,2}\s*月\s*\d{1,2}\s*日(凌晨|早间|早上|上午|中午|午间|下午|傍晚|晚间|晚|夜间)?[，,]\s*/, "");
+    if (y === x) break;
+    x = y;
+  }
+  return x;
+};
+/** 按句截：n 字以内取完整的句子；第一句就超长时在逗号处截断。 */
+export function sentences(text, n) {
+  const t = dropDate(text);
+  if (t.length <= n) return t;
+  const parts = t.match(/[^。！？；!?;]+[。！？；!?;]?/g) || [t];
+  let out = "";
+  for (const p of parts) { if ((out + p).length > n) break; out += p; }
+  if (out) return out;
+  const cut = t.slice(0, n);
+  const k = Math.max(cut.lastIndexOf("，"), cut.lastIndexOf(","));
+  return (k > n * 0.5 ? cut.slice(0, k) : cut.slice(0, n - 1)) + "…";
+}
+const mdText = (t) => String(t || "").replace(/[\[\]]/g, (c) => (c === "[" ? "［" : "］")).replace(/\*/g, "＊");
+const same = (x) => String(x || "").replace(/[\s，。、：:,.!！?？“”"'‘’《》（）()]/g, "");
+
+/** 版面模式的推送消息（Markdown，手机端渲染）：汇总时段与统计、总括；重点详写，其余按领域简写；来源名即链接。 */
 export function composeEditionMessage(parts, picks, ed, names) {
   const title = parts.title || "要闻";
   const head = parts.overnight ? "隔夜" + title : title;
@@ -1106,33 +1157,47 @@ export function composeEditionMessage(parts, picks, ed, names) {
   const warn = nWarn ? "⚠ 有 " + nWarn + " 处数据源异常，详见新闻面板「运行」" : null;
   if (!picks.length) return [parts.hhmm + " " + head + "：暂无新的重点"].concat(warn ? [warn] : []).join("\n");
   const md = String(parts.md || "").split("-").map(Number);
-  const L = ["📰 " + head + " · " + (md.length === 2 && md[0] ? md[0] + "月" + md[1] + "日 " : "") + parts.hhmm];
-  if (ed.headline) L.push(ed.headline);
-  if (parts.full) {
-    const nNew = picks.filter((x) => x.reason === "new").length;
-    L.push("本轮新报道 " + nNew + " 件" + (picks.length > nNew ? "，有进展 " + (picks.length - nNew) + " 件" : ""));
-  }
+  const L = ["📰 **" + head + "** · " + (md.length === 2 && md[0] ? md[0] + "月" + md[1] + "日 " : "") + parts.hhmm];
+  const nNew = picks.filter((x) => x.reason === "new").length;
+  const span = parts.from ? "汇总 " + parts.from + "–" + parts.hhmm + " · " : "";
+  L.push(span + "新报道 " + nNew + " 件" + (picks.length > nNew ? " · 有进展 " + (picks.length - nNew) + " 件" : ""));
+  if (ed.headline) L.push("> " + mdText(ed.headline));
   let markets = false;
-  picks.forEach((s, i) => {
+  let i = 0;
+  const item = (s, detailed) => {
+    i++;
     const again = s.reason !== "new";
     const tag = s.reason === "followup" ? "【进展】" : s.reason === "upgraded" || s.reason === "jumped" ? "【升级】" : "";
-    L.push("", (i + 1) + ". " + tag + s.title + (s.followed && s.followed.length ? " ★" : ""));
-    // 已推过的故事线再推：写进展，不重复导语
-    const cut = parts.full ? 80 : 100;
-    if (again && s.update_text) L.push("进展：" + clip(s.update_text, cut));
-    else {
-      // 程序稿的导语常常就是标题本身：一样就不重复
-      const lead = s.push_lead || s.lead;
-      const same = (x) => String(x || "").replace(/[\s，。、：:,.!！?？“”"'‘’《》（）()]/g, "");
-      if (lead && same(lead) !== same(s.title)) L.push(clip(lead, cut));
+    L.push("", "**" + i + ". " + tag + mdText(s.title) + "**" + (s.followed && s.followed.length ? " ★" : ""));
+    const lead = s.push_lead || s.lead;
+    if (again && s.update_text) {
+      L.push("进展：" + mdText(sentences(s.update_text, detailed ? 160 : 90)));
+      if (detailed && lead && same(lead) !== same(s.title)) L.push("背景：" + mdText(sentences(lead, 100)));
+    } else if (lead && same(lead) !== same(s.title)) L.push(mdText(sentences(lead, detailed ? 200 : 90)));
+    if (detailed) {
+      const leadKey = same(lead);
+      const pts = (s.points || []).map((p) => (typeof p === "string" ? p : p && p.text) || "").filter((t) => t && !leadKey.includes(same(t))).slice(0, 2);
+      for (const t of pts) L.push("· " + mdText(sentences(t, 70)));
+      if (s.impact) L.push("影响：" + mdText(sentences(s.impact, 80)));
     }
-    const who = s.outlets.map((x) => String(x.name || x.source_id).replace(/·.*$/, ""));
+    // 来源：媒体名就是链接（手机上点名字跳原文），最多列 3 家
+    const links = (s.links && s.links.length ? s.links : [{ name: (s.outlets[0] || {}).name || (s.outlets[0] || {}).source_id, url: s.url }]).filter((x) => x && x.name);
+    const shown = links.slice(0, 3).map((x) => { const n = mdText(String(x.name).replace(/·.*$/, "")); return x.url ? "[" + n + "](" + x.url + ")" : n; });
     const h = s.heat || {};
-    L.push([who.length > 1 ? who[0] + "等 " + who.length + " 家" : who[0] || "", tz(s.published_at || s.first_seen_at).slice(-5),
+    L.push([shown.join("、") + (s.outlets.length > shown.length ? " 等 " + s.outlets.length + " 家" : ""), tz(s.published_at || s.first_seen_at).slice(-5),
       s.credibility === "confirmed" ? "权威确认" : s.credibility === "disputed" ? "说法有分歧" : "", h.views != null ? "阅读 " + fmtN(h.views) : ""].filter(Boolean).join(" · "));
-    if (s.url) L.push(s.url);
     if (/^markets|^macro/.test(s.section || "")) markets = true;
-  });
+  };
+  const keys = picks.filter(isKeyStory);
+  const rest = picks.filter((s) => !isKeyStory(s));
+  if (keys.length) { L.push("", "**🔴 重点**"); for (const s of keys) item(s, true); }
+  const placed = new Set();
+  for (const g of PUSH_GROUPS) {
+    const xs = rest.filter((s) => !placed.has(s.id) && (!g.sections || g.sections.includes(s.section)));
+    if (!xs.length) continue;
+    L.push("", "**" + g.title + "**");
+    for (const s of xs) { placed.add(s.id); item(s, false); }
+  }
   L.push("");
   if (warn) L.push(warn);
   L.push((ed.mode === "llm" ? "由 " + ed.model + " 阅读 " + ed.items_read + " 条新闻后编写，可能有误，以原文为准" : "按规则摘编自各家报道") + (markets ? "；财经内容非投资建议" : "") + "。");

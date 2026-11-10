@@ -84,7 +84,7 @@ test("推送：关注的门槛低（min_follow）并标 ★；关注的故事线
   assert.deepEqual(picks.map((p) => p.title), ["沙特首都遇袭", "英伟达发布新芯片"]);
   recordEditionPushes(db, picks, "r1", nowIso, "core");
   const msg = composeEditionMessage({ hhmm: "09:00", md: "11-09", stats: "源", warnings: [], title: "要闻" }, picks, ed, {});
-  assert.match(msg, /\n2\. 英伟达发布新芯片 ★\n美联社 · /);
+  assert.match(msg, /\n\*\*\d\. 英伟达发布新芯片\*\* ★\n(\[)?美联社/);
   assert.ok(!msg.includes("\n英伟达发布新芯片\n"), "导语与标题相同时不重复");
   // 关注的故事线来了新报道
   const t = iso(600000);
@@ -93,6 +93,6 @@ test("推送：关注的门槛低（min_follow）并标 ★；关注的故事线
   const ed2 = ruleEdition(db, opts(f));
   const again = editionPicks(db, ed2, rules, { nowIso: iso(0), lookbackHours: 6 });
   assert.deepEqual(again.map((p) => [p.title, p.reason]), [["英伟达发布新芯片", "followup"]]);
-  assert.match(composeEditionMessage({ hhmm: "11:00", md: "11-09", stats: "源", warnings: [], title: "要闻" }, again, ed2, {}), /\n1\. 【进展】英伟达发布新芯片 ★\n/);
+  assert.match(composeEditionMessage({ hhmm: "11:00", md: "11-09", stats: "源", warnings: [], title: "要闻" }, again, ed2, {}), /\n\*\*1\. 【进展】英伟达发布新芯片\*\* ★\n/);
   db.close();
 });

@@ -1322,7 +1322,7 @@ export function apply(ctx, config) {
     // 推送偏好：门槛档位、每轮上限、按读者反馈调各版块门槛、每天上限；「全推」不看门槛和上限
     const pp = loadPush(p.pushPrefs);
     const full = pp.scope === "full";
-    parts = Object.assign({}, parts, { full });
+    parts = Object.assign({}, parts, { full, from: bjHhmm(new Date(Date.now() - lookbackHours * 3600000).toISOString().replace("T", " ").slice(0, 19)) });
     const all = editionPicks(db, ed, rulesFor(Object.assign({}, DEFAULT_RULES, rules || {}), pp), { nowIso, lookbackHours, penalties: sectionPenalties(db), full });
     const cap = full ? { send: all, held: 0, today: 0 } : applyDailyCap(db, all, pp);
     const picks = cap.send;

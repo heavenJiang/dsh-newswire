@@ -404,7 +404,7 @@ if (scheduleCalls.filter((c) => c[0] === "run").length === runsBefore) { bad++; 
 const d3 = await callTool("newswire_cycle", {});
 console.log("  deferred push:", d3 && d3.message && d3.message.split("\n").slice(0, 3).join(" / "), "picks:", d3 && (d3.picks || []).length);
 if (!d3 || !d3.message || !d3.edition || d3.run_id !== d1.run_id) { bad++; console.log("触发后的那次应推本轮版面", d3); }
-if (d3 && (d3.picks || []).length && !/本轮新报道 \d+ 件/.test(d3.message)) { bad++; console.log("全推消息没有本轮统计行"); }
+if (d3 && (d3.picks || []).length && !/新报道 \d+ 件/.test(d3.message)) { bad++; console.log("全推消息没有本轮统计行"); }
 await callTool("newswire_push_prefs", { timing: "on_time", scope: "picked" });
 // 面板「推送」：按最新版面立即触发一次；手动抓取写完版面后也触发一次
 const runsN = () => scheduleCalls.filter((c) => c[0] === "run").length;
