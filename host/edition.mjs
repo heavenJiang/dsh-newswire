@@ -43,7 +43,7 @@ export const DEFAULT_LAYOUT = {
   min_importance: 25,
   front: { count: 3 },
   sections: [{ id: "politics", max: 4 }, { id: "macro", max: 3 }, { id: "markets", max: 3 }, { id: "industry", max: 4 }, { id: "tech", max: 8 }, { id: "study", max: 4 }, { id: "society", max: 2 }],
-  story: { lead_chars: 120, points: 3, point_chars: 40, views: 3, impact_chars: 60 },
+  story: { lead_chars: 120, points: 3, point_chars: 40, views: 3, impact_chars: 60, rich_items: 4, rich_points: 6, rich_point_chars: 60, rich_materials: 10 },
   watch: { count: 3 },
   verify: { count: 4, min_importance: 30 },
   // 重点领域：读者最关心的方向。挑材料时优先、不做规则分诊，模型评重要度时按技术影响力评，头版留位置，影响写技术带来的变化。labels 留空即关闭
@@ -74,6 +74,8 @@ export function normalizeLayout(raw) {
     story: {
       lead_chars: num(st.lead_chars, 30, 400, D.story.lead_chars), points: num(st.points, 0, 6, D.story.points), point_chars: num(st.point_chars, 10, 120, D.story.point_chars),
       views: num(st.views, 0, 6, D.story.views), impact_chars: num(st.impact_chars, 0, 200, D.story.impact_chars),
+      rich_items: num(st.rich_items, 0, 50, D.story.rich_items), rich_points: num(st.rich_points, 1, 8, D.story.rich_points),
+      rich_point_chars: num(st.rich_point_chars, 10, 120, D.story.rich_point_chars), rich_materials: num(st.rich_materials, 1, 16, D.story.rich_materials),
     },
     watch: { count: num(r.watch && r.watch.count, 0, 6, D.watch.count) },
     verify: { count: num(r.verify && r.verify.count, 0, 8, D.verify.count), min_importance: num(r.verify && r.verify.min_importance, 0, 100, D.verify.min_importance) },
@@ -290,6 +292,22 @@ export const materialText = (it, bodies, content) => {
   return c.comments > 0 && it.comments ? main + "｜" + COMMENTS_MARK + clip(it.comments, c.comments) : main;
 };
 export const COMMENTS_MARK = "【社区评论】";
+
+/** 材料够「多」：报道篇数到了 rich_items，多读几篇后的材料合起来也够长（一两句的快讯凑不出细节）。 */
+const RICH_MIN_CHARS = 800;
+/**
+ * 材料多的报道：要点放宽（条数、字数），写稿时多读几篇。只有一两篇报道的照旧。
+ * @returns null 或 { materials, points, point_chars }
+ */
+export function richSpec(items, bodies, S, profile) {
+  const P = profile.blocks.find((b) => b.kind === "points");
+  if (!P || !S.rich_items || items.length < S.rich_items) return null;
+  const materials = Math.max(profile.content.materials, S.rich_materials);
+  const len = pickMaterials(items, materials).reduce((n, it) => n + materialText(it, bodies, profile.content).length, 0);
+  if (len < RICH_MIN_CHARS) return null;
+  const points = Math.max(P.max || S.points, S.rich_points), point_chars = Math.max(P.chars || S.point_chars, S.rich_point_chars);
+  return { materials, points, point_chars };
+}
 /** 只认报道原文的材料设置（核对导语、要点等不能依据评论的块）。 */
 const sourceOnly = (content) => (content && content.comments ? Object.assign({}, content, { comments: 0 }) : content);
 
@@ -318,7 +336,7 @@ export function verifyStory(db, story, items, bodies, content, blocks) {
   const hist = Array.isArray(story.history) ? story.history : [];
   const cited = [...new Set([].concat(story.lead_refs || [], ...(story.points || []).map((p) => (p && p.refs) || []), ...(story.views || []).map((v) => v.refs || []),
     ...(story.extra || []).flatMap((b) => [].concat(b.refs || [], ...(b.items || []).map((x) => x.refs || [])))).filter((x) => typeof x === "string"))];
-  let mats = pickMaterials(items, content && content.materials);
+  let mats = pickMaterials(items, (story.rich && story.rich.materials) || (content && content.materials));
   const missingIds = cited.filter((id) => !mats.some((m) => m.id === id));
   if (missingIds.length) mats = mats.concat(loadArticles(db, missingIds));
   const toIdx = (refs) => (refs || []).map((id) => mats.findIndex((m) => m.id === id)).filter((i) => i >= 0);
@@ -646,7 +664,8 @@ export function writePrompt(batch, layout) {
     // 前情：以前的相关故事线（H 编号），只能写进读法里能依据以前报道的块
     const hb = p.blocks.filter((x) => (x.materials || []).includes("history")).map((x) => x.name || x.id);
     const hist = (b.history || []).length && hb.length ? "\n以前的相关报道（前情，只能用在「" + hb.join("」「") + "」里，引用写 H 编号；和这件事没有直接关系就不要用）：\n" + b.history.map((h) => "[" + h.ref + "] " + String(h.at || "").slice(0, 10) + "｜" + historyText(h)).join("\n") : "";
-    return "【报道" + (i + 1) + "】" + star + b.story.title + prev + fbk + "\n材料：\n" + b.mats.map((it, k) => "[M" + (k + 1) + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + materialText(it, b.bodies, p.content)).join("\n") + hist;
+    const rich = b.rich ? "\n（这篇材料多：要点最多" + b.rich.points + "条，每条不超过" + b.rich.point_chars + "字，把经过、关键数字、各方动作写全，不要重复导语）" : "";
+    return "【报道" + (i + 1) + "】" + star + b.story.title + rich + prev + fbk + "\n材料：\n" + b.mats.map((it, k) => "[M" + (k + 1) + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + materialText(it, b.bodies, p.content)).join("\n") + hist;
   });
   // 版式与输出格式：这一批的读法都一样时按它的输出块，否则用默认的四块
   const spec = blockSpec(profs.every((p) => p.blocks === profs[0].blocks) ? profs[0].blocks : DEFAULT_BLOCKS, S, profs.some((p) => p.content.comments > 0));
@@ -684,13 +703,13 @@ export function batchByProfile(list, n) {
  * 模型写的一篇稿 → 报道字段，按读法的输出块取：读法里没有的块不收；自定义块收进 extra。
  * @param ids 把「M2」一类的材料编号换成文章 id
  */
-export function parseCopy(w, blocks, S, ids) {
+export function parseCopy(w, blocks, S, ids, rich) {
   const has = (k) => blocks.find((b) => b.kind === k);
   const P = has("points"), V = has("views"), I = has("impact"), L = has("lead");
   const line = (x, n) => (typeof x === "string" ? { text: str(x, n), refs: [] } : { text: str(x && x.text, n), refs: ids(x && x.refs) });
   const out = {
     lead: str(w.lead, ((L && L.chars) || S.lead_chars) + 20), lead_refs: ids(w.lead_refs),
-    points: P ? (Array.isArray(w.points) ? w.points : []).map((x) => line(x, (P.chars || S.point_chars) + 20)).filter((x) => x.text).slice(0, P.max || S.points) : [],
+    points: P ? (Array.isArray(w.points) ? w.points : []).map((x) => line(x, ((rich && rich.point_chars) || P.chars || S.point_chars) + 20)).filter((x) => x.text).slice(0, (rich && rich.points) || P.max || S.points) : [],
     views: V ? (Array.isArray(w.views) ? w.views : []).map((v) => ({ who: str(v && v.who, 20), says: str(v && v.says, 80), refs: ids(v && v.refs) })).filter((v) => v.who && v.says).slice(0, V.max || S.views) : [],
     impact: I ? str(w.impact, (I.chars || S.impact_chars) + 20) : "", by: "llm",
   };
@@ -718,7 +737,7 @@ export function writeFingerprint(entry, layout) {
   // 读法的写法（名称、版本、写稿要求、材料设置、输出块）改了，旧稿就不能沿用
   const f = p.id === DEFAULT_PROFILE && !promptOf(p, "write") ? "" : [p.id, p.version, p.name, promptOf(p, "write"), JSON.stringify(p.content), JSON.stringify(p.blocks)].join("|");
   const h = (entry.history || []).map((x) => x.story_id);
-  return createHash("sha1").update(JSON.stringify(Object.assign({ v: WRITE_V, t: entry.story.title, m: entry.mats.map((it) => it.id), p: entry.prevLead || "", e: (entry.errors || []).map((x) => x.text), s: layout.story, y: layout.style, f }, h.length ? { h } : {}))).digest("hex");
+  return createHash("sha1").update(JSON.stringify(Object.assign({ v: WRITE_V, t: entry.story.title, m: entry.mats.map((it) => it.id), p: entry.prevLead || "", r: entry.rich || null, e: (entry.errors || []).map((x) => x.text), s: layout.story, y: layout.style, f }, h.length ? { h } : {}))).digest("hex");
 }
 const COPY_KEYS = ["lead", "lead_refs", "points", "views", "impact", "extra", "history", "update_text", "update_by"];
 function cacheGet(db, fp) {
@@ -1025,14 +1044,16 @@ export async function llmEdition(db, model, o) {
   const entryOf = (story) => {
     const g = story._g;
     const profile = reg.get(story.profile);
-    const M = profile.content.materials;
+    // 材料多的（多篇报道、合起来够长）：多读几篇、要点放宽，只算一次
+    if (story.rich === undefined) story.rich = richSpec(g.items, bodies, layout.story, profile);
+    const M = (story.rich && story.rich.materials) || profile.content.materials;
     const prevLead = !g.isNew && g.row && g.row.copy && g.row.copy.lead && g.fresh.length ? g.row.copy.lead : "";
     // 有进展的故事线：新材料优先放进去，模型才看得到新进展
     let mats = pickMaterials(g.items, M);
     if (prevLead) { const nf = pickMaterials(g.fresh, Math.min(3, M)); mats = nf.concat(pickMaterials(g.items.filter((it) => !nf.includes(it)), M - nf.length)); }
     // 读法有能依据以前报道的块（如「背景」）：找以前的相关故事线当前情（H 编号），只找一次
     if (story.history === undefined) story.history = profile.blocks.some((b) => (b.materials || []).includes("history")) ? relatedStories(db, { id: story.id, title: story.title, entities: g.entities || [], first_seen_at: story.first_seen_at }) : [];
-    return { story, items: g.items, bodies, mats, fresh: g.fresh, prevLead, profile, history: story.history, errors: fb.errors.get(story.id) || [] };
+    return { story, items: g.items, bodies, mats, fresh: g.fresh, prevLead, profile, history: story.history, rich: story.rich, errors: fb.errors.get(story.id) || [] };
   };
   // 断点续写：上一次（中断、重启或超时前）已经写好的同一份材料，直接用写好的稿
   try { db.prepare("DELETE FROM write_cache WHERE created_at < datetime('now', '-3 days')").run(); } catch { /* 旧库没有这张表 */ }
@@ -1065,7 +1086,7 @@ export async function llmEdition(db, model, o) {
             const it = m && b.mats[Number(m[1]) - 1];
             return it ? it.id : null;
           }).filter(Boolean);
-          Object.assign(b.story, parseCopy(w, b.profile.blocks, S, ids));
+          Object.assign(b.story, parseCopy(w, b.profile.blocks, S, ids, b.rich));
           // 新进展同样要经得起核对（只认给模型看的报道原文）
           const up = b.prevLead ? str(w.update, 60) : "";
           if (up && checkText(up, b.mats.map((m) => materialText(m, b.bodies, sourceOnly(b.profile.content)))).ok) Object.assign(b.story, { update_text: up, update_by: "llm" });
@@ -1189,6 +1210,8 @@ export function updateEditionContent(db, id, ed) {
 }
 
 // ------------------------------------------------------------------ 故事线详情与「自上次查看」
+/** 详情页每篇报道最多带多少字的原文。 */
+const DETAIL_TEXT_CHARS = 4000;
 /** 一条故事线的全部：稿件、每篇报道（按时间）、进展、推送。被并入的跟到并入者。 */
 export function storyDetail(db, id) {
   let row = db.prepare("SELECT * FROM stories WHERE story_id = ?").get(id);
@@ -1199,6 +1222,12 @@ export function storyDetail(db, id) {
   const updates = db.prepare("SELECT at, text, items, by, edition_id FROM story_updates WHERE story_id = ? ORDER BY at").all(row.story_id);
   const pushes = db.prepare("SELECT pushed_at, reason, credibility, score FROM pushes WHERE story_id = ? ORDER BY id").all(row.story_id);
   const merged = db.prepare("SELECT story_id, title FROM stories WHERE merged_into = ?").all(row.story_id);
+  // 每篇报道的原文（正文优先，没有就用摘要）：详情页可以展开看，不用跳出去
+  const bodies = bodiesFor(db, items.map((x) => x.id));
+  for (const it of items) {
+    const t = String(bodies.get(it.id) || it.summary || "").replace(/\s+\n/g, "\n").trim();
+    if (t && t !== String(it.title || "").trim()) it.text = t.length > DETAIL_TEXT_CHARS ? t.slice(0, DETAIL_TEXT_CHARS - 1) + "…" : t;
+  }
   return { id: row.story_id, title: row.title, section: row.section, labels: parseJ(row.labels, []), importance: row.importance, created_at: row.created_at, updated_at: row.updated_at, copy: parseJ(row.copy, null), items, updates, pushes, merged };
 }
 

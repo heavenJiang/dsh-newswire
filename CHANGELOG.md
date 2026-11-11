@@ -2,6 +2,13 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.21 (2026-11-11)
+
+Copy was too short to learn the details. Three changes:
+- **Big stories get more key points.** When a storyline has 4 or more reports and enough text between them, writing reads 10 of them (was 6) and allows up to 6 points of 60 characters (was 3 of 40), with an instruction to cover what happened, the key numbers and what each party did. Stories with one or two reports stay as they were: the originals are that short, and longer copy would have to be made up. On real data, "tankers on fire in the Strait of Hormuz" (39 reports) and "Russia–US–Ukraine talks" (19 reports) went from about 150 to about 310 characters, all checks passed. New layout `story` fields `rich_items` / `rich_points` / `rich_point_chars` / `rich_materials`; `rich_items: 0` turns it off.
+- **Original text in the storyline view.** Each report in the timeline has a "Text" toggle that expands its body (or summary), plus "Expand all".
+- **New detailed report.** In the storyline view, "Write detailed report" has the model read every report in the storyline (near-duplicates keep only the longest; up to 20 reports and 12,000 characters) and write an overview, a timeline, key numbers, who said what, background, and what is disputed or unconfirmed. Every sentence is checked against the originals; sentences that fail are removed, and citations link to the originals. It runs in the background (about 2–4 minutes on a local model), and you're told when new reports make a rewrite worthwhile. On three real storylines it wrote 1,100–1,300 characters with every check passing. Database schema v26 (new `story_details` table). The `newswire_story` tool includes the detailed report, if written, and the opening of each report's text.
+
 ## 1.1.20 (2026-11-11)
 
 Fixes from running the new profiles on real data with a local model:

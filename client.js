@@ -41,6 +41,7 @@ window.__ModuleLoader__.load({
       track: '/api/newswire/track',
       trackItem: '/api/newswire/track/item',
       storyAnalyze: '/api/newswire/analyze',
+      storyDetail: '/api/newswire/detail',
       sourceAdd: '/api/newswire/sources/add',
       onboard: '/api/newswire/onboard',
       ask: '/api/newswire/ask',
@@ -168,7 +169,7 @@ window.__ModuleLoader__.load({
         'hs.latest': '最新版面', 'hs.viewing': '正在看历史版面（{t}）', 'fb.report': '报错', 'fb.wrong': '有误', 'fb.note': '哪里不对（可不填）', 'fb.done': '已撤下，下次重写时会避开', 'fb.cancel': '收起',
         'fb.misplaced': '不属于这里', 'fb.moved': '已移出，下次重新归并', 'q.title': '质量', 'q.when': '时间', 'q.mode': '模式', 'q.ms': '耗时', 'q.calls': '调用', 'q.fresh': '新/沿用', 'q.check': '核对', 'q.fallback': '退回', 'q.reported': '报错',
         'q.fb': '读者报错 {n} 条，已处理 {r} 条', 'q.re': '重组', 'sn.banner': '自你上次查看（{t}）以来：{n} 条新故事线，{m} 条有进展', 'sn.first': '这是你第一次打开版面：以后这里会告诉你自上次查看以来的变化。',
-        'sn.new': '新', 'sn.added': '+{n} 自上次', 'sn.nothing': '自你上次查看（{t}）以来没有新进展。', 'up.label': '进展', 'sd.back': '‹ 返回', 'sd.timeline': '时间轴', 'sd.reports': '{n} 篇报道',
+        'sn.new': '新', 'sn.added': '+{n} 自上次', 'sn.nothing': '自你上次查看（{t}）以来没有新进展。', 'up.label': '进展', 'sd.back': '‹ 返回', 'sd.timeline': '时间轴', 'sd.full': '原文', 'sd.fold': '收起', 'sd.expandAll': '全部展开', 'sd.foldAll': '全部收起', 'dt.title': '详细报道', 'dt.run': '写详细报道', 'dt.rerun': '重写详细报道', 'dt.busy': '正在读 {n} 篇报道写详细报道，约需 2–4 分钟，可以先去看别的…', 'dt.hint': '模型读这条故事线的全部报道，写成概述、经过、关键数字、各方说法；每句与原文核对。', 'dt.by': '由 {m} 依据 {n} 篇报道写成（{t}），每句已与原文核对', 'dt.dropped': '，{n} 句核对不上已删去', 'dt.newer': '写完后又有 {n} 篇新报道，可以重写。', 'dt.overview': '概述', 'dt.timeline': '经过', 'dt.numbers': '关键数字', 'dt.views': '各方说法', 'dt.background': '背景', 'dt.open': '说法不一或待确认', 'sd.reports': '{n} 篇报道',
         'sd.pushed': '已推送到手机 · {r}', 'sd.merged': '并入了：{t}', 'sd.since': '始于 {t}', 'sd.copy': '当前稿件', 'view.follows': '关注', 'fl.section': '我的关注', 'fl.follow': '☆ 关注', 'fl.following': '★ 已关注', 'fl.mute': '屏蔽', 'fl.muted': '已屏蔽，下一份版面起不再出现',
         'fl.saved': '已保存，下一份版面起生效', 'as.open': '添加数据源', 'as.learn': '让模型学会解析这个页面', 'as.learning': '通用解析没认出来，模型正在读页面结构、写解析规则…（本地模型可能要一两分钟）', 'as.relearn': '让模型再学一次', 'as.learnHint': '通用解析认不出这个页面（比如社交平台的帖子流）。模型读一遍页面结构，写出解析规则，程序试抓验证；学会后每轮由程序照着规则抓，不再调用模型。', 'as.learned': '解析规则由模型学会（{n} 次），已试抓验证。', 'as.learnFail': '模型没学会：', 'as.noModel': '需要 LLM 模式和可用的模型（在「运行 → 模型」里设置）', 'as.title': '添加数据源', 'as.close': '收起', 'as.name': '名称，如 证券时报', 'as.url': 'RSS 地址或新闻列表页地址', 'as.test': '试抓', 'as.testing': '试抓中…（约半分钟）', 'as.save': '添加（先试用）', 'as.hint': '先试抓看看能抓到什么，满意再添加。新源先「试用」：照常抓取、帮别家印证，但不单独上版或推送；攒几天数据后，下面的成绩单会告诉你值不值得开。地址、通道、翻页等细节可以在最下方的「高级」里改。', 'as.got': '抓到 {n} 条（{k}，通道 {c}），最新几条：', 'as.list': '列表页', 'as.fail': '没抓到内容：', 'as.weak': '抓到 {n} 条，但看起来不对：', 'as.dup': '这个地址已经在数据源里了', 'as.added': '已添加「{n}」，处于试用中；下一轮抓取起生效', 'fl.kind.story': '故事线', 'fl.kind.theme': '主线', 'fl.storyCount': '{n} 条故事线', 'fl.kind.keyword': '关键词', 'fl.kind.topic': '主题', 'fl.kind.source': '来源', 'fl.add': '关注', 'fl.addMute': '屏蔽',
         'fl.ph': '人名、公司或词，别名用 | 分隔，如 英伟达|NVIDIA', 'fl.listFollow': '关注中', 'fl.listMute': '已屏蔽', 'fl.none': '还没有', 'fl.remove': '移除',
@@ -282,7 +283,7 @@ window.__ModuleLoader__.load({
         'hs.latest': 'Latest edition', 'hs.viewing': 'Viewing a past edition ({t})', 'fb.report': 'Report', 'fb.wrong': 'Wrong', 'fb.note': 'What is wrong (optional)', 'fb.done': 'Removed; the next rewrite avoids it', 'fb.cancel': 'Close',
         'fb.misplaced': 'Not this story', 'fb.moved': 'Moved out; it will be regrouped', 'q.title': 'Quality', 'q.when': 'Time', 'q.mode': 'Mode', 'q.ms': 'Time taken', 'q.calls': 'Calls', 'q.fresh': 'New/reused', 'q.check': 'Check', 'q.fallback': 'Fallbacks', 'q.reported': 'Reports',
         'q.fb': '{n} reader reports, {r} handled', 'q.re': 'reflow', 'sn.banner': 'Since you last looked ({t}): {n} new storylines, {m} developing', 'sn.first': 'First visit: from now on this shows what changed since you last looked.',
-        'sn.new': 'new', 'sn.added': '+{n} since last visit', 'sn.nothing': 'Nothing new since you last looked ({t}).', 'up.label': 'Update', 'sd.back': '‹ Back', 'sd.timeline': 'Timeline', 'sd.reports': '{n} reports',
+        'sn.new': 'new', 'sn.added': '+{n} since last visit', 'sn.nothing': 'Nothing new since you last looked ({t}).', 'up.label': 'Update', 'sd.back': '‹ Back', 'sd.timeline': 'Timeline', 'sd.full': 'Text', 'sd.fold': 'Hide', 'sd.expandAll': 'Expand all', 'sd.foldAll': 'Collapse all', 'dt.title': 'Detailed report', 'dt.run': 'Write detailed report', 'dt.rerun': 'Rewrite detailed report', 'dt.busy': 'Reading {n} reports to write the detailed report, about 2–4 minutes; feel free to look elsewhere…', 'dt.hint': 'The model reads every report in this storyline and writes an overview, timeline, key numbers and who said what; every sentence is checked against the originals.', 'dt.by': 'Written by {m} from {n} reports ({t}); every sentence checked against the originals', 'dt.dropped': '; {n} sentences did not match and were removed', 'dt.newer': '{n} new reports since it was written; you can rewrite it.', 'dt.overview': 'Overview', 'dt.timeline': 'What happened', 'dt.numbers': 'Key numbers', 'dt.views': 'Who said what', 'dt.background': 'Background', 'dt.open': 'Disputed or unconfirmed', 'sd.reports': '{n} reports',
         'sd.pushed': 'pushed ({r})', 'sd.merged': 'Merged in: {t}', 'sd.since': 'since {t}', 'sd.copy': 'Current copy', 'view.follows': 'Following', 'fl.section': 'Following', 'fl.follow': '☆ Follow', 'fl.following': '★ Following', 'fl.mute': 'Mute', 'fl.muted': 'Muted; gone from the next edition',
         'fl.saved': 'Saved; takes effect from the next edition', 'as.open': 'Add a source', 'as.learn': 'Let the model learn this page', 'as.learning': 'The generic parser couldn\'t read it; the model is reading the page structure and writing rules… (a local model may take a minute or two)', 'as.relearn': 'Let the model try again', 'as.learnHint': 'The generic parser can\'t read this page (a social feed, say). The model reads the page structure once and writes parsing rules, which a test fetch verifies; after that the program follows the rules every round with no model calls.', 'as.learned': 'Parsing rules learned by the model ({n} tries) and verified by a test fetch.', 'as.learnFail': 'The model couldn\'t learn it: ', 'as.noModel': 'Needs LLM mode and an available model (Runs → Model)', 'as.title': 'Add a source', 'as.close': 'Close', 'as.name': 'Name, e.g. Securities Times', 'as.url': 'RSS feed or news list page URL', 'as.test': 'Test fetch', 'as.testing': 'Testing… (about 30 s)', 'as.save': 'Add (on trial)', 'as.hint': 'Test-fetch first to see what comes back, then add it. New sources start on trial: fetched and used to corroborate others, but never leading a story or a push alone. After a few days the scorecard below tells you whether to keep it on. URL, channels and paging can be fine-tuned under Advanced at the bottom.', 'as.got': 'Got {n} items ({k}, via {c}). Latest:', 'as.list': 'list page', 'as.fail': 'Nothing fetched: ', 'as.weak': 'Got {n} items, but they look wrong: ', 'as.dup': 'This URL is already a source', 'as.added': 'Added "{n}" on trial; it takes effect from the next round', 'fl.kind.story': 'storyline', 'fl.kind.theme': 'theme', 'fl.storyCount': '{n} storylines', 'fl.kind.keyword': 'keyword', 'fl.kind.topic': 'topic', 'fl.kind.source': 'source', 'fl.add': 'Follow', 'fl.addMute': 'Mute',
         'fl.ph': 'person, company, or term; aliases with |, e.g. 英伟达|NVIDIA', 'fl.listFollow': 'Following', 'fl.listMute': 'Muted', 'fl.none': 'none yet', 'fl.remove': 'Remove',
@@ -1185,6 +1186,25 @@ window.__ModuleLoader__.load({
     }
 
     // ------------------------------------------------------------------ 故事线详情
+    /** 详细报道：概述、经过、关键数字、各方说法、背景、待确认；出处上标链到原文。 */
+    function DetailFull(props) {
+      var d = props.detail
+      var mats = (d.materials || []).map(function (m) { return { id: m.id, name: m.source, url: m.url, t: m.t } })
+      var refs = function (r) { return h(Refs, { refs: r, mats: mats }) }
+      var k = function (key) { return h('div', { className: 'nw-rs-k' }, t(key)) }
+      var ck = d.check || {}
+      return h('section', { className: 'nw-rail-box nw-detail' },
+        h('h4', null, t('dt.title')),
+        h('p', { className: 'nw-muted nw-xs' }, t('dt.by', { m: d.model || '', n: mats.length, t: when(d.created_at) }) + (ck.dropped ? t('dt.dropped', { n: ck.dropped }) : '')),
+        d.overview ? [k('dt.overview'), h('p', { key: 'o', className: 'nw-rs-p' }, d.overview.text, refs(d.overview.refs))] : null,
+        (d.timeline || []).length ? [k('dt.timeline'), h('ol', { key: 't', className: 'nw-dt-tl' }, d.timeline.map(function (x, i) { return h('li', { key: i }, x.time ? h('span', { className: 'nw-dt-time' }, x.time) : null, h('span', null, x.text, refs(x.refs))) }))] : null,
+        (d.numbers || []).length ? [k('dt.numbers'), h('ul', { key: 'n', className: 'nw-rs-points' }, d.numbers.map(function (x, i) { return h('li', { key: i }, x.text, refs(x.refs)) }))] : null,
+        (d.views || []).length ? [k('dt.views'), h('ul', { key: 'v', className: 'nw-rs-views' }, d.views.map(function (x, i) { return h('li', { key: i }, h('b', null, x.who), '　' + x.says, refs(x.refs)) }))] : null,
+        d.background ? [k('dt.background'), h('p', { key: 'b', className: 'nw-rs-p' }, d.background.text, refs(d.background.refs))] : null,
+        (d.open || []).length ? [k('dt.open'), h('ul', { key: 'q', className: 'nw-rs-points' }, d.open.map(function (x, i) { return h('li', { key: i }, x.text, refs(x.refs)) }))] : null,
+        d.newer ? h('p', { className: 'nw-note' }, t('dt.newer', { n: d.newer })) : null)
+    }
+
     function StoryDetail(props) {
       var dPair = useState({ phase: 'busy', st: null, error: null })
       var d = dPair[0]
@@ -1193,6 +1213,25 @@ window.__ModuleLoader__.load({
         setD({ phase: 'busy', st: null, error: null })
         postJson(API.story, { id: props.id }).then(function (st) { setD({ phase: 'ready', st: st, error: null }) }).catch(function (e) { setD({ phase: 'error', st: null, error: e.message }) })
       }, [props.id])
+      var opPair = useState({})
+      var opened = opPair[0]
+      var setOpened = opPair[1]
+      var dtPair = useState({ busy: false, error: null })
+      var dt = dtPair[0]
+      var setDt = dtPair[1]
+      // 详细报道在后台写：写着的时候每 5 秒查一次故事线详情，写完（或出错）就停
+      var polling = Boolean(dt.busy || (d.st && d.st.detail_running))
+      useEffect(function () {
+        if (!polling) return
+        var timer = setInterval(function () {
+          postJson(API.story, { id: props.id }).then(function (st) {
+            if (st.detail_running) return
+            setD(function (x) { return Object.assign({}, x, { st: st }) })
+            setDt({ busy: false, error: null })
+          }).catch(function () {})
+        }, 5000)
+        return function () { clearInterval(timer) }
+      }, [polling, props.id])
       var mvPair = useState({})
       var moved = mvPair[0]
       var setMoved = mvPair[1]
@@ -1203,6 +1242,7 @@ window.__ModuleLoader__.load({
       if (d.phase === 'busy') return h('div', { className: 'nw-sd' }, back, Empty({ children: '…' }))
       if (!d.st) return h('div', { className: 'nw-sd' }, back, h('div', { className: 'nw-error' }, d.error || 'not found'))
       var st = d.st
+      var busyDt = Boolean(dt.busy || st.detail_running)
       var mats = st.items.map(function (it) { return { id: it.id, name: it.source_name || it.source_id, url: it.url, t: it.published_at || it.first_seen_at } })
       // 时间轴：报道、进展、推送按时间合在一起，按天分组
       var ev = st.items.map(function (it) { return { k: 'i', t: it.published_at || it.first_seen_at, it: it } })
@@ -1236,7 +1276,21 @@ window.__ModuleLoader__.load({
         c && c.lead ? h('section', { className: 'nw-sd-copy' },
           h('p', { className: 'nw-rs-lead' }, c.lead, h(Refs, { refs: c.lead_refs, mats: mats })),
           (c.points || []).length ? h('ul', { className: 'nw-rs-points' }, c.points.map(function (x, i) { var q = pt(x); return h('li', { key: i }, q.text, h(Refs, { refs: q.refs, mats: mats })) })) : null) : null,
-        h('section', { className: 'nw-rail-box' }, h('h4', null, t('sd.timeline')),
+        st.detail ? h(DetailFull, { detail: st.detail }) : null,
+        st.can_analyze ? h('div', { className: 'nw-impact-acts' },
+          h('button', { className: 'nw-btn nw-sm' + (st.detail ? '' : ' nw-primary'), disabled: busyDt, onClick: function () {
+            setDt({ busy: true, error: null })
+            postJson(API.storyDetail, { story_id: st.id }).catch(function (e) { setDt({ busy: false, error: e.message }) })
+          } }, busyDt ? t('dt.busy', { n: st.items.length }) : st.detail ? t('dt.rerun') : t('dt.run')),
+          !st.detail && !busyDt ? h('span', { className: 'nw-muted nw-xs' }, t('dt.hint')) : null,
+          dt.error || (!busyDt && st.detail_error) ? h('span', { className: 'nw-error' }, dt.error || st.detail_error) : null) : null,
+        h('section', { className: 'nw-rail-box' }, h('h4', null, t('sd.timeline'),
+          st.items.some(function (it) { return it.text }) ? h('button', { className: 'nw-act nw-sd-all', onClick: function () {
+            var all = st.items.every(function (it) { return !it.text || opened[it.id] })
+            var n = {}
+            if (!all) st.items.forEach(function (it) { if (it.text) n[it.id] = true })
+            setOpened(n)
+          } }, st.items.every(function (it) { return !it.text || opened[it.id] }) ? t('sd.foldAll') : t('sd.expandAll')) : null),
           days.map(function (g) {
             return h('div', { key: g.day, className: 'nw-tl-day' },
               h('div', { className: 'nw-tl-dh' }, longDate(g.day + 'T12:00:00+08:00')),
@@ -1249,6 +1303,8 @@ window.__ModuleLoader__.load({
                     h('a', { className: 'nw-tl2-a', href: x.it.url, target: '_blank', rel: 'noopener noreferrer', title: x.it.title_zh ? x.it.title : undefined }, x.it.title_zh || x.it.title),
                     x.it.title_zh ? h('div', { className: 'nw-tl2-orig' }, x.it.title) : null,
                     x.it.kind === 'digest_item' ? h('span', { className: 'nw-muted nw-xs' }, ' · ' + t('sd.fromDigest', { t: x.it.kind_note || '' })) : null,
+                    x.it.text ? h('button', { className: 'nw-act nw-sd-toggle', onClick: function () { setOpened(function (m) { var n = Object.assign({}, m); n[x.it.id] = !m[x.it.id]; return n }) } }, opened[x.it.id] ? t('sd.fold') : t('sd.full')) : null,
+                    x.it.text && opened[x.it.id] ? h('div', { className: 'nw-sd-text' }, x.it.text) : null,
                     moved[x.it.id] ? h('span', { className: 'nw-saved' }, ' ' + t('fb.moved')) : h('span', { className: 'nw-acts' }, h('button', { className: 'nw-act', onClick: function () { misplace(x.it.id) } }, t('fb.misplaced')))))
               })))
           })))
@@ -2449,7 +2505,8 @@ window.__ModuleLoader__.load({
       '.nw-imp-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.6} .nw-imp-list > li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px}',
       '.nw-imp-dir{font-size:12px;padding-top:2px} .nw-up{color:' + C.ok + '} .nw-down{color:' + C.err + '} .nw-unk{color:' + C.l3 + '}',
       '.nw-scn{font-size:11px;font-weight:700;border-radius:4px;padding:0 4px;height:18px;align-self:start;margin-top:2px;text-align:center} .nw-scn-hi{background:' + C.warnBg + ';color:' + C.warn + '} .nw-scn-mid{background:' + C.accentBg + ';color:' + C.accent + '} .nw-scn-lo{background:' + C.hover + ';color:' + C.l3 + '}',
-      '.nw-impact-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .nw-analyze-btn{color:' + C.link + '!important} .nw-analysis{max-width:760px}',
+      '.nw-sd-text{margin:6px 0 4px;padding:8px 10px;border-left:2px solid ' + C.line + ';white-space:pre-wrap;line-height:1.7;font-size:13px} .nw-sd-toggle{margin-left:6px} .nw-sd-all{float:right;font-weight:400} .nw-dt-tl{margin:4px 0 8px;padding-left:0;list-style:none} .nw-dt-tl li{display:flex;gap:10px;margin:4px 0;line-height:1.6} .nw-dt-time{flex:0 0 auto;min-width:88px;color:' + C.l3 + ';font-variant-numeric:tabular-nums;font-size:12.5px;padding-top:1px} .nw-detail{max-width:760px} .nw-detail .nw-rs-k{margin-top:10px} .nw-detail .nw-rs-p,.nw-detail .nw-rs-views,.nw-detail .nw-dt-tl{font-size:14px;line-height:1.75;color:' + C.l1 + '}' +
+      ' .nw-impact-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .nw-analyze-btn{color:' + C.link + '!important} .nw-analysis{max-width:760px}',
       '.nw-filters-1{flex-wrap:wrap} .nw-fsearch{flex:1 1 220px;max-width:420px} .nw-filters-2{padding:8px 0;border-top:1px dashed ' + C.line1 + '} .nw-hotwords{display:flex;gap:2px 4px;flex-wrap:wrap;align-items:center}',
       '.nw-evrow{display:grid;grid-template-columns:14px minmax(0,1fr);gap:8px;width:100%;text-align:left;border:0;border-top:1px solid ' + C.line1 + ';background:transparent;color:inherit;font:inherit;padding:12px 8px;cursor:pointer;border-radius:0} .nw-evrow:hover{background:' + C.hover + '} .nw-evrow.nw-active{background:' + C.accentBg + '}',
       '.nw-evdot{width:8px;height:8px;border-radius:50%;margin-top:7px;background:' + C.idle + '} .nw-evdot-hi{background:' + C.err + '} .nw-evdot-mid{background:' + C.warn + '}',
@@ -2649,7 +2706,7 @@ window.__ModuleLoader__.load({
     }
 
     var plugin = { inject: ['slots'], apply: apply }
-    plugin.__test = { DailyView, PushPanel, AskView, Welcome, ImpactBlock, AnalysisFull, TrackTab, TrackDetail, TrackSynthesis, ContentCard, SourceBoard, SourceEditor, QualityCard, StoryDetail, FollowsView, EditionView, ReadStory, NoteList, ModelCard, Topics, NotesBox, VersionSection, UpdateBanner, checkForUpdate, applyUpdate, remotes, Page, NewsTab, TimelineTab, ItemsTab, SourcesTab, RunsTab, EventCard, EventDetailView, EventDetail, RunBars, ScheduleCard, StatusLine, TestResult, SignalChips, Spark, PanelIcon, t, setLang: function (v) { lang = v }, DICT, CSS }
+    plugin.__test = { DailyView, PushPanel, AskView, Welcome, ImpactBlock, AnalysisFull, DetailFull, TrackTab, TrackDetail, TrackSynthesis, ContentCard, SourceBoard, SourceEditor, QualityCard, StoryDetail, FollowsView, EditionView, ReadStory, NoteList, ModelCard, Topics, NotesBox, VersionSection, UpdateBanner, checkForUpdate, applyUpdate, remotes, Page, NewsTab, TimelineTab, ItemsTab, SourcesTab, RunsTab, EventCard, EventDetailView, EventDetail, RunBars, ScheduleCard, StatusLine, TestResult, SignalChips, Spark, PanelIcon, t, setLang: function (v) { lang = v }, DICT, CSS }
     return plugin
   },
 })

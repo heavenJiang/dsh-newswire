@@ -12,6 +12,7 @@ import { sourceScores, setSourceState } from "./host/sources.mjs";
 import { translateTitles } from "./host/translate.mjs";
 import { DEPTHS, depthOf, depthParams, recordCall, usageToday, makeGate } from "./host/runtime.mjs";
 import { searchNews, answerNews } from "./host/ask.mjs";
+import { detailMaterials, writeDetail, saveDetail, latestDetail } from "./host/detail.mjs";
 import { analysisMaterials, analyzeStory, saveAnalysis, latestAnalysis, analysisBrief, autoAnalyzeTargets, webMaterials, searchQuery } from "./host/analysis.mjs";
 import { listTrackers, addTracker, removeTracker, unlinkStory, linkAll, trackerDetail, synthesize, suggestions as trackSuggestions, synthTargets } from "./host/tracking.mjs";
 import { parseCron, cronMatches, nextCron, minuteKey } from "./host/clock.mjs";
@@ -1056,6 +1057,28 @@ export function apply(ctx, config) {
       }
       const a = await analyzeStory(model, { title: row.title, lead: copy && copy.lead, hint: promptOf(prof, "analysis") }, mats, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
       return saveAnalysis(db, storyId, a, { model: model.label(), auto });
+    } finally { db.close(); }
+  }
+  /** 正在写的详细报道：故事线 id → { at, error }（写完删掉；失败留下错误，下次查看时告诉读者）。 */
+  const detailJobs = new Map();
+  /** 后台写详细报道（本地模型要几分钟，不让面板的请求一直挂着）；同一条已在写就不重复开。 */
+  function startDetail(storyId) {
+    const cur = detailJobs.get(storyId);
+    if (cur && !cur.error) return;
+    detailJobs.set(storyId, { at: Date.now(), error: null });
+    void runDetail(storyId).then(() => detailJobs.delete(storyId)).catch((err) => detailJobs.set(storyId, { at: Date.now(), error: errText(err) }));
+  }
+  /** 详细报道：模型读这条故事线的全部报道写一篇分块的长稿，逐句核对，存档并返回。 */
+  async function runDetail(storyId) {
+    const db = openIfExists(p.db);
+    if (!db) throw new Error("no_db");
+    try {
+      const row = db.prepare("SELECT story_id, title, copy FROM stories WHERE story_id = ?").get(storyId);
+      if (!row) throw new Error("not_found");
+      let copy = null; try { copy = JSON.parse(row.copy || "null"); } catch { copy = null; }
+      const mats = detailMaterials(db, storyId, bodiesFor);
+      const d = await writeDetail(model, { title: row.title, lead: copy && copy.lead }, mats, { style: loadLayout(p.layoutFile, p.layoutSeed).style, timeoutMs: Math.max(cfg.modelTimeoutMs, 300000) });
+      return saveDetail(db, storyId, d, { model: model.label() });
     } finally { db.close(); }
   }
   /** 追踪对象的关注项：公司 / 技术 / 人物按别名关注（报道进「我的关注」、推送门槛更低），主线按挂上的故事线关注。 */
@@ -2140,6 +2163,26 @@ export function apply(ctx, config) {
       },
     });
 
+    // 详细报道：模型读一条故事线的全部报道写长稿（本地模型约 2–4 分钟）。后台写，立即返回；面板查故事线详情看进度
+    // （detail_running / detail_error），wait=true 时等写完再返回（工具调用用）
+    route({
+      path: "/api/newswire/detail",
+      methods: ["POST"],
+      fetch: async (request) => {
+        const body = await bodyOf(request);
+        const id = strOrNull(body.story_id);
+        if (!id) return jsonResponse({ error: "story_required" }, 400);
+        if (!(modeNow() === "llm" && llmReady())) return jsonResponse({ error: "no_model" }, 409);
+        if (!withDb(p, (db) => db && db.prepare("SELECT 1 FROM stories WHERE story_id = ?").get(id))) return jsonResponse({ error: "not_found" }, 404);
+        if (body.wait === true) {
+          try { return jsonResponse({ ok: true, detail: await runDetail(id) }, 200); }
+          catch (err) { return jsonResponse({ error: errText(err) }, 502); }
+        }
+        startDetail(id);
+        return jsonResponse({ ok: true, running: true }, 202);
+      },
+    });
+
     // 追踪：追踪对象列表与建议；增删、重写综述；单个对象的详情
     function latestThemes(db) { const ed = latestEdition(db, "all"); return (ed && ed.content && ed.content.themes) || []; }
     route({
@@ -2200,13 +2243,15 @@ export function apply(ctx, config) {
           const d = db ? storyDetail(db, id) : null;
           if (d) {
             d.analysis = latestAnalysis(db, d.id);
+            d.detail = latestDetail(db, d.id);
             // 关键主体：每个都能一键追踪；已在追踪的标出来
             const tracked = db.prepare("SELECT t.id, t.name, t.aliases FROM trackers t WHERE t.status = 'active'").all();
             d.entities = db.prepare("SELECT name FROM story_entities WHERE story_id = ?").all(d.id).map((r) => { const t = tracked.find((x) => x.name === r.name || JSON.parse(x.aliases || "[]").includes(r.name)); return { name: r.name, tracker: t ? t.id : null }; });
           }
           return d;
         });
-        return st ? jsonResponse(Object.assign(st, { can_analyze: modeNow() === "llm" && llmReady() }), 200) : jsonResponse({ error: "not_found" }, 404);
+        const job = st ? detailJobs.get(st.id) : null;
+        return st ? jsonResponse(Object.assign(st, { can_analyze: modeNow() === "llm" && llmReady(), detail_running: Boolean(job && !job.error), detail_error: (job && job.error) || null }), 200) : jsonResponse({ error: "not_found" }, 404);
       },
     });
 
@@ -2448,7 +2493,7 @@ export function apply(ctx, config) {
 
     tool({
       name: "newswire_story",
-      description: "One storyline in full: its current copy, every report in time order (source, time, title, link), the developments recorded edition by edition, and its pushes. Storyline ids come from newswire_edition. Use it to answer 'what happened with X so far'.",
+      description: "One storyline in full: its current copy, every report in time order (source, time, title, link, and the opening of its text), the developments recorded edition by edition, its pushes, and the latest detailed report if the reader generated one (overview, timeline, key numbers, who said what, background, open questions; every sentence checked against the reports). Storyline ids come from newswire_edition. Use it to answer 'what happened with X so far'.",
       parameters: { type: "object", additionalProperties: false, required: ["id"], properties: { id: { type: "string", description: "Storyline id (st-…)." } } },
       output: {
         schema: { type: "object", additionalProperties: true, required: ["found"], properties: { found: { type: "boolean" }, story: { oneOf: [{ type: "object" }, { type: "null" }] } } },
@@ -2460,7 +2505,13 @@ export function apply(ctx, config) {
         },
       },
       async execute(args) {
-        const st = withDb(p, (db) => (db ? storyDetail(db, String((args && args.id) || "")) : null));
+        const st = withDb(p, (db) => {
+          const d = db ? storyDetail(db, String((args && args.id) || "")) : null;
+          if (d) d.detail = latestDetail(db, d.id);
+          return d;
+        });
+        // 每篇报道的原文只给开头（整条故事线可能几十篇），要细节看 detail（详细报道，读者在面板里生成过才有）
+        if (st) for (const it of st.items) if (it.text && it.text.length > 200) it.text = it.text.slice(0, 199) + "…";
         return { found: Boolean(st), story: st };
       },
     });

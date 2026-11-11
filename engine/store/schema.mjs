@@ -20,6 +20,7 @@
  * v23 write_cache：模型写好的稿按材料指纹存下来，中断或重启后重编时同样的材料不再让模型重写。
  * v24 读法：sources.profile（源声明的读法）、stories.profile（故事线用的读法）。
  * v25 articles.comments：社区讨论（Hacker News 等）的热门评论，读法要看评论时作为材料。
+ * v26 story_details：故事线的详细报道（读者在详情页要求时由模型读全部报道写成，逐句核对；每次一行）。
  */
 import { completeness } from "../pipeline/quality.mjs";
 import { anchorReader, trimTail, relevant, MIN_SHORT } from "../pipeline/bodytext.mjs";
@@ -253,7 +254,12 @@ const V24 = [
 ];
 // v25：社区讨论的热门评论（不混进正文：正文与评论分开存，核对导语时只认正文）
 const V25 = ["ALTER TABLE articles ADD COLUMN comments TEXT"];
-export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25];
+// v26：详细报道（读者要看细节时，模型读这条故事线的全部报道写成；每次一行）
+const V26 = [
+  "CREATE TABLE IF NOT EXISTS story_details (id INTEGER PRIMARY KEY AUTOINCREMENT, story_id TEXT, created_at TEXT, model TEXT, items INTEGER, content TEXT)",
+  "CREATE INDEX IF NOT EXISTS idx_story_details ON story_details(story_id, id)",
+];
+export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
 export function migrate(db) {

@@ -29,6 +29,7 @@ It is a plugin for DeepSeek Harness. It gathers news from dozens of Chinese and 
 | Ten outlets run the same story, and you read it ten times | **One storyline per event**: reports are merged across outlets and across Chinese and English. Near-verbatim reposts are labeled and never count as independent confirmation. |
 | A fluent model summary, and no way to tell if it's true | **Every sentence has a source**: each sentence names the reports it rests on. Numbers, foreign names and quoted words must appear in the source text, or the sentence is dropped. |
 | Headline-only items, ads in the feed, gaps between fetches | **Complete, clean, continuous**: headline-only items get their full text from the original page; roundups are split into single items; ads and paywall teasers are filtered out. Each source resumes exactly where the last round stopped and pages back to close any gap. |
+| The copy is too short and you want the details | **Detailed report**: one click in the storyline view and the model reads every report in it and writes an overview, timeline, key numbers and who said what; each report's original text also expands in place. Stories with many reports get more key points in the edition too. |
 | You know what happened, not what it means | **Impact and outlook**: for major stories the model works out which markets, companies (with tickers) and industries are affected, two or three ways things could go, and the signals to watch. |
 | You follow a company, and the news about it is scattered | **Tracking**: follow a company, a technology, a person or a theme. Related storylines attach automatically, and the model keeps an up-to-date synthesis: current state, trend, milestones, and what changed since last time. |
 | Too many pushes and you mute it; too few and you miss things | **Pushes at your pace**: every 2 hours, three times a day, or the evening digest only. A story is pushed again only when it really moves, and sections you mark "not useful" get a higher bar automatically. |
@@ -53,6 +54,14 @@ News arrives one item at a time, but what you care about is usually a thread: wh
 - "Worth tracking" suggests subjects from recent coverage. Tracked subjects join your follows, so their developments are pushed to you.
 
 ![Tracking](docs/images/panel-tracking.png)
+
+### 📰 Detailed report
+
+Edition copy is kept short so it scans quickly: one lead and a few key points. There are three ways to get the details:
+
+- **More points for big stories**: when a storyline has 4 or more reports and enough text, writing reads more of them (up to 10) and allows up to 6 points of 60 characters. Tune `rich_items`, `rich_points`, `rich_point_chars` and `rich_materials` under `story` in the layout file; `rich_items: 0` turns it off.
+- **Original text in place**: in the storyline timeline, each report has a "Text" toggle that expands its body (or summary), plus "Expand all".
+- **Write a detailed report**: in the storyline view, click "Write detailed report". The model reads every report in the storyline (duplicates removed, up to 20) and writes an overview, timeline, key numbers, who said what, background, and what is disputed or unconfirmed. Every sentence is checked against the originals and sentences that fail are removed. A local model takes about 2–4 minutes; it runs in the background so you can keep reading. Rewrite it when new reports arrive.
 
 ### 📈 Impact and outlook
 
@@ -231,7 +240,7 @@ The panel follows the harness's light and dark themes and works at phone width.
 |---|---|
 | `newswire_edition` | The latest edition; `refresh=true` rebuilds it in the current mode |
 | `newswire_daily` | Today's digest: summary, main threads, what to watch, the day's numbers |
-| `newswire_story` | Everything about one storyline: current copy, every report, every update, push history |
+| `newswire_story` | Everything about one storyline: current copy, every report (with the opening of its text), every update, push history, and the detailed report if one was written |
 | `newswire_track` | Tracking: list, add (company / technology / person / theme, optional ticker), get, rewrite the synthesis, remove |
 | `newswire_analyze` | Impact and outlook analysis for one storyline |
 | `newswire_follow` | Follow or mute storylines, keywords, topics and sources |

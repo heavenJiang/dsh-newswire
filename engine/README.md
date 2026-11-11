@@ -127,7 +127,7 @@ Which profile a story uses: if every item's source declares a `profile` in `sour
 ## Times from links
 When a source gives no time, the link is checked: a full timestamp (`/2026101415255489242/`) counts as `page_text`; a date only (`t20261107_`, `/20261029/`, `/2026/11-08/`) is stored as `url_date` (Beijing midnight) for display and datasets, but continuity and clustering treat it as untrusted. Time confidence only rises on merge: fetched < url_date < page_text < feed. Push selection skips events whose lead article's time (including a link date) is more than a day before the look-back window, so a new source's old list items are not pushed.
 
-## Data model (schema v25)
+## Data model (schema v26)
 | Table | Contents |
 |---|---|
 | `sources` | Source config snapshot (with weight / tier / grp / pack / adapter / removed_at / profile) |
@@ -151,6 +151,7 @@ When a source gives no time, the link is checked: a full timestamp (`/2026101415
 | `stories` | Storylines (v10): stories that persist across editions — title, section, topics, importance, status (active / merged and into which), the model's copy (with the item count when written, to decide reuse), first and last edition, profile (v24) |
 | `story_items` | Which storyline each item belongs to (one per item), its rule event, when it joined |
 | `story_updates` | Storyline developments (v11): edition, time, text, reports added, written by model or program |
+| `story_details` | Detailed reports (v26): written by the model from all of a storyline's reports when a reader asks (overview, timeline, key numbers, who said what, background, open questions; every sentence checked), one row per write, with the report count at the time |
 | `kv` | Simple state such as the last viewing time per pack (`seen:<pack>`) |
 | `digests` | Daily digests (v12): pack, date, mode, model, headline, full content (arcs, tomorrow, numbers), duration, calls |
 | `feedback` | Reader feedback: a wrong sentence (error), a misplaced report, "this is an ad" (promo) and "this is news" (not_promo), with storyline, edition, note, and when it was handled |
