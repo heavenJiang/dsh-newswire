@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "timezone": "Asia/Shanghai",
   "defaults": {
     "channels": [
@@ -1047,6 +1047,81 @@
       "note": "GitHub 官方博客：开发者工具与工程实践",
       "enabled": false,
       "added_in": 7
+    },
+    {
+      "id": "reddit_localllama",
+      "name": "Reddit·r/LocalLLaMA",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "html_index",
+      "adapter": "reddit",
+      "url": "https://old.reddit.com/r/LocalLLaMA/top/?t=day",
+      "channels": [
+        "browse"
+      ],
+      "max_items": 20,
+      "weight": 0.4,
+      "tier": "community",
+      "group": "reddit",
+      "pack": "core",
+      "profile": "community",
+      "continuity": "snapshot",
+      "min_points": 50,
+      "comment_items": 6,
+      "note": "Reddit r/LocalLLaMA 当天热门（本地与开源大模型）：50 分以上的帖子；分数最高的 6 条读帖子页取顶层评论。社区讨论，不算独立信源。Reddit 不接受未登录的直接请求，只能用 browse",
+      "enabled": false,
+      "added_in": 8
+    },
+    {
+      "id": "reddit_ml",
+      "name": "Reddit·r/MachineLearning",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "html_index",
+      "adapter": "reddit",
+      "url": "https://old.reddit.com/r/MachineLearning/top/?t=day",
+      "channels": [
+        "browse"
+      ],
+      "max_items": 20,
+      "weight": 0.4,
+      "tier": "community",
+      "group": "reddit",
+      "pack": "core",
+      "profile": "community",
+      "continuity": "snapshot",
+      "min_points": 50,
+      "comment_items": 6,
+      "note": "Reddit r/MachineLearning 当天热门（论文与研究讨论）：50 分以上的帖子；分数最高的 6 条读帖子页取顶层评论。社区讨论，不算独立信源。只能用 browse",
+      "enabled": false,
+      "added_in": 8
+    },
+    {
+      "id": "github_trending",
+      "name": "GitHub Trending",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "html_index",
+      "adapter": "github_trending",
+      "url": "https://github.com/trending?since=daily",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 15,
+      "weight": 0.4,
+      "tier": "community",
+      "group": "github_trending",
+      "pack": "core",
+      "profile": "oss",
+      "continuity": "snapshot",
+      "min_stars_today": 100,
+      "note": "GitHub 当日热门项目：今日新增 100 星以上；项目说明（README）由正文抓取去项目页取。按「开源项目」读法写：是什么、亮点、适合谁",
+      "enabled": false,
+      "added_in": 8
     }
   ]
 }

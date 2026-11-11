@@ -119,7 +119,8 @@ engine/
 | `wire` | 新闻 | 默认 | 导语、要点、各方说法、影响 |
 | `tech-frontier` | AI 与新技术 | 分类为科技或 AI 与半导体（重点领域） | 同上，影响写技术带来的变化，要点优先技术参数 |
 | `tech-deep` | 技术长文 | 源声明 `profile: "tech-deep"`（技术博客） | 导语、技术要点、背景、可借鉴；正文取 3000 字，按开头、中段、结尾截取 |
-| `community` | 社区讨论 | 源声明 `profile: "community"`（Hacker News 等） | 导语、要点（依据原文）、社区观点（依据评论） |
+| `community` | 社区讨论 | 源声明 `profile: "community"`（Hacker News、Reddit） | 导语、要点（依据原文）、社区观点（依据评论） |
+| `oss` | 开源项目 | 源声明 `profile: "oss"`（GitHub Trending） | 导语（是什么、谁做的）、亮点、适合谁；材料是项目说明 |
 
 一篇报道用哪个读法：报道里每条新闻的源都在 `sources.json` 里声明了 `profile` → 用声明的（多数的那个）；否则按分类与源命中的、优先级最高的；都不命中用默认读法 `wire`。故事线记下读法（`stories.profile`），影响分析按它的侧重。写稿时一批里的报道用同一个读法，提示词的固定部分相同，生产环境的前缀缓存才命中。
 
@@ -174,7 +175,9 @@ engine/
 
 ## 站点适配器
 `adapters/<id>.mjs` 导出 `{ id, browseMode: "html", waitFor, parse(html, { url, max, src }) }`，可选 `rawHtml: true` 与 `enrich(items, { fetchHtml, src, deadline })`。browse 通道用 `html` 模式取渲染后的整页（等 `waitFor` 选择器出现，最多 15 秒）；`rawHtml` 时改为在页面里用浏览器自己的 fetch 取服务器给的原始 HTML，浏览器自动翻译改不到它。http 通道把响应体交给同一个 `parse`。`enrich` 在抓取成功后补读详情页（先 browse 后 http，`src.enrich_ms` 默认 120 秒）。
-`hackernews` 适配器读 Hacker News 首页：只收 `min_points`（默认 100）分以上的帖子，链接是帖子指向的原文（没有外链的 Ask/Show HN 用讨论页），分数和评论数记为热度。`enrich` 读分数最高的 `comment_items`（默认 8）条的讨论页，顶层评论存进 `articles.comments`，Ask HN 的正文作摘要。`tier: "community"` 的源不算独立媒体：事件里单独列出（`outlets` 里标 `community: true`），不加来源分、不参与印证。
+`hackernews` 适配器读 Hacker News 首页：只收 `min_points`（默认 100）分以上的帖子，链接是帖子指向的原文（没有外链的 Ask/Show HN 用讨论页），分数和评论数记为热度。`enrich` 读分数最高的 `comment_items`（默认 8）条的讨论页，顶层评论存进 `articles.comments`，Ask HN 的正文作摘要。`reddit` 适配器读 old.reddit.com 的版块页（`/r/<版块>/top/?t=day`）：`data-*` 属性里的分数、评论数、时间、链接；广告帖不收，低于 `min_points`（默认 50）的不收；图片、视频和文字帖链接帖子页，外链帖链接原文。`enrich` 读分数最高的 `comment_items`（默认 6）条的帖子页（`?depth=1&sort=top`，只要顶层评论，不要 AutoModerator），文字帖正文作摘要。Reddit 拒绝未登录的直接请求，只能走 browse。
+`github_trending` 适配器读 GitHub Trending：项目、说明、语言、总星数、今日新增星数（热度）；低于 `min_stars_today`（默认 100）的不收；没有发布时间。
+`tier: "community"` 的源不算独立媒体：事件里单独列出（`outlets` 里标 `community: true`），不加来源分、不参与印证。
 `telegram` 适配器读 Telegram 公开频道的网页预览 `https://t.me/s/<频道名>`（不用登录）：一帖一条的快讯直接成条（加粗首行为标题，「信源」链接记为原始出处）；`[1/3] [2/3] …` 分帖发的汇总先拼回，再按「━━ 栏目 ━━」和「N、标题」拆成单条。条目链接是消息链接加 `?i=<第几条>`。配源时 `url` 写 `https://t.me/s/<频道名>`，`paging` 写 `{ "mode": "before", "param": "before", "id_pattern": "t\\.me/[A-Za-z0-9_]+/(\\d+)" }`。私有频道（`t.me/+…` 邀请链接）和关了网页预览的频道读不到；国内网络需要能访问 t.me。
 
 新增适配器：写模块 → 在 `adapters/index.mjs` 登记 → 存一份快照 `tests/fixtures/<id>.html.gz` → 在 `tests/unit/adapters.test.mjs` 加断言。

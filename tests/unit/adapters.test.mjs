@@ -24,8 +24,8 @@ function common(items, host) {
   assert.equal(new Set(items.map((x) => x.link)).size, items.length, "链接不应重复");
 }
 
-test("注册表包含 6 个适配器且都声明了 browse 等待选择器", () => {
-  assert.deepEqual(adapterIds().sort(), ["apnews", "hackernews", "jiemian", "techflow", "telegram", "thepaper"]);
+test("注册表包含 8 个适配器且都声明了 browse 等待选择器", () => {
+  assert.deepEqual(adapterIds().sort(), ["apnews", "github_trending", "hackernews", "jiemian", "reddit", "techflow", "telegram", "thepaper"]);
   for (const id of adapterIds()) assert.ok(getAdapter(id).waitFor, id + " 缺 waitFor");
 });
 
@@ -145,4 +145,39 @@ test("Hacker News：首页帖子按分数门槛收，链接是原文，时间是
   assert.match(first.comments, /^· （15 条回复）I received 9 reports of Fil-C issues/);
   assert.ok(first.comments.split("\n").length >= 5 && first.comments.split("\n").every((l) => l.length <= 420));
   assert.equal(first.content, "", "外链帖不拿讨论页当正文");
+});
+
+test("GitHub Trending：项目、说明、语言、总星数与今日新增；按今日新增门槛收", () => {
+  const gt = getAdapter("github_trending");
+  const all = gt.parse(load("github_trending"), { max: 30, src: { min_stars_today: 0 } });
+  assert.equal(all.length, 12);
+  assert.ok(all.every((x) => /^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(x.link)), "链接是项目页");
+  assert.equal(new Set(all.map((x) => x.link)).size, all.length);
+  assert.ok(all.every((x) => x.published_at === "" && x.signals.likes > 0), "热门榜没有发布时间，记抓取时间");
+  const first = all[0];
+  assert.equal(first.title, "meta/astryx：An open source design system that's fully customizable and agent ready");
+  assert.deepEqual([first.signals_raw.language, first.signals_raw.stars, first.signals_raw.stars_today], ["TypeScript", 23298, 3108]);
+  assert.ok(gt.parse(load("github_trending"), { max: 30, src: { min_stars_today: 1000 } }).length < all.length);
+});
+
+test("Reddit（old.reddit）：广告帖不收；外链帖链接原文，图片与文字帖链接帖子页；帖子页只取顶层评论、不要机器人", async () => {
+  const rd = getAdapter("reddit");
+  const row = (o) => '<div class=" thing id-t3_' + o.id + ' link " data-fullname="t3_' + o.id + '" data-type="link" data-author="u' + o.id + '" data-subreddit="LocalLLaMA" data-timestamp="' + o.ts + '" data-url="' + o.url + '" data-permalink="/r/LocalLLaMA/comments/' + o.id + '/x/" data-domain="' + o.domain + '" data-comments-count="' + o.c + '" data-score="' + o.s + '" data-promoted="' + (o.ad ? "true" : "false") + '" ><div class="entry"><p class="title"><a class="title may-blank outbound" href="' + o.url + '">' + o.title + '</a></p></div></div>';
+  const html = row({ id: "a1", ts: 1794306232000, url: "https://i.redd.it/x.png", domain: "i.redd.it", c: 205, s: 548, title: "Fable 5.2 has guardrails &amp; caps" }) +
+    row({ id: "a2", ts: 1794346236000, url: "https://9to5mac.com/2026/11/10/apple-local-ai/", domain: "9to5mac.com", c: 97, s: 428, title: "Apple has new Mac app for local AI" }) +
+    row({ id: "a3", ts: 1794346236000, url: "https://ads.example.com/", domain: "ads.example.com", c: 0, s: 900, title: "Try our GPU cloud", ad: true }) +
+    row({ id: "a4", ts: 1794346236000, url: "https://example.com/low", domain: "example.com", c: 1, s: 12, title: "Low score post here" });
+  const items = rd.parse(html, { max: 10, src: { min_points: 50 } });
+  assert.deepEqual(items.map((x) => x.link), ["https://www.reddit.com/r/LocalLLaMA/comments/a1/x/", "https://9to5mac.com/2026/11/10/apple-local-ai/"]);
+  assert.equal(items[0].title, "Fable 5.2 has guardrails & caps");
+  assert.equal(items[0].published_at, new Date(1794306232000).toISOString());
+  assert.deepEqual([items[1].signals.likes, items[1].signals.comments, items[1].signals_raw.discussion], [428, 97, "https://old.reddit.com/r/LocalLLaMA/comments/a2/x/"]);
+  const cm = (author, score, text, sticky) => '<div class=" thing id-t1_' + author + ' comment ' + (sticky ? "stickied " : "") + '" data-type="comment" data-author="' + author + '"><div class="entry"><p class="tagline"><span class="score unvoted" title="' + score + '">' + score + ' points</span></p><form><div class="usertext-body may-blank-within md-container "><div class="md"><p>' + text + '</p></div>\n</div></form></div></div>';
+  const page = '<div class="sitetable linklisting"><div class="expando"><div class="usertext-body"><div class="md"><p>Self post body text that explains the question.</p></div></div></div></div>' +
+    cm("AutoModerator", 1, "Please read the rules of this subreddit before posting.") + cm("alice", 248, "Apple making local LLMs easy is a big step in the right direction.") + cm("bob", 163, "short") + cm("carol", 40, "Harbor turns your Mac into a private inference server.");
+  const fetchHtml = async (u) => (u.startsWith("https://old.reddit.com/r/LocalLLaMA/comments/a1/x/?depth=1") ? page : null);
+  const r = await rd.enrich(items, { fetchHtml, src: { comment_items: 6 } });
+  assert.deepEqual([r.tried, r.ok], [2, 1]);
+  assert.equal(items[0].comments, "· （248 赞）Apple making local LLMs easy is a big step in the right direction.\n· （40 赞）Harbor turns your Mac into a private inference server.");
+  assert.equal(items[0].summary, "Self post body text that explains the question.", "图片 / 文字帖：帖子正文作摘要");
 });

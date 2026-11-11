@@ -556,6 +556,7 @@ function normalizeSource(s) {
   if (s.backfill === false || s.backfill === true) out.backfill = s.backfill;
   if (s.min_points !== undefined) out.min_points = clampNum(s.min_points, 0, 5000, 100);
   if (s.comment_items !== undefined) out.comment_items = clampNum(s.comment_items, 0, 30, 8);
+  if (s.min_stars_today !== undefined) out.min_stars_today = clampNum(s.min_stars_today, 0, 100000, 100);
   if (s.body === "list" || s.body === "none") out.body = s.body;
   out.enabled = s.enabled !== false;
   if (s.max_items !== undefined) out.max_items = clampNum(s.max_items, 1, 300, 20);
@@ -706,9 +707,10 @@ const SOURCE_PROPS = {
   lang: { type: "string", description: "zh / en。" },
   weight: { type: "number", description: "Credibility weight 0–1, used by cross-validation." },
   tier: { type: "string", enum: TIERS, description: "primary (first-hand, wire, official), secondary (reposts, aggregators), or community (discussion sites such as Hacker News; never counts as an independent outlet)." },
-  profile: { type: "string", description: "Profile for this source's stories: wire, tech-frontier, tech-deep (tech blogs), community (discussion sites), or one defined under dataDir/profiles." },
-  min_points: { type: "number", description: "Hacker News adapter: skip posts below this score (default 100)." },
-  comment_items: { type: "number", description: "Hacker News adapter: read the discussion page of this many top posts for comments (default 8, 0 = none)." },
+  profile: { type: "string", description: "Profile for this source's stories: wire, tech-frontier, tech-deep (tech blogs), community (discussion sites), oss (open-source projects), or one defined under dataDir/profiles." },
+  min_points: { type: "number", description: "Hacker News / Reddit adapters: skip posts below this score (default 100 / 50)." },
+  comment_items: { type: "number", description: "Hacker News / Reddit adapters: read the discussion page of this many top posts for comments (default 8 / 6, 0 = none)." },
+  min_stars_today: { type: "number", description: "GitHub Trending adapter: skip repositories with fewer new stars today (default 100)." },
   group: { type: "string", description: "Media group; channels of one group share it and count as one outlet in cross-validation." },
   pack: { type: "string", description: "Topic pack; default core." },
   max_items: { type: "number", description: "Items to take on a source's first round (1–300). After that, a source with a continuity cursor fetches everything newer than the last round (up to 300 per round; Cailian pages back until it reaches the last round), so this is not a per-round limit." },

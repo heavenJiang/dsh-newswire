@@ -2,6 +2,13 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.19 (2026-11-11)
+
+- **Reddit and GitHub Trending**, also off by default and read through browse:
+  - Reddit: today's top posts in r/LocalLLaMA and r/MachineLearning with 50 points or more. Written as Community discussion; the 6 highest-scoring posts have their page read for top-level comments (AutoModerator skipped). Reddit refuses logged-out requests, so it is read with your browser's session.
+  - GitHub Trending: projects with 100 or more new stars today, written with the new Open-source project profile: what it is, who made it, highlights and who it suits, from the project README. Tagged "开源" in the panel.
+- Source config upgrades to v8: only these three sources are added, and they start off.
+
 ## 1.1.18 (2026-11-11)
 
 - **Background from earlier coverage for long-form tech.** After Horizon's history search, but over local storylines: up to 2 written storylines from the last 90 days, matched by title similarity and shared entities, are given to the model as H1, H2 and may be used only in Background. Only that block may rest on them when checking; the lead and points still rest on this story's reports alone. In the panel, "earlier" opens that storyline. No model call, no network. Any profile can use it by giving a block `materials: ["history"]`.

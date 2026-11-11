@@ -49,12 +49,13 @@ test("v1 → v2：补新源与新字段、去掉 exa、保留用户改动", () =
   assert.deepEqual(up.doc.sources.find((s) => s.id === "jiemian").paging, { mode: "param", param: "page", start: 2, max_pages: 4 });
 });
 
-test("v6 → v7：只加海外技术源，而且关着；用户没加的旧种子源（试用频道）不借升级加进来；声明的读法补进已有的源", () => {
+test("v6 → v8：只加海外技术源，而且关着；用户没加的旧种子源（试用频道）不借升级加进来；声明的读法补进已有的源", () => {
   const seed = SEED;
   const v6 = { version: 6, sources: seed.sources.filter((s) => !s.added_in && !s.id.startsWith("tg_")).map((s) => Object.assign({}, s, { enabled: s.id === "cls_telegraph" })) };
   const up = upgradeConfig(v6, seed);
-  assert.equal(up.doc.version, 7);
-  assert.deepEqual(up.added.sort(), seed.sources.filter((s) => s.added_in === 7).map((s) => s.id).sort());
+  assert.equal(up.doc.version, CONFIG_VERSION);
+  assert.deepEqual(up.added.sort(), seed.sources.filter((s) => s.added_in >= 7).map((s) => s.id).sort());
+  assert.ok(up.added.includes("reddit_localllama") && up.added.includes("github_trending"), "v8 的源也加进来");
   assert.ok(up.added.includes("hn_front") && up.added.includes("simonw"));
   assert.ok(!up.added.some((id) => id.startsWith("tg_")));
   for (const id of up.added) assert.equal(up.doc.sources.find((s) => s.id === id).enabled, false);

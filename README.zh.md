@@ -176,9 +176,9 @@ dsh plugin --profile web add github:heavenJiang/dsh-newswire
 | core | 国际 | 路透、美联社 World / Business、BBC、纽约时报、卫报、FT、道琼斯、半岛电视台、德国之声中文、南华早报 |
 | study_abroad | 国内 | 教育部留学服务中心（通知公告、新闻动态）、教育部工作动态、国家留学基金委 |
 | study_abroad | 国际 | 英国 UKVI、加拿大 IRCC、美国 USCIS、The PIE News、ICEF Monitor |
-| core | 海外技术（默认关闭） | Hacker News、OpenAI News、Simon Willison、Hugging Face、NVIDIA 技术博客、vLLM、Lil'Log、Ahead of AI、Interconnects、GitHub Blog |
+| core | 海外技术（默认关闭） | Hacker News、Reddit（r/LocalLLaMA、r/MachineLearning）、GitHub Trending、OpenAI News、Simon Willison、Hugging Face、NVIDIA 技术博客、vLLM、Lil'Log、Ahead of AI、Interconnects、GitHub Blog |
 
-**海外技术源**默认关闭，在「数据源」页打开。Hacker News 用「社区讨论」读法：只收 100 分以上的帖子，链接是帖子指向的原文，分数最高的 8 条再读讨论页取顶层评论，写成「社区观点」；它是讨论不是报道，不算独立信源，也不进「待核实」。技术博客用「技术长文」读法，写技术要点、背景和可借鉴之处。这些源都用 browse 读；英文页面读的是服务器给的原始 HTML，不受浏览器自动翻译影响。
+**海外技术源**默认关闭，在「数据源」页打开。Hacker News 用「社区讨论」读法：只收 100 分以上的帖子，链接是帖子指向的原文，分数最高的 8 条再读讨论页取顶层评论，写成「社区观点」；它是讨论不是报道，不算独立信源，也不进「待核实」。Reddit 同样按「社区讨论」写，只收 50 分以上的帖子（Reddit 不接受未登录的直接请求，只能用 browse 读）。GitHub Trending 只收当天新增 100 星以上的项目，用「开源项目」读法写：是什么、亮点、适合谁。技术博客用「技术长文」读法，写技术要点、背景和可借鉴之处。这些源都用 browse 读；英文页面读的是服务器给的原始 HTML，不受浏览器自动翻译影响。
 
 **想加一个源？** 在「数据源」页点「＋ 添加数据源」，填名称和 RSS 或新闻列表页地址，先试抓看能抓到什么，满意再添加。类型（RSS / 列表页）、地区和 id 会自动判断，新源先进「试用」。
 

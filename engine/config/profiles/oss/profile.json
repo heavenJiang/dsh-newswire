@@ -1,0 +1,16 @@
+{
+  "id": "oss",
+  "name": "开源项目",
+  "version": 1,
+  "note": "GitHub 热门项目等开源项目介绍：说清是什么、亮点在哪、适合谁。由源声明（sources.json 里 profile: \"oss\"）。",
+  "priority": 20,
+  "badge": "开源",
+  "match": {},
+  "content": { "materials": 2, "body_chars": 2500, "summary_chars": 400, "sampling": "head-middle-tail" },
+  "blocks": [
+    { "kind": "lead", "chars": 100, "ask": "说清这个项目是做什么的、谁做的" },
+    { "kind": "points", "max": 3, "chars": 50, "ask": "功能亮点、技术做法或和同类项目的不同" },
+    { "kind": "list", "id": "fit", "name": "适合谁", "max": 2, "chars": 40, "ask": "哪些开发者或团队用得上、拿来做什么" }
+  ],
+  "prompts": { "rubric": "rubric.md", "write": "write.md" }
+}
