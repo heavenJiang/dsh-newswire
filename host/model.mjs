@@ -36,7 +36,8 @@ const str = (v, n) => (typeof v === "string" && v.trim() ? clip(v, n) : "");
 
 // ------------------------------------------------------------------ 调用
 /**
- * @param o { getLlm(): ctx.llm|undefined, getDefault(): ctx.agentDefaultModel|undefined, pinned?(): {provider, model}|null, provider?, model?, timeoutMs }
+ * @param o { getLlm(): ctx.llm|undefined, getDefault(): ctx.agentDefaultModel|undefined, pinned?(): {provider, model}|null, provider?, model?, timeoutMs,
+ *            slot?(step): Promise<release>  调用前领名额（排队），用完归还 }
  */
 export function createModel(o) {
   const selection = () => {
@@ -69,6 +70,8 @@ export function createModel(o) {
       // 每天的 token 预算用完了：模型步骤不再调用，退回程序结果
       const blocked = typeof o.gate === "function" ? o.gate(opt && opt.step) : null;
       if (blocked) throw new Error(blocked);
+      // 排队：本地模型一次跑不了几个请求，先领名额（读者点的排在后台任务前面）；等名额的时间不算进这次调用的超时
+      const release = typeof o.slot === "function" ? await o.slot(opt && opt.step) : null;
       const t0 = Date.now();
       let usage = null;
       let failure = null;
@@ -94,6 +97,7 @@ export function createModel(o) {
         throw e;
       } finally {
         clearTimeout(timer);
+        if (release) release();
         // 记账：宿主给了 usage 就用它，否则按字数估（中文约 1.6 字一个 token）
         const rec = { step: (opt && opt.step) || "other", model: sel.provider + "/" + sel.model, ms: Date.now() - t0, ok: !failure && Boolean(text.trim()),
           in: usage ? usage.inputTokens || 0 : Math.round(String(user).length / 1.6), out: usage ? usage.outputTokens || 0 : Math.round(text.length / 1.6),

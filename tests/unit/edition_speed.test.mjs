@@ -69,7 +69,9 @@ test("头版先写；归并统筹完先出一版（全是程序稿），每写�
   add(db, "top", "今天的头条事件", 30);
   const { m, log } = fake();
   const snaps = [];
-  const ed = await llmEdition(db, m, opts({ onProgress: (s) => snaps.push(s) }));
+  // 这里的材料都是一句话，按默认版式不交给模型写（见 model_time.test）；关掉这条才看得到写稿顺序
+  const layout = Object.assign({}, LAYOUT, { story: Object.assign({}, LAYOUT.story, { brief_chars: 0 }) });
+  const ed = await llmEdition(db, m, opts({ layout, onProgress: (s) => snaps.push(s) }));
   assert.match(log.write[0], /【报道1】今天的头条/, "头版那篇最先写");
   assert.ok(snaps.length >= 2);
   assert.equal(snaps[0].stats.partial, true);

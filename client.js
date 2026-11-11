@@ -90,6 +90,7 @@ window.__ModuleLoader__.load({
         'ask.ph': '搜索或提问，如：伊朗局势最近怎么样', 'ask.for': '「{q}」', 'ask.found': '近 {h} 小时找到 {n} 篇相关报道', 'ask.close': '× 回到版面', 'ask.answer': '回答', 'ask.reading': '模型正在读 {n} 篇相关报道作答（约 1 分钟）…', 'ask.notEnough': '找到的报道不足以回答这个问题。',
         'ask.by': '由 {m} 依据下列报道作答，每句标了出处', 'ask.dropped': '{n} 句与原文核对不上，已删去', 'ask.partial': '材料不全，回答可能不完整', 'ask.stories': '相关故事线', 'ask.reports': '{n} 篇', 'ask.items': '相关报道', 'ask.none': '没找到和「{t}」相关的报道。',
         'ps.title': '推送', 'ps.hint': '推到手机的每一条都会打扰你：先定好什么时候推、推多少。节奏会直接改定时任务的时间；每一轮里过了门槛的才推。', 'ps.cadence': '节奏', 'ps.level': '门槛', 'ps.fewer': '少而精', 'ps.normal': '适中', 'ps.more': '多一些', 'ps.limits': '上限', 'ps.perRound': '每轮最多', 'ps.daily': '每天最多', 'ps.timing': '时机', 'ps.onTime': '到点推送', 'ps.whenReady': '写完再推', 'ps.timingHint': '写完再推：到点只抓取，本轮版面写完（通常晚 10～20 分钟）再推一条，内容都是本轮的。到点推送：模型没写完时先推已编好的版面。', 'ps.delivery': '方式', 'ps.deliveryAuto': '直接发到手机', 'ps.deliveryTask': '经定时任务', 'ps.deliveryHint': '直接发：插件按定时任务的时间自己抓取、写版面，写完直接发到手机，不经过定时任务里的模型（模型转发长消息会改写、漏发）；这期间定时任务显示为暂停。', 'ps.deliveryNoSvc': '没装掌上指挥台（或它关了「允许其他插件发消息到手机」），现在经定时任务推送。', 'ps.direct': '由插件直接推送到手机，下一次 {n}', 'ps.scope': '内容', 'ps.picked': '挑重点', 'ps.full': '本轮新内容全推', 'ps.scopeHint': '全推：本轮所有新报道和有进展的报道都推，不看门槛和上限，消息会比较长。',
+        'ph.title': '推送链路', 'ph.fix': '怎么修：', 'mq.running': '模型正在跑：', 'mq.waiting': '排队：', 'mq.secs': '{n} 秒', 'mq.hint': '读者点的（详细报道、影响分析、问答）排在版面和后台任务前面',
         'ps.save': '保存', 'ps.saved': '已保存。', 'ps.noSvc': '当前宿主没有定时任务服务，只能保存偏好。', 'ps.noTask': '还没有安排定时推送：在对话里说「每 2 小时推送要闻」即可。', 'ps.task': '定时任务：{s}，下一次 {n}', 'ps.learned': '根据你对推送的反馈，这些版块的门槛已自动提高：{s}',
         'ps.log': '推送记录', 'ps.up': '有用', 'ps.down': '没用', 'ps.none': '还没有推送过。',
         'ed.partial': '模型已归并好版面，正在逐篇写稿（已写 {w}/{n} 篇，头版先写）；没写到的暂用程序稿，写完自动替换',
@@ -204,6 +205,7 @@ window.__ModuleLoader__.load({
         'ask.ph': 'Search or ask, e.g. what is happening with Iran', 'ask.for': '“{q}”', 'ask.found': '{n} related reports in the last {h} hours', 'ask.close': '× Back to edition', 'ask.answer': 'Answer', 'ask.reading': 'The model is reading {n} related reports (about a minute)…', 'ask.notEnough': 'The reports found are not enough to answer this.',
         'ask.by': 'Answered by {m} from the reports below; every sentence is cited', 'ask.dropped': '{n} sentences did not match the sources and were removed', 'ask.partial': 'the material is incomplete', 'ask.stories': 'Related storylines', 'ask.reports': '{n} reports', 'ask.items': 'Related reports', 'ask.none': 'Nothing found for “{t}”.',
         'ps.title': 'Push', 'ps.hint': 'Every push interrupts you, so decide when and how much. Cadence changes the scheduled task itself; within each round only stories over the bar are pushed.', 'ps.cadence': 'Cadence', 'ps.level': 'Bar', 'ps.fewer': 'Fewer', 'ps.normal': 'Normal', 'ps.more': 'More', 'ps.limits': 'Limits', 'ps.perRound': 'Per round', 'ps.daily': 'Per day', 'ps.timing': 'Timing', 'ps.onTime': 'At the scheduled time', 'ps.whenReady': 'When the edition is ready', 'ps.timingHint': 'When ready: fetch at the scheduled time and push once this round\'s edition is written (usually 10–20 minutes later), so everything in it is from this round. At the scheduled time: if the model has not finished, push the latest written edition.', 'ps.delivery': 'Delivery', 'ps.deliveryAuto': 'Straight to the phone', 'ps.deliveryTask': 'Through the scheduled task', 'ps.deliveryHint': 'Straight to the phone: the plugin fetches and writes the edition on the scheduled task\'s timetable and posts it to the phone itself, with no model relaying it (a model relaying a long message may rewrite or drop it). The scheduled task shows as paused meanwhile.', 'ps.deliveryNoSvc': 'The Switchboard plugin is not installed (or its "Let other plugins post to the phone" is off), so pushes go through the scheduled task.', 'ps.direct': 'Posted straight to the phone by the plugin, next {n}', 'ps.scope': 'Content', 'ps.picked': 'Top stories', 'ps.full': 'Everything new this round', 'ps.scopeHint': 'Everything new: every new story and every story with new reports this round, ignoring the bar and limits. Messages get long.',
+        'ph.title': 'Push path', 'ph.fix': 'Fix: ', 'mq.running': 'Model is running: ', 'mq.waiting': 'Waiting: ', 'mq.secs': '{n}s', 'mq.hint': 'What you ask for (detailed report, impact analysis, Q&A) goes ahead of editions and background work',
         'ps.save': 'Save', 'ps.saved': 'Saved.', 'ps.noSvc': 'This host has no schedule service; only the preferences are saved.', 'ps.noTask': 'No scheduled push yet: say "push the news every 2 hours" in the chat.', 'ps.task': 'Scheduled task: {s}, next {n}', 'ps.learned': 'From your feedback, these sections now have a higher bar: {s}',
         'ps.log': 'Push history', 'ps.up': 'Useful', 'ps.down': 'Not useful', 'ps.none': 'Nothing pushed yet.',
         'ed.partial': 'The model has laid out the edition and is writing stories ({w}/{n} done, front page first); the rest show program copy until replaced',
@@ -1015,6 +1017,7 @@ window.__ModuleLoader__.load({
       if (hist.id && ed) notes.push(h('div', { key: 'h', className: 'nw-callout nw-warnbox' }, t('hs.viewing', { t: when(ed.created_at) }), ' ', h('button', { className: 'nw-mini', onClick: function () { setIn(setHist, { id: null }) } }, t('hs.latest'))))
       var cs = (c && c.stats) || {}
       if (e.busy || (!hist.id && (cs.preview || cs.partial))) notes.push(h('div', { key: 'b', className: 'nw-working' }, h('span', { className: 'nw-pulse' }), cs.partial ? t('ed.partial', { w: cs.written || 0, n: cs.to_write || 0 }) : cs.preview ? t('ed.preview') : t('ed.busy')))
+      if (e.model && e.model.queue && !hist.id) notes.push(h(QueueLine, { key: 'q', queue: e.model.queue }))
       if (newer && !hist.id) notes.push(h('div', { key: 'nw', className: 'nw-callout nw-newer' }, t('ed.newer', { t: hhmm(newer.created_at) }), ' ', h('button', { className: 'nw-mini', onClick: function () { setNewer(null); load() } }, t('ed.newerGo'))))
       if (flNote) notes.push(h('div', { key: 'fl', className: 'nw-note' }, flNote))
       if (e.error) notes.push(h('div', { key: 'e', className: 'nw-error' }, e.error))
@@ -1428,7 +1431,33 @@ window.__ModuleLoader__.load({
           })))))
     }
 
+    // ------------------------------------------------------------------ 模型队列
+    /** 模型在跑什么、谁在排队（没有任务时不显示）。 */
+    function QueueLine(props) {
+      var q = props.queue
+      if (!q || !(q.jobs || []).length) return null
+      var name = function (x) { return x.label || x.kind }
+      var running = (q.jobs || []).filter(function (x) { return x.state === 'running' })
+      var waiting = (q.jobs || []).filter(function (x) { return x.state === 'waiting' })
+      if (!running.length && !waiting.length) return null
+      return h('div', { className: 'nw-working nw-queue', title: t('mq.hint') },
+        running.length ? h('span', { className: 'nw-pulse' }) : null,
+        running.length ? h('span', null, t('mq.running'), running.map(function (x) { return name(x) }).join('、')) : null,
+        waiting.length ? h('span', { className: 'nw-muted' }, t('mq.waiting'), waiting.map(function (x) { return name(x) + '（' + t('mq.secs', { n: x.secs }) + '）' }).join('、')) : null)
+    }
+
     // ------------------------------------------------------------------ 推送
+    /** 推送链路自检：一段一段列出通不通，不通的给出原因和修法。 */
+    function PushHealth(props) {
+      var hl = props.health
+      if (!hl) return null
+      return h('div', { className: 'nw-ph' + (hl.ok ? ' nw-ph-ok' : ' nw-ph-bad') },
+        h('div', { className: 'nw-ph-h' }, h('b', null, t('ph.title')), ' ', hl.summary),
+        h('ul', { className: 'nw-ph-list' }, (hl.steps || []).map(function (x) {
+          return h('li', { key: x.id, className: x.ok ? 'nw-ph-y' : 'nw-ph-n' },
+            h('span', { className: 'nw-ph-mark' }, x.ok ? '✓' : '✗'), h('span', null, x.text, x.fix ? h('span', { className: 'nw-ph-fix' }, ' ', t('ph.fix'), x.fix) : null))
+        })))
+    }
     function PushPanel(props) {
       var vPair = useState(null)
       var v = vPair[0]
@@ -1454,6 +1483,7 @@ window.__ModuleLoader__.load({
       return h('section', { className: 'nw-push' },
         h('h2', { className: 'nw-sec-h' }, t('ps.title')),
         h('p', { className: 'nw-muted nw-xs' }, t('ps.hint')),
+        h(PushHealth, { health: v.health }),
         h('div', { className: 'nw-ps-grid' },
           h('div', { className: 'nw-ps-k' }, t('ps.cadence')),
           h('div', { className: 'nw-ps-cad' }, Object.keys(v.cadences).map(function (k) {
@@ -2542,7 +2572,10 @@ window.__ModuleLoader__.load({
       '.nw-status{gap:8px;align-items:center} .nw-st-warn{border:0;background:' + C.warnBg + ';color:' + C.warn + ';border-radius:999px;padding:1px 8px;font:inherit;font-size:11px;cursor:pointer}',
       '.nw-btn.nw-sm{padding:4px 10px;font-size:12px}',
       '.nw-edition{display:flex;flex-direction:column;gap:18px;padding-top:4px}',
-      '.nw-working{display:flex;align-items:center;gap:8px;font-size:12px;color:' + C.l2 + '}',
+      '.nw-working{display:flex;align-items:center;gap:8px;font-size:12px;color:' + C.l2 + '} .nw-queue{flex-wrap:wrap}',
+      '.nw-ph{border:1px solid ' + C.line1 + ';border-radius:8px;padding:10px 12px;margin:10px 0 14px;font-size:13px;line-height:1.6} .nw-ph-bad{border-color:' + C.warn + '}',
+      '.nw-ph-h{color:' + C.l1 + '} .nw-ph-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:12px;color:' + C.l2 + '}',
+      '.nw-ph-list li{display:flex;gap:8px;align-items:baseline} .nw-ph-mark{flex:none;width:14px;text-align:center} .nw-ph-y .nw-ph-mark{color:' + C.ok + '} .nw-ph-n .nw-ph-mark{color:' + C.warn + '} .nw-ph-n{color:' + C.l1 + '} .nw-ph-fix{color:' + C.l2 + '}',
       '.nw-pulse{width:7px;height:7px;border-radius:50%;background:' + C.accent + ';animation:nwpulse 1.4s ease-in-out infinite} @keyframes nwpulse{0%,100%{opacity:.25}50%{opacity:1}}',
       '.nw-mast{display:flex;flex-direction:column;gap:6px;padding-bottom:16px;border-bottom:1px solid ' + C.l1 + '}',
       '.nw-mast-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}',
@@ -2706,7 +2739,7 @@ window.__ModuleLoader__.load({
     }
 
     var plugin = { inject: ['slots'], apply: apply }
-    plugin.__test = { DailyView, PushPanel, AskView, Welcome, ImpactBlock, AnalysisFull, DetailFull, TrackTab, TrackDetail, TrackSynthesis, ContentCard, SourceBoard, SourceEditor, QualityCard, StoryDetail, FollowsView, EditionView, ReadStory, NoteList, ModelCard, Topics, NotesBox, VersionSection, UpdateBanner, checkForUpdate, applyUpdate, remotes, Page, NewsTab, TimelineTab, ItemsTab, SourcesTab, RunsTab, EventCard, EventDetailView, EventDetail, RunBars, ScheduleCard, StatusLine, TestResult, SignalChips, Spark, PanelIcon, t, setLang: function (v) { lang = v }, DICT, CSS }
+    plugin.__test = { DailyView, PushPanel, PushHealth, QueueLine, AskView, Welcome, ImpactBlock, AnalysisFull, DetailFull, TrackTab, TrackDetail, TrackSynthesis, ContentCard, SourceBoard, SourceEditor, QualityCard, StoryDetail, FollowsView, EditionView, ReadStory, NoteList, ModelCard, Topics, NotesBox, VersionSection, UpdateBanner, checkForUpdate, applyUpdate, remotes, Page, NewsTab, TimelineTab, ItemsTab, SourcesTab, RunsTab, EventCard, EventDetailView, EventDetail, RunBars, ScheduleCard, StatusLine, TestResult, SignalChips, Spark, PanelIcon, t, setLang: function (v) { lang = v }, DICT, CSS }
     return plugin
   },
 })

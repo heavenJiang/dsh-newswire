@@ -43,7 +43,12 @@ export const DEFAULT_LAYOUT = {
   min_importance: 25,
   front: { count: 3 },
   sections: [{ id: "politics", max: 4 }, { id: "macro", max: 3 }, { id: "markets", max: 3 }, { id: "industry", max: 4 }, { id: "tech", max: 8 }, { id: "study", max: 4 }, { id: "society", max: 2 }],
-  story: { lead_chars: 120, points: 3, point_chars: 40, views: 3, impact_chars: 60, rich_items: 4, rich_points: 6, rich_point_chars: 60, rich_materials: 10 },
+  story: { lead_chars: 120, points: 3, point_chars: 40, views: 3, impact_chars: 60, rich_items: 4, rich_points: 6, rich_point_chars: 60, rich_materials: 10,
+    // 省模型时间：已有模型稿、不在头版的故事线，新报道不到 rewrite_min 篇也不到原有篇数的 rewrite_ratio 时先沿用旧稿（标出新增了什么），攒够了再重写；
+    // 只有一篇、原文不超过 brief_chars 字的快讯不交给模型改写（程序稿就是原文）。rewrite_min 设 0、brief_chars 设 0 各自关闭
+    rewrite_min: 2, rewrite_ratio: 0.25, brief_chars: 160 },
+  // 统筹（总括、头版、值得关注）：变化小（头版没动、新报道都排不进头版、不超过 reuse_changes 条）且上次统筹不超过 reuse_hours 小时时沿用，不调用模型。reuse_hours 设 0 关闭
+  plan: { reuse_hours: 3, reuse_changes: 6 },
   watch: { count: 3 },
   verify: { count: 4, min_importance: 30 },
   // 重点领域：读者最关心的方向。挑材料时优先、不做规则分诊，模型评重要度时按技术影响力评，头版留位置，影响写技术带来的变化。labels 留空即关闭
@@ -76,7 +81,9 @@ export function normalizeLayout(raw) {
       views: num(st.views, 0, 6, D.story.views), impact_chars: num(st.impact_chars, 0, 200, D.story.impact_chars),
       rich_items: num(st.rich_items, 0, 50, D.story.rich_items), rich_points: num(st.rich_points, 1, 8, D.story.rich_points),
       rich_point_chars: num(st.rich_point_chars, 10, 120, D.story.rich_point_chars), rich_materials: num(st.rich_materials, 1, 16, D.story.rich_materials),
+      rewrite_min: num(st.rewrite_min, 0, 20, D.story.rewrite_min), rewrite_ratio: num(st.rewrite_ratio, 0, 1, D.story.rewrite_ratio), brief_chars: num(st.brief_chars, 0, 600, D.story.brief_chars),
     },
+    plan: { reuse_hours: num(r.plan && r.plan.reuse_hours, 0, 24, D.plan.reuse_hours), reuse_changes: num(r.plan && r.plan.reuse_changes, 0, 50, D.plan.reuse_changes) },
     watch: { count: num(r.watch && r.watch.count, 0, 6, D.watch.count) },
     verify: { count: num(r.verify && r.verify.count, 0, 8, D.verify.count), min_importance: num(r.verify && r.verify.min_importance, 0, 100, D.verify.min_importance) },
     focus: normalizeFocus(r.focus),
@@ -449,6 +456,29 @@ export function storyRows(db, ids) {
   return out;
 }
 
+/**
+ * 先不重写：故事线已有模型稿，写稿后新加入的报道不到 rewrite_min 篇、也不到写稿时篇数的 rewrite_ratio，且重要度不到 60。
+ * 旧稿照样逐句核对；新报道攒够（或故事线变重要、上了头版）再重写。
+ */
+export function deferRewrite(row, s, S) {
+  if (!row || !row.copy || row.copy.by !== "llm" || !row.copy.lead || !(S && S.rewrite_min > 0)) return false;
+  const had = Number(row.copy.items) || 0;
+  const pending = s._total - had;
+  if (pending <= 0 || s.importance >= 60) return false;
+  return pending < S.rewrite_min || pending < Math.ceil(had * S.rewrite_ratio);
+}
+/**
+ * 一句话快讯：故事线只有一篇报道，原文完整且不超过 brief_chars 字，不算重要，读法不是要长材料的那种。
+ * 这种稿子模型写出来就是把原文换个说法，不值一次调用。
+ */
+export function isBriefWire(g, s, S, profile) {
+  if (!(S && S.brief_chars > 0) || g.items.length !== 1 || s.importance >= 60) return false;
+  if (profile && profile.content && profile.content.body_chars >= 2000) return false;
+  const it = g.items[0];
+  const text = String(it.summary || "").replace(/\s+/g, " ").trim();
+  if (it.completeness && it.completeness !== "full" && text && text !== String(it.title || "").trim()) return false;
+  return Math.max(text.length, String(it.title || "").length) <= S.brief_chars;
+}
 /** 稿件可以沿用：模型写的，且写稿后没有新报道加入。 */
 const copyFresh = (row, total) => Boolean(row && row.copy && row.copy.by === "llm" && row.copy.items >= total);
 const copyOf = (c) => Object.assign({ lead: c.lead || "", lead_refs: c.lead_refs || [], points: c.points || [], views: c.views || [], impact: c.impact || "" }, Array.isArray(c.extra) && c.extra.length ? { extra: c.extra } : {}, Array.isArray(c.history) && c.history.length ? { history: c.history } : {});
@@ -952,12 +982,23 @@ export async function llmEdition(db, model, o) {
   const merged = new Map(); // 被并入者下标（1 起） → 并入目标下标
   let plan = null;
   const ids = new Set(groups.map((g) => g.id));
+  const byIdAll = (id) => groups.find((g) => g.id === id);
   const prevPlanOk = o.prev && o.prev.headline && !((o.prev.stats && o.prev.stats.fallbacks) || []).includes("plan");
-  if (!fresh.length && prevPlanOk) {
+  // 变化小也沿用：头版的故事线没有新报道，有变化的故事线都排不进头版（重要度低于头版里最低的），条数不多，上次统筹还不旧
+  const prevFront = prevPlanOk ? (o.prev.front || []).filter((i) => ids.has(i)) : [];
+  const frontFloor = prevFront.length ? Math.min(...prevFront.map((i) => byIdAll(i).importance)) : -1;
+  const changed = groups.filter((g) => g.isNew || g.fresh.length);
+  const planAt = prevPlanOk && o.prev.stats && o.prev.stats.plan_at ? o.prev.stats.plan_at : null;
+  const PL = layout.plan || { reuse_hours: 0, reuse_changes: 0 };
+  const minor = Boolean(prevPlanOk && fresh.length && PL.reuse_hours > 0 && planAt && Date.now() - Date.parse(planAt) < PL.reuse_hours * 3600000 && prevFront.length
+    && changed.filter((g) => !g.triage).length <= PL.reuse_changes && changed.every((g) => g.importance < frontFloor && !prevFront.includes(g.id)));
+  if ((!fresh.length || minor) && prevPlanOk) {
+    if (minor) stats.plan_minor = changed.length;
+    if (planAt) stats.plan_at = planAt;
     plan = { reuse: true, headline: o.prev.headline, frontIds: (o.prev.front || []).filter((i) => ids.has(i)), watch: (o.prev.watch || []).map((w) => ({ text: w.text, stories: (w.stories || []).filter((i) => ids.has(i)) })), themesKept: (o.prev.themes || []).map((t) => Object.assign({}, t, { stories: (t.stories || []).filter((i) => ids.has(i)) })).filter((t) => t.stories.length >= 2) };
     stats.plan_reused = true;
   } else {
-    try { plan = await call("plan", planPrompt(top, layout), 6000); } catch { plan = {}; stats.fallbacks.push("plan"); }
+    try { plan = await call("plan", planPrompt(top, layout), 6000); stats.plan_at = new Date().toISOString(); } catch { plan = {}; stats.fallbacks.push("plan"); }
     for (const m of Array.isArray(plan.merge) ? plan.merge : []) {
       const ks = (Array.isArray(m) ? m : []).map(Number).filter((k) => k >= 1 && k <= top.length && !merged.has(k));
       if (ks.length < 2) continue;
@@ -1000,11 +1041,20 @@ export async function llmEdition(db, model, o) {
   const placed = new Set(parts.placed);
   let reused = 0;
   const toWrite = [];
+  const frontSet = new Set(parts.front || []);
+  const SW = layout.story;
+  stats.deferred = 0;
+  stats.brief = 0;
   for (const s of stories) {
     const g = s._g;
     // 有读者报错未处理的，重写
     if (!g.absorbed && copyFresh(g.row, s._total) && !fb.errors.has(s.id)) { Object.assign(s, copyOf(g.row.copy), { by: "llm", reused: true }); reused++; }
-    else if (placed.has(s.id)) toWrite.push(s);
+    else if (!placed.has(s.id)) continue;
+    // 小进展：已有模型稿、不在头版、不算重要、新报道还少——先沿用旧稿（「进展」一行由程序标出新增了什么），攒够了再重写
+    else if (!g.absorbed && !fb.errors.has(s.id) && !frontSet.has(s.id) && deferRewrite(g.row, s, SW)) { Object.assign(s, copyOf(g.row.copy), { by: "llm", reused: true, deferred: s._total - g.row.copy.items }); reused++; stats.deferred++; }
+    // 一句话快讯：只有一篇、原文很短，模型改写出来还是那句话——用程序稿（就是原文）
+    else if (!frontSet.has(s.id) && isBriefWire(g, s, SW, reg.get(s.profile))) stats.brief++;
+    else toWrite.push(s);
   }
   // 头版先写（读者最先看到），再按重要度
   const frontRank = new Map((parts.front || []).map((id, i) => [id, i]));

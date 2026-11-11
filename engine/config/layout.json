@@ -13,7 +13,8 @@
     { "id": "study", "max": 4 },
     { "id": "society", "max": 2 }
   ],
-  "story": { "lead_chars": 120, "points": 3, "point_chars": 40, "views": 3, "impact_chars": 60, "rich_items": 4, "rich_points": 6, "rich_point_chars": 60, "rich_materials": 10 },
+  "story": { "lead_chars": 120, "points": 3, "point_chars": 40, "views": 3, "impact_chars": 60, "rich_items": 4, "rich_points": 6, "rich_point_chars": 60, "rich_materials": 10, "rewrite_min": 2, "rewrite_ratio": 0.25, "brief_chars": 160 },
+  "plan": { "reuse_hours": 3, "reuse_changes": 6 },
   "watch": { "count": 3 },
   "verify": { "count": 4, "min_importance": 30 },
   "focus": { "name": "AI 与新技术", "labels": ["tech", "industry.ai_semis"], "boost": 20 },

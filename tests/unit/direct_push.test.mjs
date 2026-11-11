@@ -25,7 +25,7 @@ async function mountAt(dir0, tasks0, o0) {
     async run(req) { calls.push(["run", req.id]); return tasks.get(req.id) || { code: "schedule_not_found" }; },
   };
   const sent = [];
-  const phone = { available: () => true, async send(text, opt) { sent.push({ text, source: opt && opt.source }); return { delivered: 1 }; } };
+  const phone = { available: () => o.unavailable !== true, async send(text, opt) { sent.push({ text, source: opt && opt.source }); return { delivered: 1 }; } };
   let unplug = null;
   const routes = [];
   const tools = [];
@@ -130,4 +130,40 @@ test("刚启动、桥接插件还没加载：先不交还上次接管的任务�
   await again.call("/api/newswire/push");
   assert.equal([...m.tasks.values()][0].status, "paused", "启动 3 分钟内不交还");
   again.dispose();
+});
+
+test("推送链路自检：没装桥接插件、装了但没填聊天、直接推送生效，三种情况各说清原因和修法", async () => {
+  const a = await mount({ phone: false });
+  await a.tool("newswire_schedule_setup").execute({});
+  const ha = (await a.call("/api/newswire/push")).health;
+  assert.equal(ha.route, "task");
+  assert.equal(ha.ok, false);
+  assert.match(ha.summary, /经定时任务/);
+  assert.match(ha.steps.find((x) => x.id === "bridge").fix, /掌上指挥台/);
+  a.dispose();
+
+  const b = await mount({ phone: true, unavailable: true });
+  await b.tool("newswire_schedule_setup").execute({});
+  const hb = (await b.call("/api/newswire/push")).health;
+  assert.equal(hb.route, "task");
+  assert.equal(hb.steps.find((x) => x.id === "bridge").ok, true);
+  const chats = hb.steps.find((x) => x.id === "chats");
+  assert.equal(chats.ok, false);
+  assert.match(chats.fix, /定时任务推送聊天/);
+  assert.equal([...b.tasks.values()][0].status, "active", "发不出去就不接管");
+  const tb = await b.tool("newswire_push_prefs").execute({});
+  assert.equal(tb.health.route, "task");
+  b.dispose();
+
+  const c = await mount({ phone: true });
+  await c.tool("newswire_schedule_setup").execute({});
+  const hc = (await c.call("/api/newswire/push")).health;
+  assert.equal(hc.route, "direct");
+  assert.equal(hc.ok, true);
+  assert.ok(hc.steps.every((x) => x.ok || x.id === "recent"), JSON.stringify(hc.steps));
+  await c.call("/api/newswire/push/now", {});
+  await wait(80);
+  const last = (await c.call("/api/newswire/push")).health.steps.find((x) => x.id === "last");
+  assert.ok(last && last.ok, "记下最近一次直接发送");
+  c.dispose();
 });

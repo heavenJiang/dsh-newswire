@@ -69,7 +69,7 @@ test("综述：首次给全部近况；之后增量——只给上次综述与�
   story(db, "s1", "英伟达发布Rubin平台", { ents: ["英伟达"], msAgo: 5 * 86400000, lead: "英伟达发布Rubin平台，算力提升3倍。" });
   story(db, "s2", "英伟达与多家云厂商签约", { ents: ["英伟达"], msAgo: 3 * 86400000, lead: "英伟达与多家云厂商签署供货协议。" });
   const id = addTracker(db, { name: "英伟达", kind: "company", ticker: "NVDA", entities: ENT });
-  assert.equal(needsSynthesis(db, id), true);
+  assert.equal(needsSynthesis(db, id), 2, "还没有综述：要写，返回动态篇数");
   const { m, prompts } = fake((n) => n === 1
     ? { state: "英伟达持续推出新平台", trend: "新品节奏加快，算力提升3倍", milestones: [{ date: "11-04", text: "发布Rubin平台" }],
         implications: [{ area: "股价", target: "英伟达", ticker: "NVDA", direction: "利好", why: "新平台巩固领先", confidence: "中" }, { area: "行业", target: "云厂商", direction: "利好", why: "采购额将增长80%", confidence: "高" }],
@@ -80,12 +80,18 @@ test("综述：首次给全部近况；之后增量——只给上次综述与�
   assert.equal(a.dropped, 1);
   assert.equal(a.changed, "首次综述");
   assert.match(prompts[0], /近来的动态/);
-  assert.equal(needsSynthesis(db, id), false);
+  assert.equal(needsSynthesis(db, id), 0);
   await new Promise((r) => setTimeout(r, 1100)); // 库里的时间精确到秒
   story(db, "s3", "英伟达CEO黄仁勋被调查", { ents: ["英伟达"], msAgo: 600000, imp: 75 });
   linkStories(db, id, { days: 1 });
-  assert.equal(needsSynthesis(db, id), true, "有重要度 ≥70 的新动态");
-  assert.deepEqual(synthTargets(db, 2), [id]);
+  // 间隔：离上次不到 2 小时不写；不到间隔（默认 6 小时）只有重要度 ≥ 80 的才写；过了间隔照旧（≥2 篇或有 ≥70 的）
+  const H = 3600000;
+  assert.equal(needsSynthesis(db, id), 0, "刚写过");
+  assert.equal(needsSynthesis(db, id, { now: Date.now() + 3 * H }), 0, "3 小时：重要度 75 还不够");
+  assert.equal(needsSynthesis(db, id, { now: Date.now() + 3 * H, gapHours: 2 }), 1, "间隔调小就写");
+  assert.equal(needsSynthesis(db, id, { now: Date.now() + 7 * H }), 1, "过了间隔：有重要度 ≥70 的新动态");
+  assert.deepEqual(synthTargets(db, 2), []);
+  assert.deepEqual(synthTargets(db, 2, { now: Date.now() + 7 * H }), [id]);
   const b = await synthesize(db, m, id, { model: "f/m" });
   assert.equal(b.incremental, true);
   assert.match(prompts[1], /上次综述（/);

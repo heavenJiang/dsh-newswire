@@ -174,14 +174,25 @@ export function synthPrompt(t, prev, items, older) {
     items.map((x, i) => "[" + (i + 1) + "] " + String(x.first_at || "").slice(5, 16) + "｜" + x.title + "｜" + clip(x.lead, 200) + (x.update ? "｜进展：" + clip(x.update, 80) : "")).join("\n");
 }
 
-/** 该不该重写综述：没有综述、或之后新挂上的故事线 ≥ 2 篇、或有重要度 ≥ 70 的新动态。 */
-export function needsSynthesis(db, id) {
+/** 自动重写综述的最短间隔（小时）：大主线（特朗普、AI）几乎每轮都有两三篇新报道，每轮都重写既占模型又看不出差别。 */
+export const SYNTH_GAP_HOURS = 6;
+/**
+ * 该不该重写综述：没有综述 → 要；离上次不到 2 小时 → 不；不到间隔（gapHours）→ 只有出了重要度 ≥ 80 的新动态才写；
+ * 过了间隔 → 之后新挂上的故事线 ≥ 2 篇、或有重要度 ≥ 70 的新动态。
+ * @returns 0（不用）或新动态的篇数
+ */
+export function needsSynthesis(db, id, o) {
   const tl = timeline(db, id, 80);
-  if (!tl.length) return false;
+  if (!tl.length) return 0;
   const sy = db.prepare("SELECT at FROM tracker_syntheses WHERE tracker_id = ? ORDER BY id DESC LIMIT 1").get(id);
-  if (!sy) return true;
+  if (!sy) return tl.length;
   const fresh = tl.filter((x) => x.updated_at > sy.at);
-  return fresh.length >= 2 || fresh.some((x) => x.importance >= 70);
+  if (!fresh.length) return 0;
+  const hours = (((o && o.now) || Date.now()) - Date.parse(String(sy.at).replace(" ", "T") + "Z")) / 3600000;
+  const gap = o && Number.isFinite(o.gapHours) ? o.gapHours : SYNTH_GAP_HOURS;
+  if (hours < Math.min(2, gap)) return 0;
+  if (hours < gap) return fresh.some((x) => x.importance >= 80) ? fresh.length : 0;
+  return fresh.length >= 2 || fresh.some((x) => x.importance >= 70) ? fresh.length : 0;
 }
 
 /** 写一份综述（增量），核对后存档。 */
@@ -251,7 +262,7 @@ export function suggestions(db, o) {
 }
 
 /** 版面出来后自动重写综述的对象：需要重写的里面，新动态最多的前 n 个。 */
-export function synthTargets(db, n) {
+export function synthTargets(db, n, o) {
   if (!n) return [];
-  return db.prepare("SELECT id FROM trackers WHERE status = 'active'").all().map((r) => r.id).filter((id) => needsSynthesis(db, id)).slice(0, n);
+  return db.prepare("SELECT id FROM trackers WHERE status = 'active'").all().map((r) => ({ id: r.id, fresh: needsSynthesis(db, r.id, o) })).filter((x) => x.fresh > 0).sort((a, b) => b.fresh - a.fresh).slice(0, n).map((x) => x.id);
 }

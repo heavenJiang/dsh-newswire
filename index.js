@@ -15,6 +15,8 @@ import { searchNews, answerNews } from "./host/ask.mjs";
 import { detailMaterials, writeDetail, saveDetail, latestDetail } from "./host/detail.mjs";
 import { analysisMaterials, analyzeStory, saveAnalysis, latestAnalysis, analysisBrief, autoAnalyzeTargets, webMaterials, searchQuery } from "./host/analysis.mjs";
 import { listTrackers, addTracker, removeTracker, unlinkStory, linkAll, trackerDetail, synthesize, suggestions as trackSuggestions, synthTargets } from "./host/tracking.mjs";
+import { createQueue, PRIORITY } from "./host/queue.mjs";
+import { prune } from "./host/retention.mjs";
 import { parseCron, cronMatches, nextCron, minuteKey } from "./host/clock.mjs";
 import { CADENCES, LEVELS, TIMINGS, SCOPES, DELIVERIES, loadPush, savePush, normalizePush, sectionPenalties, rulesFor, applyDailyCap, recentPushes as pushHistory } from "./host/push.mjs";
 import { markKind } from "./engine/pipeline/quality.mjs";
@@ -758,7 +760,10 @@ export function apply(ctx, config) {
   }
   const modeNow = () => (prefs().mode === "llm" || prefs().mode === "economy" ? prefs().mode : cfg.modelMode);
   // 宿主的模型服务与默认模型（可选）：LLM 模式下有它们才调用模型；没有就退回程序编排
+  // 模型调用统一排队：读者点的（详细报道、影响分析、问答）排在版面和后台任务前面；名额数是实测的并发数（没测过先给 2，让第一次能并行试）
+  const queue = createQueue({ slots: () => Number(prefs().concurrency) || 2 });
   const model = createModel({
+    slot: (step) => queue.acquire(step),
     getLlm: () => optional.llm,
     getDefault: () => optional.defaultModel,
     pinned: () => { const x = prefs(); return x.provider && x.model ? { provider: x.provider, model: x.model } : null; },
@@ -837,7 +842,7 @@ export function apply(ctx, config) {
         if (Date.now() + per > deadline) { rs.skipped = targets.length - rs.read; break; }
         rs.read++;
         try {
-          const r = await readSource({ read: (u, w) => pageRead(ctx, cfg, p, u, w), model }, src, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
+          const r = await queue.run({ kind: "read", label: "读页面：" + src.id, priority: PRIORITY.background }, () => readSource({ read: (u, w) => pageRead(ctx, cfg, p, u, w), model }, src, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) }));
           if (r.ok) { rs.ok++; rs.items += r.items.length; rs.dropped += r.dropped || 0; await writeFile(path.join(dir, src.id + ".json"), JSON.stringify({ items: r.items, dropped: r.dropped || 0, why: r.why || {}, ms: r.ms, model: model.label() })); }
           else rs.failed.push(src.id + ":" + (r.error || "empty"));
         } catch (err) { rs.failed.push(src.id + ":" + errText(err).slice(0, 60)); }
@@ -860,7 +865,7 @@ export function apply(ctx, config) {
     const pr = prefs();
     return {
       mode: modeNow(), mode_from: pr.mode ? "panel" : "settings", service: Boolean(optional.llm), available: model.available(), ready: llmReady(), label: model.label(),
-      pinned: pr.provider && pr.model ? { provider: pr.provider, model: pr.model } : null, default: defaultSelection(), busy: modelState.busy, last: modelState.last, read: modelState.read || null,
+      pinned: pr.provider && pr.model ? { provider: pr.provider, model: pr.model } : null, default: defaultSelection(), busy: modelState.busy, queue: queue.view(), last: modelState.last, read: modelState.read || null,
       depth: depthOf(pr), depths: Object.fromEntries(Object.entries(DEPTHS).map(([k, v]) => [k, v])), daily_tokens: Number(pr.daily_tokens) || 0,
       speed: Object.assign({ concurrency: pr.concurrency || null, probe: pr.probe || null }, model.profile()),
     };
@@ -890,7 +895,11 @@ export function apply(ctx, config) {
    * 编一份版面并存库。wantLlm 且模型可用时由模型编排，否则（或模型编排整体失败时）由程序编排。不抛错。
    * @param o { pack, runId, wantLlm, minHours }
    */
-  async function makeEdition(o) {
+  function makeEdition(o) {
+    const pack = o.pack && !String(o.pack).includes(",") ? String(o.pack) : "all";
+    return queue.run({ kind: "edition", label: "版面" + (pack === "all" ? "" : "（" + pack + "）"), priority: Number.isInteger(o.priority) ? o.priority : PRIORITY.push }, () => makeEditionNow(o));
+  }
+  async function makeEditionNow(o) {
     const db = openIfExists(p.db);
     if (!db) return null;
     const t0 = Date.now();
@@ -1001,7 +1010,8 @@ export function apply(ctx, config) {
   }
 
   /** 编一份日报并存档。LLM 模式且模型可用时由模型写，否则程序写。 */
-  async function makeDaily(o) {
+  function makeDaily(o) { return queue.run({ kind: "daily", label: "日报", priority: PRIORITY.push }, () => makeDailyNow(o)); }
+  async function makeDailyNow(o) {
     const db = openIfExists(p.db);
     if (!db) return null;
     const useLlm = modeNow() === "llm" && model.available();
@@ -1031,7 +1041,10 @@ export function apply(ctx, config) {
 
   /** 手动抓取后在后台编版面（不让面板干等）。 */
   /** 分析一条故事线的影响与走势（模型），存档并返回。 */
-  async function runAnalysis(storyId, auto) {
+  function runAnalysis(storyId, auto) { return queue.run({ kind: "analysis", label: "影响分析：" + storyTitle(storyId), priority: auto ? PRIORITY.background : PRIORITY.reader }, () => runAnalysisNow(storyId, auto)); }
+  /** 故事线标题（排队显示用）。 */
+  function storyTitle(storyId) { try { const r = withDb(p, (db) => (db ? db.prepare("SELECT title FROM stories WHERE story_id = ?").get(storyId) : null)); return r && r.title ? String(r.title).slice(0, 24) : String(storyId); } catch { return String(storyId); } }
+  async function runAnalysisNow(storyId, auto) {
     const db = openIfExists(p.db);
     if (!db) throw new Error("no_db");
     try {
@@ -1069,7 +1082,8 @@ export function apply(ctx, config) {
     void runDetail(storyId).then(() => detailJobs.delete(storyId)).catch((err) => detailJobs.set(storyId, { at: Date.now(), error: errText(err) }));
   }
   /** 详细报道：模型读这条故事线的全部报道写一篇分块的长稿，逐句核对，存档并返回。 */
-  async function runDetail(storyId) {
+  function runDetail(storyId) { return queue.run({ kind: "detail", label: "详细报道：" + storyTitle(storyId), priority: PRIORITY.reader }, () => runDetailNow(storyId)); }
+  async function runDetailNow(storyId) {
     const db = openIfExists(p.db);
     if (!db) throw new Error("no_db");
     try {
@@ -1110,23 +1124,30 @@ export function apply(ctx, config) {
     for (const [tid, sids] of Object.entries(linked)) withDb(p, (db) => { if (db) { const t = db.prepare("SELECT kind FROM trackers WHERE id = ?").get(tid); if (t && t.kind === "theme") void background(syncTrackerFollows(db, tid, sids), "tracker follows"); } });
     if (!(modeNow() === "llm" && llmReady())) return;
     const dp = depthParams(prefs());
+    // 这些后台工作不占「模型正忙」：它们的调用排在版面后面（队列按优先级），新一轮版面不用等它们；同时只跑一组
     setTimeout(async () => {
+      if (autoWork.running) return;
+      autoWork.running = true;
+      try { await autoWorkNow(ed, dp); } finally { autoWork.running = false; }
+    }, 0);
+  }
+  const autoWork = { running: false };
+  async function autoWorkNow(ed, dp) {
+    {
       let ids = [];
       try { ids = dp.autoAnalyze ? withDb(p, (db) => (db ? autoAnalyzeTargets(db, ed, { max: dp.autoAnalyze, isFocus: (s) => { const lay = loadLayout(p.layoutFile, p.layoutSeed); return Boolean(s && inFocus(lay.focus, [s.section].concat(s.labels || []))); } }) : [])) : []; } catch { ids = []; }
       for (const id of ids) {
         if (modelState.busy) break;
-        modelState.busy = "analyze:" + id;
-        try { await runAnalysis(id, true); } catch { /* 下一份版面再试 */ } finally { modelState.busy = null; }
+        try { await runAnalysis(id, true); } catch { /* 下一份版面再试 */ }
       }
       let ts = [];
-      try { ts = withDb(p, (db) => (db ? synthTargets(db, dp.track || 0) : [])); } catch { ts = []; }
+      try { ts = withDb(p, (db) => (db ? synthTargets(db, dp.track || 0, { gapHours: dp.trackGapH }) : [])); } catch { ts = []; }
       for (const id of ts) {
         if (modelState.busy) break;
-        modelState.busy = "track:" + id;
-        try { await runSynthesis(id); } catch { /* 下一份版面再试 */ } finally { modelState.busy = null; }
+        try { await runSynthesis(id, true); } catch { /* 下一份版面再试 */ }
       }
       try { await repairRecipes(); } catch { /* 下一份版面再试 */ }
-    }, 0);
+    }
   }
 
   /**
@@ -1151,19 +1172,23 @@ export function apply(ctx, config) {
       if (last && Date.now() - Date.parse(last.value) < 86400000) continue;
       const now = new Date().toISOString();
       withDb(p, (db) => { if (db) db.prepare("INSERT INTO kv (key, value, updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").run(key, now, now.replace("T", " ").slice(0, 19)); });
-      modelState.busy = "recipe:" + src.id;
       try {
-        const r = await learnRecipe({ outline: (u) => pageOutline(ctx, cfg, p, u), test: (s2) => testSource(ctx, cfg, p, { source: s2, max_items: 8 }), model }, src, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
+        const r = await queue.run({ kind: "recipe", label: "修解析规则：" + src.id, priority: PRIORITY.idle }, () => learnRecipe({ outline: (u) => pageOutline(ctx, cfg, p, u), test: (s2) => testSource(ctx, cfg, p, { source: s2, max_items: 8 }), model }, src, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) }));
         if (r.ok) {
           await upsertSourceInConfig(p, { id: src.id, extract: r.extract, type: "html_index", channels: ["browse"], note: "解析规则由模型于 " + now.slice(0, 10) + " 自动更新（原来的解析连续两轮抓不到内容）" });
           ctx.logger?.info?.("dsh-newswire: 已为 " + src.id + " 重新学会解析规则");
         }
-      } catch { /* 明天再试 */ } finally { modelState.busy = null; }
+      } catch { /* 明天再试 */ }
       return;
     }
   }
 
-  async function runSynthesis(id) {
+  function runSynthesis(id, auto) {
+    let name = String(id);
+    try { const r = withDb(p, (db) => (db ? db.prepare("SELECT name FROM trackers WHERE id = ?").get(id) : null)); if (r && r.name) name = r.name; } catch { /* 用 id */ }
+    return queue.run({ kind: "track", label: "追踪综述：" + name, priority: auto ? PRIORITY.idle : PRIORITY.reader }, () => runSynthesisNow(id));
+  }
+  async function runSynthesisNow(id) {
     const db = openIfExists(p.db);
     if (!db) throw new Error("no_db");
     try { return await synthesize(db, model, id, { model: model.label(), timeoutMs: Math.max(cfg.modelTimeoutMs, 300000) }); } finally { db.close(); }
@@ -1171,7 +1196,7 @@ export function apply(ctx, config) {
 
   function backgroundEdition(runId, pack) {
     if (modelState.busy) return;
-    void background(makeEdition({ pack, runId, wantLlm: modeNow() === "llm" }), "edition");
+    void background(makeEdition({ pack, runId, wantLlm: modeNow() === "llm", priority: PRIORITY.background }), "edition");
   }
 
   function taxonomyNames() {
@@ -1314,13 +1339,79 @@ export function apply(ctx, config) {
       const svc = direct();
       if (!svc) return false;
       let r = null;
-      try { r = await svc.send(String(text), { source: "dsh-newswire" }); } catch { return false; }
-      if (r && r.delivered > 0) return true;
-      if (!(r && r.reason === "too-soon")) return false;
+      try { r = await svc.send(String(text), { source: "dsh-newswire" }); } catch (err) { noteSend(false, errText(err), text); return false; }
+      if (r && r.delivered > 0) { noteSend(true, null, text, r.delivered); return true; }
+      if (!(r && r.reason === "too-soon")) { noteSend(false, (r && r.reason) || "not-sent", text); return false; }
       await sleep(11000);
     }
     return false;
   }
+  /** 记下最近一次直接发送的结果（自检页用）。 */
+  function noteSend(ok, reason, text, chats) {
+    try { kvSet("push_last", { at: new Date().toISOString(), ok, reason: reason || null, chars: String(text || "").length, chats: chats || 0 }); } catch { /* 只是记录 */ }
+  }
+  function kvGet(key) { try { const r = withDb(p, (db) => (db ? db.prepare("SELECT value FROM kv WHERE key = ?").get(key) : null)); return r ? JSON.parse(r.value) : null; } catch { return null; } }
+  function kvSet(key, value) { withDb(p, (db) => { if (db) db.prepare("INSERT INTO kv (key, value, updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").run(key, JSON.stringify(value), nowIsoUtc()); }); }
+
+  /**
+   * 推送链路自检：从「到点」到「手机收到」逐段看通不通，不通的写明原因和怎么修。
+   * 两条路：直接发（插件自己到点、写完直接发，不经过模型）；经定时任务（宿主到点叫模型调工具、模型把消息转发出去，模型慢或忙时会超时、改写）。
+   */
+  async function pushHealth() {
+    const pp = loadPush(p.pushPrefs);
+    const steps = [];
+    const add = (id, ok, text, fix) => steps.push(fix ? { id, ok, text, fix } : { id, ok, text });
+    const svc = optional.phonePush;
+    let avail = false;
+    try { avail = Boolean(svc && typeof svc.available === "function" && svc.available()); } catch { avail = false; }
+    if (!svc) add("bridge", false, "没找到掌上指挥台的「直接发到手机」服务", "装上或升级掌上指挥台（dsh-switchboard 0.5.23 以上）并启用。");
+    else add("bridge", true, "掌上指挥台的「直接发到手机」服务在");
+    if (svc) {
+      if (avail) add("chats", true, "服务可用：已填接收推送的聊天");
+      else add("chats", false, "服务在，但现在发不出去", "在掌上指挥台的设置里填「定时任务推送聊天」（Telegram 填你和机器人私聊的聊天 ID），并确认「允许其他插件发消息到手机」开着、总开关开着。");
+    }
+    if (pp.delivery === "task") add("delivery", false, "推送方式选的是「经定时任务」", "在「推送」→「方式」里改成「直接发到手机」。");
+    else add("delivery", true, "推送方式：直接发到手机");
+    let task = null;
+    if (!optional.schedule) add("task", false, "宿主没有提供定时任务服务", "直接发也按定时任务的时间表跑：需要宿主的定时任务插件。");
+    else {
+      task = await pushTask("core");
+      if (!task) add("task", false, "还没有定时推送任务（时间表）", "在「推送」里选一个节奏，会自动创建。");
+      else add("task", true, "时间表：" + (task.expression || task.kind) + "（" + (task.status === "active" ? "由宿主的定时任务触发" : "宿主任务已暂停") + "）");
+    }
+    const on = Boolean(direct());
+    const taken = clock.tasks.filter((t) => t.kind === "cycle").length > 0;
+    if (on && taken) add("clock", true, "插件按自己的时钟到点运行，下一次 " + (clockNext() ? bjHhmm(clockNext().replace("T", " ").slice(0, 19)) : "—"));
+    else if (on && task) add("clock", false, "直接发可用，但还没接管时间表", task.kind !== "cron" ? "定时任务不是 cron 时间规则，插件接管不了：在「推送」里重新选一次节奏。" : "一分钟内会自动接管；一直不接管就在「推送」里重新选一次节奏。");
+    const last = kvGet("push_last");
+    if (last) add("last", Boolean(last.ok), "最近一次直接发送：" + bjHhmm(String(last.at).replace("T", " ").slice(0, 19)) + (last.ok ? " 已送出（" + last.chars + " 字）" : " 没发出去（" + (last.reason || "未知原因") + "）"));
+    const lastPush = withDb(p, (db) => (db ? db.prepare("SELECT MAX(pushed_at) t, COUNT(*) n FROM pushes WHERE pushed_at >= datetime('now', '-1 day')").get() : null));
+    if (lastPush && lastPush.t) add("recent", true, "近 24 小时记了 " + lastPush.n + " 条推送，最近一次 " + bjHhmm(lastPush.t));
+    else add("recent", false, "近 24 小时没有推送记录");
+    const pend = readPending("core");
+    if (pend) add("pending", true, pend.ready ? "有一条写好的推送等着发" : "本轮版面正在写（" + bjHhmm(String(pend.at).replace("T", " ").slice(0, 19)) + " 抓取），写完就推");
+    const route = on && taken ? "direct" : task && task.status === "active" ? "task" : on ? "direct_pending" : "none";
+    const summary = route === "direct" ? "直接推送已生效：到点由插件抓取、写完直接发到手机，不经过模型，没有 10 分钟的时限。"
+      : route === "task" ? "现在走的是「经定时任务」：宿主到点叫模型调用工具，再由模型把消息转发到手机。模型慢或正忙时会超时，长消息可能被改写。" + (steps.find((x) => !x.ok && x.fix) ? "按下面标出的一项改好，就会换成直接推送。" : "")
+      : route === "direct_pending" ? "直接推送可用，正在接管时间表。" : "现在推不到手机：按下面标出的项逐个处理。";
+    return { route, ok: route === "direct", summary, steps };
+  }
+
+  // ---------------------------------------------------------------- 数据保留
+  /** 每天清理一次只增不减的表（版面、账本、抓取记录等），模型和抓取都闲着时做。 */
+  function maintenanceTick() {
+    if (modelState.busy || busyWith()) return;
+    const last = kvGet("maintenance");
+    if (last && Date.now() - Date.parse(last.at) < 24 * 3600000) return;
+    const db = openIfExists(p.db);
+    if (!db) return;
+    try {
+      const t0 = Date.now();
+      const r = prune(db);
+      db.prepare("INSERT INTO kv (key, value, updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").run("maintenance", JSON.stringify(Object.assign({ at: new Date().toISOString(), ms: Date.now() - t0 }, r)), nowIsoUtc());
+    } catch (err) { try { console.error("[newswire] maintenance failed:", errText(err)); } catch { /* ignore */ } } finally { db.close(); }
+  }
+
   // ---------------------------------------------------------------- 插件自己的时钟
   // 直接推送可用时，宿主定时任务里的模型就不必每轮转发（本地模型会改写、漏发、把乱码发到手机）：
   // 暂停本插件建的定时任务，按它们的 cron 自己到点跑；直接推送断了 3 分钟以上（或改回「经定时任务」）就恢复那些任务。
@@ -1620,7 +1711,7 @@ export function apply(ctx, config) {
         prewarm.done.set(key, at);
         const runId = newRunId("prep");
         const res = await guardedRun({ packs: pack, read_budget_ms: Math.max(4 * 60000, until - 12 * 60000) }, runId);
-        if (res.ok) await makeEdition({ pack, runId: res.run_id || runId, wantLlm: true });
+        if (res.ok) await makeEdition({ pack, runId: res.run_id || runId, wantLlm: true, priority: PRIORITY.background });
         prewarm.tasksAt = 0;
         return;
       }
@@ -1644,7 +1735,7 @@ export function apply(ctx, config) {
     hooks.dailyRun = dailyRun;
     disposers.push(() => { hooks.dailyRun = null; });
     // 预编排：每分钟看一眼下一次定时推送还有多久
-    { const t = setInterval(() => { void background(prewarmTick(), "prewarm"); void background(checkPending(), "pending push"); }, 60000); disposers.push(() => clearInterval(t)); }
+    { const t = setInterval(() => { void background(prewarmTick(), "prewarm"); void background(checkPending(), "pending push"); try { maintenanceTick(); } catch { /* 明天再清 */ } }, 60000); disposers.push(() => clearInterval(t)); }
     // 30 秒看一次时钟（同一分钟只触发一次），保证不漏掉整点
     { const t = setInterval(() => { void background(clockTick(), "direct clock"); }, 30000); disposers.push(() => clearInterval(t)); }
 
@@ -2066,7 +2157,9 @@ export function apply(ctx, config) {
       let task = null;
       try { const r = await scheduleSetup({ action: "status" }); task = r && r.task; } catch { /* 没有定时服务 */ }
       const dp = { service: Boolean(optional.phonePush), on: Boolean(direct()), clock: clock.tasks.length > 0, next: clockNext() };
-      return { prefs, direct: dp, cadences: Object.fromEntries(Object.entries(CADENCES).map(([k, v]) => [k, v.label])), levels: Object.keys(LEVELS), task, schedule_available: Boolean(optional.schedule),
+      let health = null;
+      try { health = await pushHealth(); } catch { health = null; }
+      return { prefs, direct: dp, health, cadences: Object.fromEntries(Object.entries(CADENCES).map(([k, v]) => [k, v.label])), levels: Object.keys(LEVELS), task, schedule_available: Boolean(optional.schedule),
         penalties: withDb(p, (db) => (db ? sectionPenalties(db) : {})), pushes: withDb(p, (db) => (db ? pushHistory(db, 40) : [])) };
     }
     async function applyPush(next) {
@@ -2119,7 +2212,7 @@ export function apply(ctx, config) {
         if (!(modeNow() === "llm" && llmReady())) return jsonResponse({ q, error: "no_model" }, 409);
         try {
           const bodies = withDb(p, (db) => bodiesFor(db, hits.items.map((x) => x.id)));
-          const a = await answerNews(model, q, hits, bodies, { timeoutMs: Math.max(cfg.modelTimeoutMs, 180000) });
+          const a = await queue.run({ kind: "ask", label: "问答：" + String(q).slice(0, 20), priority: PRIORITY.reader }, () => answerNews(model, q, hits, bodies, { timeoutMs: Math.max(cfg.modelTimeoutMs, 180000) }));
           return jsonResponse(Object.assign({ q, model: model.label() }, a), 200);
         } catch (err) {
           return jsonResponse({ q, error: errText(err) }, 502);
@@ -2664,19 +2757,19 @@ export function apply(ctx, config) {
 
     tool({
       name: "newswire_push_prefs",
-      description: "Read or change how often and how much news is pushed to the phone. cadence: every2h (07–21) / every4h (8, 12, 16, 20) / thrice (8, 12, 18) / daily_only (no rounds, only the evening recap) — changing it updates the scheduled task if one exists. level: fewer (higher bar) / normal / more. per_round: max stories per push (1–15). daily_max: max stories per day (1–100). timing: on_time (push at the scheduled time; if the model has not finished, push the latest written edition) / when_ready (fetch at the scheduled time, push once this round's edition is written, usually 10–20 minutes later). scope: picked (stories over the bar, within the limits) / full (every new story and every story with new reports this round, ignoring the bar and limits). delivery: auto (when the chat bridge plugin offers its phonePush service, the plugin posts to the phone itself on the task's schedule and pauses the scheduled task, so no model relays the text; otherwise through the scheduled task) / task (always through the scheduled task). With no arguments, returns the current settings, recent pushes and per-section adjustments learned from the reader's feedback.",
+      description: "Read or change how often and how much news is pushed to the phone. cadence: every2h (07–21) / every4h (8, 12, 16, 20) / thrice (8, 12, 18) / daily_only (no rounds, only the evening recap) — changing it updates the scheduled task if one exists. level: fewer (higher bar) / normal / more. per_round: max stories per push (1–15). daily_max: max stories per day (1–100). timing: on_time (push at the scheduled time; if the model has not finished, push the latest written edition) / when_ready (fetch at the scheduled time, push once this round's edition is written, usually 10–20 minutes later). scope: picked (stories over the bar, within the limits) / full (every new story and every story with new reports this round, ignoring the bar and limits). delivery: auto (when the chat bridge plugin offers its phonePush service, the plugin posts to the phone itself on the task's schedule and pauses the scheduled task, so no model relays the text; otherwise through the scheduled task) / task (always through the scheduled task). With no arguments, returns the current settings, per-section adjustments learned from the reader's feedback, and `health`: a step-by-step check of the push path (which route is in use, what is broken and how to fix it).",
       parameters: { type: "object", additionalProperties: false, properties: {
         cadence: { type: "string", enum: Object.keys(CADENCES) }, level: { type: "string", enum: Object.keys(LEVELS) },
         per_round: { type: "number" }, daily_max: { type: "number" }, timing: { type: "string", enum: TIMINGS }, scope: { type: "string", enum: SCOPES }, delivery: { type: "string", enum: DELIVERIES } } },
       timeoutMs: 30000,
       output: {
         schema: { type: "object", additionalProperties: true, required: ["prefs"], properties: { prefs: { type: "object" } } },
-        render: (_a, v) => [{ type: "text", text: "推送节奏：" + (CADENCES[v.prefs.cadence] || {}).label + "｜档位：" + v.prefs.level + "｜每轮最多 " + v.prefs.per_round + " 条｜每天最多 " + v.prefs.daily_max + " 条｜" + (v.prefs.timing === "when_ready" ? "写完再推" : "到点推送") + "｜" + (v.prefs.scope === "full" ? "本轮新内容全推" : "挑重点") + (v.schedule_note ? "\n" + v.schedule_note : "") }],
+        render: (_a, v) => [{ type: "text", text: "推送节奏：" + (CADENCES[v.prefs.cadence] || {}).label + "｜档位：" + v.prefs.level + "｜每轮最多 " + v.prefs.per_round + " 条｜每天最多 " + v.prefs.daily_max + " 条｜" + (v.prefs.timing === "when_ready" ? "写完再推" : "到点推送") + "｜" + (v.prefs.scope === "full" ? "本轮新内容全推" : "挑重点") + (v.schedule_note ? "\n" + v.schedule_note : "") + (v.health ? "\n推送链路：" + v.health.summary + v.health.steps.filter((x) => !x.ok && x.fix).map((x) => "\n✗ " + x.text + "：" + x.fix).join("") : "") }],
       },
       async execute(args) {
         const a = args || {};
         const changed = ["cadence", "level", "per_round", "daily_max", "timing", "scope", "delivery"].some((k) => a[k] !== undefined);
-        if (!changed) { const v = await pushView(); return { prefs: v.prefs, penalties: v.penalties, task: v.task }; }
+        if (!changed) { const v = await pushView(); return { prefs: v.prefs, penalties: v.penalties, task: v.task, health: v.health }; }
         const r = await applyPush(a);
         return { prefs: r.prefs, schedule_note: r.schedule ? r.schedule.note : null };
       },
