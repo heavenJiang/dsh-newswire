@@ -2,6 +2,16 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.15 (2026-11-11)
+
+- **Profiles: different kinds of stories are written differently.** After Horizon's profiles, adapted to storylines. A profile sets a story's scoring guidance, writing guidance, how its material is excerpted, and what impact analysis looks at.
+  - Two are built in: "News" (the default) and "AI and new technology". The focus-area wording that used to sit in code now lives in Markdown files in the profile directory; the writing is the same as before.
+  - Which profile a story uses: if all its items come from sources that declare a profile (new `profile` field in `sources.json`), that one; otherwise the highest-priority profile whose categories or sources match; otherwise "News".
+  - A `profiles/<id>/` directory in the data directory replaces a built-in profile or adds a new one. `focus` in `layout.json` still works and overrides the name, categories and boost of "AI and new technology".
+  - Each writing batch uses one profile, so the fixed part of the prompt is identical and hosted models' prefix cache hits. When a profile's writing changes, cached copy is rewritten.
+  - Storylines record their profile, and impact analysis follows its focus.
+  - Long articles can be excerpted from the start, middle and end (`head-middle-tail`), so conclusions are not cut off.
+
 ## 1.1.14 (2026-11-11)
 
 - **Pushes go straight to the phone instead of through a model.** Until now the local model in the scheduled task had to copy the whole push into its reply. It failed to copy a 14,000-character push and sent stray `<tool_call>` markup to the phone instead, and did the same in rounds that had nothing to push. With dsh-switchboard 0.5.23 or later installed:

@@ -1,0 +1,9 @@
+{
+  "id": "wire",
+  "name": "新闻",
+  "version": 1,
+  "note": "默认读法：快讯、时政、财经等新闻。没有命中其他读法的报道都按这个写。",
+  "priority": 0,
+  "match": {},
+  "content": { "materials": 6, "body_chars": 900, "summary_chars": 240, "sampling": "prefix" }
+}

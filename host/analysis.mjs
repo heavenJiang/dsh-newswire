@@ -7,6 +7,7 @@
  */
 import { parseJsonLoose } from "./model.mjs";
 import { checkText } from "./factcheck.mjs";
+import { builtinProfiles, promptOf } from "./profiles.mjs";
 
 const clip = (s, n) => { const t = String(s || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 const str = (v, n) => (typeof v === "string" && v.trim() ? clip(v, n) : "");
@@ -15,9 +16,20 @@ const AREAS = ["市场", "公司", "行业", "科技", "政策", "地缘", "民�
 const DIRS = ["利好", "利空", "不确定"];
 const LEVELS = ["高", "中", "低"];
 
+/**
+ * 这条故事线的分析侧重：读法的 analysis.md（调用方按读法给出 hint）；
+ * 旧写法只给 focus（重点领域名称）时，用内置重点领域读法的侧重。
+ */
+function hintOf(story) {
+  if (typeof story.hint === "string") return story.hint;
+  if (!story.focus) return "";
+  const p = builtinProfiles().list.find((x) => x.focus);
+  return p ? promptOf(Object.assign({}, p, { name: story.focus }), "analysis") : "";
+}
+
 export function analysisPrompt(story, mats) {
   return "任务：分析一件正在发生的新闻的潜在影响和可能的演变。依据材料与常识推演；具体数字只能用材料里出现过的，不要编造数字；没有把握的写「不确定」或「低」。" +
-    (story.focus ? "\n这是一条" + story.focus + "新闻：着重分析这项技术或产品的影响力——比现有方案新在哪里、会改变谁（竞争对手、开发者与用户、算力与芯片供应链、上下游公司）、多快会落地、可能被谁跟进或反制。" : "") +
+    (hintOf(story) ? "\n" + hintOf(story) : "") +
     "\n- summary：一句话说这件事意味着什么（不超过60字）" +
     "\n- impacts：最多 4 条，谁会受影响。area 取 " + AREAS.join("/") + "；target 写受影响的对象（公司、资产、行业或地区）；ticker 若是上市公司写股票代码（不确定就留空）；direction 取 " + DIRS.join("/") + "；why 写传导逻辑（不超过60字）；confidence 取 " + LEVELS.join("/") +
     "\n- scenarios：2 到 3 种可能的走向。name 如 基准/升级/缓和；likelihood 取 " + LEVELS.join("/") + "；what 写会怎样发展（不超过60字）；signals 写看到什么说明正往这个方向走（不超过40字）" +

@@ -28,7 +28,8 @@ import { readLock } from "./engine/lock.mjs";
 import { createModel, analyzeEvents } from "./host/model.mjs";
 import { cleanExtract, learnRecipe, judgeRecipe } from "./host/recipe.mjs";
 import { readSource, readTargets } from "./host/modelread.mjs";
-import { loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, storyDetail, sinceSeen, editionDiff, reassemble, scrubStory, qualityRows, editionById, editionList, tickerBoard, updateEditionContent, bodiesFor, inFocus } from "./host/edition.mjs";
+import { loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, storyDetail, sinceSeen, editionDiff, reassemble, scrubStory, qualityRows, editionById, editionList, tickerBoard, updateEditionContent, bodiesFor, inFocus, profilesOf, storyProfile } from "./host/edition.mjs";
+import { promptOf } from "./host/profiles.mjs";
 import { buildDaily, saveDaily, latestDaily, dailyDates, composeDailyMessage, todayBj } from "./host/daily.mjs";
 import { recordPushes, DEFAULT_RULES } from "./engine/pipeline/select.mjs";
 import { loadFollows, updateFollows, KINDS as FOLLOW_KINDS } from "./host/follows.mjs";
@@ -505,7 +506,7 @@ function validateOne(s, at, problems) {
   if (s.timeout_ms !== undefined && clampNum(s.timeout_ms, 5000, 180000, 0) === 0) problems.push(at + " timeout_ms 需为 5000-180000");
   if (s.weight !== undefined && s.weight !== null && !(Number(s.weight) >= 0 && Number(s.weight) <= 1)) problems.push(at + " weight 需为 0-1");
   if (s.tier !== undefined && s.tier !== null && s.tier !== "" && TIERS.indexOf(s.tier) < 0) problems.push(at + " tier 只能是 primary/secondary");
-  for (const k of ["group", "pack"]) if (s[k] !== undefined && s[k] !== null && s[k] !== "" && (typeof s[k] !== "string" || !ID_RE.test(s[k]))) problems.push(at + " " + k + " 需为 [a-z0-9_-] 标识");
+  for (const k of ["group", "pack", "profile"]) if (s[k] !== undefined && s[k] !== null && s[k] !== "" && (typeof s[k] !== "string" || !ID_RE.test(s[k]))) problems.push(at + " " + k + " 需为 [a-z0-9_-] 标识");
   if (s.region !== undefined && s.region !== null && (typeof s.region !== "string" || s.region.length > 8)) problems.push(at + " region 需为不超过 8 字符的地区码（如 CN/US/UK/INTL）");
   if (!regexOk(s.url_include) || !regexOk(s.url_exclude)) problems.push(at + " url_include/url_exclude 不是合法正则");
   if (s.continuity !== undefined && s.continuity !== null && s.continuity !== "" && ["stream", "snapshot"].indexOf(s.continuity) < 0) problems.push(at + " continuity 只能是 stream（按时间滚动，判断衔接）或 snapshot（首页推荐，不判断）");
@@ -539,7 +540,7 @@ export function validateSources(body, opts) {
   return problems;
 }
 
-const STR_FIELDS = ["id", "name", "category", "region", "lang", "type", "adapter", "url", "note", "category_src", "url_include", "url_exclude", "tier", "group", "pack", "removed_at", "wait_for"];
+const STR_FIELDS = ["id", "name", "category", "region", "lang", "type", "adapter", "url", "note", "category_src", "url_include", "url_exclude", "tier", "group", "pack", "profile", "removed_at", "wait_for"];
 
 /** 只保留认识的字段并规范化（防止面板把健康度之类的派生字段写回配置）。 */
 function normalizeSource(s) {
@@ -1026,13 +1027,16 @@ export function apply(ctx, config) {
     const db = openIfExists(p.db);
     if (!db) throw new Error("no_db");
     try {
-      const row = db.prepare("SELECT story_id, title, copy, section, labels FROM stories WHERE story_id = ?").get(storyId);
+      const row = db.prepare("SELECT story_id, title, copy, section, labels, profile FROM stories WHERE story_id = ?").get(storyId);
       if (!row) throw new Error("not_found");
       let copy = null; try { copy = JSON.parse(row.copy || "null"); } catch { copy = null; }
       let labels = []; try { labels = JSON.parse(row.labels || "[]"); } catch { labels = []; }
       const lay = loadLayout(p.layoutFile, p.layoutSeed);
       const mats = analysisMaterials(db, storyId, bodiesFor);
-      const a = await analyzeStory(model, { title: row.title, lead: copy && copy.lead, focus: inFocus(lay.focus, [row.section].concat(labels)) ? lay.focus.name : "" }, mats, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
+      // 分析的侧重按故事线的读法（写稿时记下的；旧故事线没记的按版块与分类认）
+      const reg = profilesOf(lay);
+      const prof = row.profile && reg.byId.has(row.profile) ? reg.get(row.profile) : storyProfile(lay, { section: row.section, labels }, []);
+      const a = await analyzeStory(model, { title: row.title, lead: copy && copy.lead, hint: promptOf(prof, "analysis") }, mats, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
       return saveAnalysis(db, storyId, a, { model: model.label(), auto });
     } finally { db.close(); }
   }

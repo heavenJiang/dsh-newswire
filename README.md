@@ -275,6 +275,7 @@ Editable files in the data directory:
 | `sources.json` | Sources, plus `push.<pack>` thresholds: 50 for multi-source events, 36 for single-source, at most 8 per round |
 | `taxonomy.json` | 7 top-level and 29 second-level categories, 13 regions, cross-language entity aliases, noise rules |
 | `layout.json` | Layout: section order, stories per section, style and length |
+| `profiles/<id>/` | Profiles (optional): how a kind of story is scored, written, and analyzed. Built in: "news" and "AI and new technology"; a directory with the same id replaces the built-in one, and new ids add profiles. Format in [engine/README.md](engine/README.md#profiles) |
 
 On upgrade, new sources, categories and rules are merged in, your edits are kept, and the old file is saved as a `.bak`.
 

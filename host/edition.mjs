@@ -18,6 +18,8 @@ import { createHash } from "node:crypto";
 import { parseJsonLoose } from "./model.mjs";
 import { verifyCopy, checkText } from "./factcheck.mjs";
 import { applyFollows, matchList } from "./follows.mjs";
+import { loadProfiles, builtinProfiles, withFocus, focusOf, profileFor, promptOf, BUILTIN_PROFILES_DIR, DEFAULT_PROFILE } from "./profiles.mjs";
+import path from "node:path";
 
 export const EDITION_VERSION = 1;
 
@@ -93,11 +95,40 @@ export function inFocus(focus, labels) {
   return (labels || []).some((l) => fl.some((f) => l === f || String(l).startsWith(f + ".")));
 }
 
+/**
+ * 读版式并挂上读法表（layout.profiles，不参与序列化）：内置读法 → 版式种子旁的 profiles/ → 数据目录的 profiles/（后者覆盖前者）。
+ * 版式文件里写了 focus 的，覆盖重点领域读法的名称、分类与加权；layout.focus 始终由读法表得出（旧代码照常用）。
+ */
 export function loadLayout(file, seedFile) {
+  let raw = null;
   for (const f of [file, seedFile]) {
-    if (f && existsSync(f)) { try { return normalizeLayout(JSON.parse(readFileSync(f, "utf8"))); } catch { /* 坏文件：试下一个 */ } }
+    if (f && existsSync(f)) { try { raw = JSON.parse(readFileSync(f, "utf8")); break; } catch { /* 坏文件：试下一个 */ } }
   }
-  return normalizeLayout(null);
+  const layout = normalizeLayout(raw);
+  const dirs = [BUILTIN_PROFILES_DIR];
+  for (const f of [seedFile, file]) if (f) { const d = path.join(path.dirname(f), "profiles"); if (!dirs.includes(d)) dirs.push(d); }
+  return attachProfiles(layout, loadProfiles(dirs), raw && raw.focus && typeof raw.focus === "object" ? layout.focus : null);
+}
+
+/** 把读法表挂到版式上；focus 给了就先覆盖重点领域读法。 */
+export function attachProfiles(layout, reg, focus) {
+  const r = focus ? withFocus(reg, focus) : reg;
+  const f = focusOf(r);
+  layout.focus = { name: f.name || layout.focus.name, labels: f.labels, boost: f.labels.length ? f.boost : layout.focus.boost };
+  Object.defineProperty(layout, "profiles", { value: r, enumerable: false, configurable: true, writable: true });
+  return layout;
+}
+
+/** 版式的读法表；没挂（测试里直接 normalizeLayout 的）就用内置读法 + 版式的 focus。 */
+export function profilesOf(layout) {
+  if (layout && layout.profiles) return layout.profiles;
+  return withFocus(builtinProfiles(), layout && layout.focus);
+}
+
+/** 一篇报道（或一组新闻）用的读法。 */
+export function storyProfile(layout, story, items) {
+  const its = items || [];
+  return profileFor(profilesOf(layout), { section: story.section, labels: story.labels || [], sources: [...new Set(its.map((it) => it.source_id).filter(Boolean))], declared: its.map((it) => it.src_profile || null) });
 }
 
 // ------------------------------------------------------------------ 分类表
@@ -128,7 +159,7 @@ export function gatherItems(db, o) {
   const focusArgs = fl.flatMap((f) => [f, f + ".%"]);
   const boost = fl.length ? Number(o.focus.boost ?? 20) : 0;
   const rows = db.prepare(`SELECT ${focusSql} AS focus, a.id, a.title, a.summary, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.pack, a.completeness, a.kind, a.parent_id, COALESCE(s.trial, 0) AS trial,
-      s.name AS source_name, COALESCE(s.grp, a.source_id) AS grp, m.event_id, e.importance AS ev_importance, e.credibility AS ev_cred, e.labels AS ev_labels, e.dispute AS ev_dispute
+      s.name AS source_name, s.profile AS src_profile, COALESCE(s.grp, a.source_id) AS grp, m.event_id, e.importance AS ev_importance, e.credibility AS ev_cred, e.labels AS ev_labels, e.dispute AS ev_dispute
     FROM articles a LEFT JOIN sources s ON s.id = a.source_id LEFT JOIN event_members m ON m.article_id = a.id LEFT JOIN events e ON e.event_id = m.event_id
     WHERE ${where.join(" AND ")} AND a.title IS NOT NULL AND a.title != '' AND COALESCE(a.kind, 'news') NOT IN ('promo', 'digest', 'ticker')
     ORDER BY COALESCE(e.importance, 0) + ${boost} * focus DESC, m.event_id, a.first_seen_at DESC LIMIT ?`).all(...focusArgs, ...args, o.limit || 150);
@@ -237,12 +268,26 @@ export function pickMaterials(items, max) {
   for (const it of sorted) { (seen.has(it.grp) ? rest : first).push(it); seen.add(it.grp); }
   return first.concat(rest).slice(0, max || 6);
 }
-/** 材料文本：与写稿时给模型看的一致（核对只认模型看到过的内容）。 */
-export const materialText = (it, bodies) => {
+/**
+ * 材料文本：与写稿时给模型看的一致（核对只认模型看到过的内容）。
+ * content 是读法的材料设置：正文截多少字、摘要截多少字、截取方式（prefix 取开头；head-middle-tail 取开头、中段、结尾，长文的结论不会被截掉）。
+ */
+export const materialText = (it, bodies, content) => {
+  const c = content || {};
   const body = bodies && bodies.get(it.id);
   // 有正文时给正文（摘要多半是正文开头，不重复给）；没有就给摘要
-  return [it.title, body ? clip(body, 900) : it.summary ? clip(it.summary, 240) : ""].filter(Boolean).join("｜");
+  return [it.title, body ? sample(body, c.body_chars || 900, c.sampling) : it.summary ? clip(it.summary, c.summary_chars || 240) : ""].filter(Boolean).join("｜");
 };
+
+/** 长文按读法截取：prefix 取开头；head-middle-tail 按 4:3:3 取开头、中段、结尾，用「……」隔开。 */
+export function sample(text, n, mode) {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  if (mode !== "head-middle-tail" || t.length <= n) return clip(t, n);
+  const avail = n - 4;
+  const a = Math.floor(avail * 0.4), b = Math.floor(avail * 0.3), c = avail - a - b;
+  const mid = Math.max(a, Math.floor(t.length / 2 - b / 2));
+  return t.slice(0, a).trim() + "……" + t.slice(mid, mid + b).trim() + "……" + t.slice(t.length - c).trim();
+}
 const matView = (it) => ({ id: it.id, name: it.source_name || it.source_id, url: it.url, t: it.published_at || it.first_seen_at });
 
 function loadArticles(db, ids) {
@@ -255,16 +300,16 @@ function loadArticles(db, ids) {
  * 核对一篇模型稿并整理出处（出处存文章 id）。程序稿不核对（取自原文）。
  * 结果写回 story：lead / lead_refs / lead_missing / points / views / impact / materials / check / push_lead。
  */
-export function verifyStory(db, story, items, bodies) {
+export function verifyStory(db, story, items, bodies, content) {
   const cited = [...new Set([].concat(story.lead_refs || [], ...(story.points || []).map((p) => (p && p.refs) || []), ...(story.views || []).map((v) => v.refs || [])).filter((x) => typeof x === "string"))];
-  let mats = pickMaterials(items);
+  let mats = pickMaterials(items, content && content.materials);
   const missingIds = cited.filter((id) => !mats.some((m) => m.id === id));
   if (missingIds.length) mats = mats.concat(loadArticles(db, missingIds));
   const toIdx = (refs) => (refs || []).map((id) => mats.findIndex((m) => m.id === id)).filter((i) => i >= 0);
   const toIds = (idx) => (idx || []).map((i) => mats[i] && mats[i].id).filter(Boolean);
   story.materials = mats.map(matView);
   if (story.by !== "llm") { story.check = null; return story; }
-  const v = verifyCopy({ lead: story.lead, lead_refs: toIdx(story.lead_refs), points: (story.points || []).map((p) => (typeof p === "string" ? p : { text: p.text, refs: toIdx(p.refs) })), views: (story.views || []).map((x) => ({ who: x.who, says: x.says, refs: toIdx(x.refs) })), impact: story.impact }, mats.map((m) => materialText(m, bodies)));
+  const v = verifyCopy({ lead: story.lead, lead_refs: toIdx(story.lead_refs), points: (story.points || []).map((p) => (typeof p === "string" ? p : { text: p.text, refs: toIdx(p.refs) })), views: (story.views || []).map((x) => ({ who: x.who, says: x.says, refs: toIdx(x.refs) })), impact: story.impact }, mats.map((m) => materialText(m, bodies, content)));
   Object.assign(story, {
     lead: v.copy.lead, lead_refs: toIds(v.copy.lead_refs), points: v.copy.points.map((p) => ({ text: p.text, refs: toIds(p.refs) })),
     views: v.copy.views.map((x) => ({ who: x.who, says: x.says, refs: toIds(x.refs) })), impact: v.copy.impact, check: v.check,
@@ -366,7 +411,7 @@ export function ruleEdition(db, o) {
   const args = [o.since, Math.min(layout.min_importance, layout.verify.min_importance), staleBefore(o.since)];
   if (o.pack && o.pack !== "all") { where.push("e.pack = ?"); args.push(o.pack); }
   const events = db.prepare("SELECT e.* FROM events e WHERE " + where.join(" AND ") + " ORDER BY e.importance DESC LIMIT 80").all(...args);
-  const memQ = db.prepare(`SELECT a.id, a.title, a.summary, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.completeness, COALESCE(s.trial, 0) AS trial, s.name AS source_name, COALESCE(m.grp, a.source_id) AS grp, m.event_id
+  const memQ = db.prepare(`SELECT a.id, a.title, a.summary, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.completeness, COALESCE(s.trial, 0) AS trial, s.name AS source_name, s.profile AS src_profile, COALESCE(m.grp, a.source_id) AS grp, m.event_id
     FROM event_members m JOIN articles a ON a.id = m.article_id LEFT JOIN sources s ON s.id = a.source_id WHERE m.event_id = ? ORDER BY COALESCE(a.published_at, a.first_seen_at) LIMIT 10`);
   // 每个规则事件对应一条故事线：成员已归入的沿用那条（模型模式下起的标题、写的稿都能接着用），否则新起
   const byId = new Map();
@@ -400,19 +445,21 @@ export function ruleEdition(db, o) {
     let copy;
     if (copyFresh(row, total)) { copy = Object.assign(copyOf(row.copy), { by: "llm", reused: true }); reused++; }
     else copy = ruleCopy(g.items, facts, layout, parseJ(e.factors, {}), gb);
-    return Object.assign({ id: g.id, title: row ? row.title : e.title, section: row ? row.section : topOf(labels[0]) || "other", labels: row ? row.labels : labels, importance: Math.round(e.importance || 0), is_new: !row, updated: Boolean(row) && g.fresh.length > 0 }, facts, copy, { _g: g, _total: total });
+    const section = row ? row.section : topOf(labels[0]) || "other";
+    const profile = storyProfile(layout, { section, labels: row ? row.labels : labels }, g.items).id;
+    return Object.assign({ id: g.id, title: row ? row.title : e.title, section, labels: row ? row.labels : labels, importance: Math.round(e.importance || 0), profile, is_new: !row, updated: Boolean(row) && g.fresh.length > 0 }, facts, copy, { _g: g, _total: total });
   });
   for (const s of allStories) if (s.updated) Object.assign(s, programUpdate(s._g.fresh));
   // 关注与屏蔽：屏蔽的不上版（但照样登记故事线，免得下次再处理）
   const stories = applyFollows(allStories.slice(), o.follows).filter(notTrialOnly);
   const rb = bodiesFor(db, stories.filter((s) => s.by === "llm").flatMap((s) => s._g.items.map((it) => it.id)));
-  for (const s of stories) { verifyStory(db, s, s._g.items, rb); scrubStory(s, fb.errors.get(s.id)); }
+  for (const s of stories) { verifyStory(db, s, s._g.items, rb, profilesOf(layout).get(s.profile).content); scrubStory(s, fb.errors.get(s.id)); }
   const watch = events.filter((e) => { const f = parseJ(e.factors, {}); return (f.persistence > 0 || f.speed > 0) && e.importance >= 40; })
     .slice(0, layout.watch.count).map((e) => { const s = stories.find((x) => x.event_ids.includes(e.event_id)); return s ? { text: s.title + "：" + s.source_count + " 家跟进，仍在发展", stories: [s.id] } : null; }).filter(Boolean);
   const parts = assemble(stories, layout, o.names || {}, { watch });
   const out = finish(o, stories.map(strip), parts, { mode: "rules", items_read: stories.reduce((n, s) => n + s.article_ids.length, 0), stats: { reused, fresh_items: groups.reduce((n, g) => n + g.fresh.length, 0), check: sumChecks(stories) } });
   // 规则模式只登记新故事线与新归入的新闻，不改已有故事线的标题、版块和模型写的稿
-  out._persist = allStories.map((s) => ({ id: s.id, isNew: s.is_new, title: s.title, section: s.section, labels: s.labels, importance: s.importance, keepMeta: !s.is_new, copy: null, update: s.updated && s.update_text ? { text: s.update_text, by: s.update_by, items: s._g.fresh.length } : null, items: s._g.fresh.map((it) => ({ article_id: it.id, event_id: it.event_id || null })) }));
+  out._persist = allStories.map((s) => ({ id: s.id, isNew: s.is_new, title: s.title, section: s.section, labels: s.labels, importance: s.importance, profile: s.profile, keepMeta: !s.is_new, copy: null, update: s.updated && s.update_text ? { text: s.update_text, by: s.update_by, items: s._g.fresh.length } : null, items: s._g.fresh.map((it) => ({ article_id: it.id, event_id: it.event_id || null })) }));
   return out;
 }
 
@@ -483,15 +530,21 @@ export function pickCandidates(groups, batch, n) {
 
 /** 提示词的固定部分放前面、材料放后面：生产环境的大模型对相同前缀有缓存，固定部分命中就省 token。 */
 /** 重点领域的评分要求（归并时给模型）。 */
-export function focusRubric(focus) {
+/** 文字取自重点领域读法的 rubric.md；reg 是读法表（不给用内置读法）。 */
+export function focusRubric(focus, reg) {
   if (!focus || !(focus.labels || []).length) return "";
-  return "读者最关注「" + focus.name + "」（AI 模型与应用、芯片与算力、前沿技术、科技公司发布的新产品新技术与技术路线、重要开源与研究突破），这类新闻一条都不要漏收，也不要放进 noise。" +
-    "它们的重要度按技术影响力评，不按报道家数：看技术本身有多新（首次、突破、刷新纪录）、发布方分量（头部科技公司、顶尖实验室、主要芯片厂）、会改变什么（行业竞争格局、开发者和用户、成本与算力供需、相关公司），" +
-    "头部公司发布的新模型、新芯片或关键技术 50–70，可能改变行业格局的突破 70 以上，一般产品更新、融资、人事 30–45；只有一家报道不压分。";
+  const r = withFocus(reg || builtinProfiles(), focus);
+  return promptOf(r.list.find((p) => p.focus), "rubric");
 }
 
-export function groupPrompt(items, tax, cands, adExamples, focus) {
-  const fr = focusRubric(focus);
+/** 有评分要求（rubric.md）的其他读法：归并时一并告诉模型（重点领域读法已由 focusRubric 给出）。 */
+function otherRubrics(reg) {
+  return (reg ? reg.list : []).filter((p) => !p.focus && p.id !== DEFAULT_PROFILE && promptOf(p, "rubric")).map((p) => promptOf(p, "rubric"));
+}
+
+export function groupPrompt(items, tax, cands, adExamples, focus, reg) {
+  const fr = focusRubric(focus, reg);
+  const more = otherRubrics(reg);
   const lines = items.map((it) => "[" + it.n + "] " + (fr && it.focus ? "★" : "") + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + clip(it.title, 100) + (it.summary ? "｜" + clip(it.summary, 90) : "") +
     (it._peers && it._peers.length ? "（同一事件另有 " + it._peers.length + " 篇：" + [...new Set(it._peers.map((x) => x.source_name || x.source_id))].slice(0, 4).join("、") + "）" : ""));
   const known = (cands || []).map((g, i) => "[S" + (i + 1) + "] " + g.section + "｜" + clip(g.title, 50));
@@ -500,6 +553,7 @@ export function groupPrompt(items, tax, cands, adExamples, focus) {
     "每篇新报道给出：\n- title：中文标题，概括这件事（不超过30字）\n- section：一级分类 id；labels：最贴切的 1–2 个二级分类 id" +
     "\n- importance：0–100 的重要度，看影响面、权威性、报道家数与时效（常规公告、个股小事 20–40；全国性政策、重大市场波动 50–70；重大国际事件、突发灾难 70 以上）" +
     (fr ? "\n" + fr + "标 ★ 的是程序按分类认出的这类新闻，没标的也可能是。" : "") +
+    more.map((t) => "\n" + t).join("") +
     "\n- entities：这件事的关键主体（公司、机构、人物、产品或技术名，最多 4 个，用最常见的中文名）" +
     '\n只输出一个 JSON 对象：{"stories":[{"items":[编号],"story":"","title":"","section":"","labels":[""],"importance":0,"entities":[""]}],"noise":[编号]}' +
     "\n\n分类表（一级 id 名称：二级 id 名称……）：\n" + tax.text +
@@ -510,9 +564,10 @@ export function groupPrompt(items, tax, cands, adExamples, focus) {
 
 export function planPrompt(stories, layout) {
   const fr = layout.focus && (layout.focus.labels || []).length ? layout.focus : null;
+  const focal = fr ? profilesOf(layout).list.find((p) => p.focus) : null;
   const lines = stories.map((s, i) => "[" + (i + 1) + "] " + (fr && inFocus(fr, [s.section].concat(s.labels || [])) ? "★" : "") + s.section + "｜" + s.importance + "｜" + s.source_count + "家｜" + clip(s.title, 60));
   return "任务：给一份新闻版面做统筹。\n1. merge：讲同一件事、应当合并的报道编号组（没有就给空数组）\n2. headline：一句话总括这段时间最重要的事（不超过40字）\n3. front：头版放的 " + layout.front.count + " 篇报道编号，按重要性排序\n4. watch：值得继续关注的 " + Math.max(1, layout.watch.count) + " 件事以内，每件说明原因（不超过50字），附报道编号" +
-    (fr ? "\n读者最关注「" + fr.name + "」（标 ★ 的报道）：头版至少放 1 篇影响最大的 ★ 报道（有的话），值得关注里优先写新技术接下来的进展；评估时看技术的影响力，不只看报道家数。" : "") +
+    (focal && promptOf(focal, "plan") ? "\n" + promptOf(focal, "plan") : "") +
     "\n5. themes：把属于同一条更大的主线、但不是同一件事的报道串起来（如同一场冲突的不同事件、同一家公司接连的动作、同一项技术的多方进展），每条主线给 name（不超过12字）、kind（conflict/company/technology/policy/market/other）和报道编号；没有就给空数组" +
     '\n只输出一个 JSON 对象：{"merge":[[编号]],"headline":"","front":[编号],"watch":[{"text":"","refs":[编号]}],"themes":[{"name":"","kind":"","refs":[编号]}]}' +
     "\n\n这段时间按重要度排列的报道（编号｜版块｜重要度｜报道家数｜标题）：\n" + lines.join("\n");
@@ -520,6 +575,9 @@ export function planPrompt(stories, layout) {
 
 export function writePrompt(batch, layout) {
   const S = layout.story;
+  const reg = profilesOf(layout);
+  // 每篇的读法：调用方给了就用（entryOf），否则按版块与分类认
+  const profs = batch.map((b) => b.profile || profileFor(reg, { section: b.story.section, labels: b.story.labels || [] }));
   // 材料编号 M1…：每句话都要标出依据哪几条材料，程序据此核对
   const blocks = batch.map((b, i) => {
     // 已有故事线有新报道：给出上次的导语，并标出哪些是新材料，让模型写「相比上次的新进展」
@@ -527,12 +585,15 @@ export function writePrompt(batch, layout) {
     const fresh = b.mats.map((it, k) => (freshIds.has(it.id) ? "M" + (k + 1) : null)).filter(Boolean);
     const prev = b.prevLead ? "\n上次导语：" + clip(b.prevLead, 160) + (fresh.length ? "\n本次新增材料：" + fresh.join("、") : "") : "";
     const fbk = (b.errors || []).length ? "\n读者指出这些说法有误，不要再写：" + b.errors.map((e) => "『" + clip(e.text, 60) + "』" + (e.note ? "（" + clip(e.note, 40) + "）" : "")).join("；") : "";
-    const star = layout.focus && inFocus(layout.focus, [b.story.section].concat(b.story.labels || [])) ? "（" + layout.focus.name + "）" : "";
-    return "【报道" + (i + 1) + "】" + star + b.story.title + prev + fbk + "\n材料：\n" + b.mats.map((it, k) => "[M" + (k + 1) + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + materialText(it, b.bodies)).join("\n");
+    const p = profs[i];
+    const star = p.id !== DEFAULT_PROFILE && promptOf(p, "write") ? "（" + p.name + "）" : "";
+    return "【报道" + (i + 1) + "】" + star + b.story.title + prev + fbk + "\n材料：\n" + b.mats.map((it, k) => "[M" + (k + 1) + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + materialText(it, b.bodies, p.content)).join("\n");
   });
+  // 这一批里用到的其他读法的写稿要求
+  const asks = [...new Set(profs.filter((p) => p.id !== DEFAULT_PROFILE && promptOf(p, "write")))].map((p) => "标了（" + p.name + "）的报道，" + promptOf(p, "write"));
   return "请按版式为以下每篇报道写稿。写作要求：" + layout.style + "每句话只能依据该报道的材料，并在 refs 里标出依据的材料编号；材料里没有的数字、人名、机构名一律不写。" +
     "\n版式：lead 导语（不超过" + S.lead_chars + "字，说清谁、何时、何事）；points 要点（最多" + S.points + "条，每条不超过" + S.point_chars + "字，写导语之外的关键事实或数字）；views 各方说法（最多" + S.views + "条，{who: 媒体或当事方, says: 说法}，只在各家说法不同或有当事方表态时写，否则给空数组）；impact 影响（不超过" + S.impact_chars + "字，对市场、政策或相关人群的影响，材料不足就给空字符串）。" +
-    (layout.focus && (layout.focus.labels || []).length ? "标了（" + layout.focus.name + "）的报道，impact 写这项技术或产品带来的变化：对行业竞争格局、开发者与用户、成本与算力供需或相关公司的影响；points 优先写技术要点（性能、参数、价格、开放方式、上线时间）。" : "") + "\n\n" +
+    asks.join("") + "\n\n" +
     "update：只对给了「上次导语」的报道写，说清相比上次有什么新进展（不超过40字，依据新增材料；没有实质进展给空字符串）。" +
     '\n只输出一个 JSON 对象：{"stories":[{"ref":1,"lead":"","lead_refs":["M1"],"points":[{"text":"","refs":["M2"]}],"views":[{"who":"","says":"","refs":["M1"]}],"impact":"","update":""}]}' +
     "\n\n" + blocks.join("\n\n");
@@ -545,14 +606,29 @@ export function writePrompt(batch, layout) {
  * @param o { pack, since, hours, layout, names, taxonomy, maxItems, maxStories, batchSize, budgetMs, callTimeoutMs, prev（上一份版面内容）}
  * @returns 版面；材料太少时 { fallback: "too_few_items" }
  */
+/** 按顺序分批，每批 n 篇、同一个读法：取下一篇，再从后面按顺序找同读法的凑满。 */
+export function batchByProfile(list, n) {
+  const rest = list.slice();
+  const out = [];
+  while (rest.length) {
+    const head = rest.shift();
+    const b = [head];
+    for (let i = 0; i < rest.length && b.length < n; ) { if ((rest[i].profile || DEFAULT_PROFILE) === (head.profile || DEFAULT_PROFILE)) b.push(rest.splice(i, 1)[0]); else i++; }
+    out.push(b);
+  }
+  return out;
+}
+
 /** 模型服务断连一类的错误：值得等一会儿重试。 */
 const CONN_ERR = /connection error|econnreset|econnrefused|fetch failed|socket hang up|network|terminated/i;
 /** 写稿缓存的版本：写稿提示词或写法改了就加一，旧缓存自然失效。 */
 const WRITE_V = 1;
 /** 一篇稿的材料指纹：材料、上次导语、读者报错、写法、重点领域标记与提示词版本都一样，才算同一份稿。 */
 export function writeFingerprint(entry, layout) {
-  const star = layout.focus && inFocus(layout.focus, [entry.story.section].concat(entry.story.labels || [])) ? layout.focus.name : "";
-  return createHash("sha1").update(JSON.stringify({ v: WRITE_V, t: entry.story.title, m: entry.mats.map((it) => it.id), p: entry.prevLead || "", e: (entry.errors || []).map((x) => x.text), s: layout.story, y: layout.style, f: star })).digest("hex");
+  const p = entry.profile || storyProfile(layout, entry.story, entry.items);
+  // 读法的写法（名称、版本、写稿要求、材料设置、输出块）改了，旧稿就不能沿用
+  const f = p.id === DEFAULT_PROFILE && !promptOf(p, "write") ? "" : [p.id, p.version, p.name, promptOf(p, "write"), JSON.stringify(p.content), JSON.stringify(p.blocks)].join("|");
+  return createHash("sha1").update(JSON.stringify({ v: WRITE_V, t: entry.story.title, m: entry.mats.map((it) => it.id), p: entry.prevLead || "", e: (entry.errors || []).map((x) => x.text), s: layout.story, y: layout.style, f })).digest("hex");
 }
 const COPY_KEYS = ["lead", "lead_refs", "points", "views", "impact", "update_text", "update_by"];
 function cacheGet(db, fp) {
@@ -567,6 +643,8 @@ function cachePut(db, fp, story) {
 
 export async function llmEdition(db, model, o) {
   const layout = o.layout;
+  const reg = profilesOf(layout);
+  const contentOf = (s) => reg.get(s.profile).content;
   const t0 = Date.now();
   const deadline = t0 + (o.budgetMs || 600000);
   const left = () => deadline - Date.now();
@@ -702,7 +780,7 @@ export async function llmEdition(db, model, o) {
     let got = null;
     try {
       if (Date.now() > groupDeadline) throw new Error("group_budget");
-      const j = await call("group", groupPrompt(batch, tax, cands, adExamples, layout.focus), 2000 + 500 * batch.length, 300000);
+      const j = await call("group", groupPrompt(batch, tax, cands, adExamples, layout.focus, profilesOf(layout)), 2000 + 500 * batch.length, 300000);
       if (Array.isArray(j.stories)) got = j.stories;
       // 模型判为非新闻的：标成 promo（读者判过的不动），之后不再进版面
       const nz = (Array.isArray(j.noise) ? j.noise : []).map(Number).filter((n) => inBatch.has(n) && !["corroborated", "confirmed", "disputed"].includes(byN.get(n).ev_cred) && !isDigestTitle(byN.get(n).title) && byN.get(n).kind !== "digest_item" && !(got || []).some((g) => (g.items || []).map(Number).includes(n)));
@@ -794,7 +872,8 @@ export async function llmEdition(db, model, o) {
   const allStories = finalGroups.map((g) => {
     const facts = storyFacts(g.items);
     const total = (g.row ? g.row.total : 0) + g.fresh.length;
-    return Object.assign({ id: g.id, title: g.title, section: g.section, labels: g.labels, importance: g.importance, by: g.by, is_new: Boolean(g.isNew), updated: !g.isNew && g.fresh.length > 0, _g: g, _total: total, _k: top.indexOf(g) + 1 }, facts);
+    const profile = storyProfile(layout, g, g.items).id;
+    return Object.assign({ id: g.id, title: g.title, section: g.section, labels: g.labels, importance: g.importance, profile, by: g.by, is_new: Boolean(g.isNew), updated: !g.isNew && g.fresh.length > 0, _g: g, _total: total, _k: top.indexOf(g) + 1 }, facts);
   });
   // 关注与屏蔽：屏蔽的不上版、不写稿（但照样登记故事线，免得每轮再交给模型）
   const stories = applyFollows(allStories.slice(), o.follows).filter(notTrialOnly);
@@ -831,7 +910,7 @@ export async function llmEdition(db, model, o) {
           const rc = ruleCopy(s._g.items, s, layout, {}, pb);
           Object.assign(c, { lead: rc.lead, lead_refs: rc.lead_refs, points: rc.points, views: rc.views, impact: rc.impact, by: s.by === "llm" ? "llm-group" : "rules" });
         }
-        verifyStory(db, c, s._g.items, bodiesNow || pb);
+        verifyStory(db, c, s._g.items, bodiesNow || pb, contentOf(s));
         return strip(c);
       });
       o.onProgress(finish(o, snap, parts, { mode: "llm", model: model.label(), items_read: items.length, stats: Object.assign({}, stats, { partial: true, written: written.size, to_write: toWrite.length }) }));
@@ -852,11 +931,13 @@ export async function llmEdition(db, model, o) {
   // 接近 2 说明服务端真在并行（之后用 3），接近 1 说明在排队（之后用 1），结果交给 o.onProbe 记住
   const entryOf = (story) => {
     const g = story._g;
+    const profile = reg.get(story.profile);
+    const M = profile.content.materials;
     const prevLead = !g.isNew && g.row && g.row.copy && g.row.copy.lead && g.fresh.length ? g.row.copy.lead : "";
     // 有进展的故事线：新材料优先放进去，模型才看得到新进展
-    let mats = pickMaterials(g.items);
-    if (prevLead) { const nf = pickMaterials(g.fresh, 3); mats = nf.concat(pickMaterials(g.items.filter((it) => !nf.includes(it)), 6 - nf.length)); }
-    return { story, items: g.items, bodies, mats, fresh: g.fresh, prevLead, errors: fb.errors.get(story.id) || [] };
+    let mats = pickMaterials(g.items, M);
+    if (prevLead) { const nf = pickMaterials(g.fresh, Math.min(3, M)); mats = nf.concat(pickMaterials(g.items.filter((it) => !nf.includes(it)), M - nf.length)); }
+    return { story, items: g.items, bodies, mats, fresh: g.fresh, prevLead, profile, errors: fb.errors.get(story.id) || [] };
   };
   // 断点续写：上一次（中断、重启或超时前）已经写好的同一份材料，直接用写好的稿
   try { db.prepare("DELETE FROM write_cache WHERE created_at < datetime('now', '-3 days')").run(); } catch { /* 旧库没有这张表 */ }
@@ -890,14 +971,15 @@ export async function llmEdition(db, model, o) {
           });
           // 新进展同样要经得起核对（只认给模型看的材料）
           const up = b.prevLead ? str(w.update, 60) : "";
-          if (up && checkText(up, b.mats.map((m) => materialText(m, b.bodies))).ok) Object.assign(b.story, { update_text: up, update_by: "llm" });
+          if (up && checkText(up, b.mats.map((m) => materialText(m, b.bodies, b.profile.content))).ok) Object.assign(b.story, { update_text: up, update_by: "llm" });
           written.add(b.story.id);
           cachePut(db, writeFingerprint(b, layout), b.story);
         }
       } catch { stats.fallbacks.push("write:" + batch.length); /* 这一批用程序拼的稿 */ }
   };
   const groupsOf3 = [];
-  for (let i = 0; i < toWrite.length; i += 3) groupsOf3.push(toWrite.slice(i, i + 3));
+  // 一批里的报道用同一个读法（提示词的固定部分相同，生产环境的前缀缓存才命中）；按写稿顺序取，同读法的往前凑
+  for (const b of batchByProfile(toWrite, 3)) groupsOf3.push(b);
   let conc = Math.max(1, o.concurrency || 1);
   let next = 0;
   if (o.probe && groupsOf3.length >= 2) {
@@ -930,7 +1012,7 @@ export async function llmEdition(db, model, o) {
   // 4. 核对：模型稿（新写的与沿用的）逐句核对，整理出处
   const allBodies = bodiesFor(db, stories.filter((s) => s.by === "llm" && !written.has(s.id)).flatMap((s) => s._g.items.map((it) => it.id)));
   for (const [k, v] of bodies) allBodies.set(k, v);
-  for (const s of stories) { verifyStory(db, s, s._g.items, allBodies); if (!written.has(s.id)) scrubStory(s, fb.errors.get(s.id)); }
+  for (const s of stories) { verifyStory(db, s, s._g.items, allBodies, contentOf(s)); if (!written.has(s.id)) scrubStory(s, fb.errors.get(s.id)); }
   stats.check = sumChecks(stories);
   Object.assign(stats, { written: written.size, reused, groups: groups.length, ms: Date.now() - t0 });
   const out = finish(o, stories.map(strip), parts, { mode: "llm", model: model.label(), items_read: items.length, stats });
@@ -939,7 +1021,7 @@ export async function llmEdition(db, model, o) {
   const at = new Date().toISOString();
   // 模型失败时按规则临时归并出的新故事线不登记：下一轮这些新闻再交给模型
   out._persist = allStories.filter((s) => !(s._g.isNew && s._g.by === "rules")).map((s) => ({
-    id: s.id, isNew: s.is_new, title: s.title, section: s.section, labels: s.labels, importance: s.importance, absorbed: s._g.absorbed || [], entities: s._g.entities || [],
+    id: s.id, isNew: s.is_new, title: s.title, section: s.section, labels: s.labels, importance: s.importance, profile: s.profile, absorbed: s._g.absorbed || [], entities: s._g.entities || [],
     copy: written.has(s.id) ? { lead: s.lead, lead_refs: s.lead_refs, points: s.points, views: s.views, impact: s.impact, by: "llm", model: model.label(), at, items: s._total } : null,
     update: s.updated && s.update_text ? { text: s.update_text, by: s.update_by, items: s._g.fresh.length } : null,
     resolve: written.has(s.id) && fb.errors.has(s.id),
@@ -953,7 +1035,8 @@ export async function llmEdition(db, model, o) {
 export function persistStories(db, list, editionId, pack) {
   if (!list || !list.length) return;
   const now = nowSql();
-  const ins = db.prepare("INSERT INTO stories (story_id, pack, title, section, labels, importance, status, copy, created_at, updated_at, created_edition, updated_edition) VALUES (?,?,?,?,?,?,'active',?,?,?,?,?) ON CONFLICT(story_id) DO NOTHING");
+  const ins = db.prepare("INSERT INTO stories (story_id, pack, title, section, labels, importance, status, copy, created_at, updated_at, created_edition, updated_edition, profile) VALUES (?,?,?,?,?,?,'active',?,?,?,?,?,?) ON CONFLICT(story_id) DO NOTHING");
+  const upProfile = db.prepare("UPDATE stories SET profile = ? WHERE story_id = ?");
   const upMeta = db.prepare("UPDATE stories SET title = ?, section = ?, labels = ?, importance = ?, status = 'active', merged_into = NULL, updated_at = ?, updated_edition = ? WHERE story_id = ?");
   const touch = db.prepare("UPDATE stories SET updated_at = ?, updated_edition = ? WHERE story_id = ?");
   const upCopy = db.prepare("UPDATE stories SET copy = ? WHERE story_id = ?");
@@ -966,7 +1049,8 @@ export function persistStories(db, list, editionId, pack) {
   db.exec("BEGIN");
   try {
     for (const s of list) {
-      ins.run(s.id, pack || "all", s.title, s.section, JSON.stringify(s.labels || []), s.importance, s.copy ? JSON.stringify(s.copy) : null, now, now, editionId, editionId);
+      ins.run(s.id, pack || "all", s.title, s.section, JSON.stringify(s.labels || []), s.importance, s.copy ? JSON.stringify(s.copy) : null, now, now, editionId, editionId, s.profile || null);
+      if (s.profile && !s.isNew) upProfile.run(s.profile, s.id);
       if (s.isNew) { /* 刚插入 */ } else if (s.keepMeta) { if (s.items.length) touch.run(now, editionId, s.id); } else upMeta.run(s.title, s.section, JSON.stringify(s.labels || []), s.importance, now, editionId, s.id);
       if (s.copy && !s.isNew) upCopy.run(JSON.stringify(s.copy), s.id);
       for (const src of s.absorbed || []) { move.run(s.id, src); retire.run(s.id, now, src); }

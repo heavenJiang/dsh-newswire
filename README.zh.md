@@ -275,6 +275,7 @@ browseBin: ''                   # 留空自动探测；agentReachBin、mcporterB
 | `sources.json` | 数据源，以及 `push.<主题包>` 推送门槛：多源事件 50、单源 36、每轮最多 8 条 |
 | `taxonomy.json` | 7 个一级、29 个二级分类，13 个地区，跨语言实体别名，噪声规则 |
 | `layout.json` | 版式：版块顺序、每版篇数、写法与字数 |
+| `profiles/<id>/` | 读法（可选）：某类报道怎么评分、怎么写、影响分析看什么。内置「新闻」和「AI 与新技术」两种；放一个同名目录就覆盖内置的，也可以新增。格式见 [engine/README.zh.md](engine/README.zh.md#读法profile) |
 
 插件升级时，新的源、分类和规则会合并进来，你改过的内容会保留，旧文件留作 `.bak` 备份。
 

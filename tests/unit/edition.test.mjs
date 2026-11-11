@@ -118,7 +118,9 @@ test("模型编排：归并跨语言报道、版块与标签校验、统筹头�
   assert.ok(!Object.values(ed.stories).some((s) => s.article_ids.includes("a5")), "噪声条目不收");
   assert.deepEqual(ed.watch, [{ text: "沙特官方后续通报", stories: [s1.id] }]);
   assert.equal(calls.length, 3, "归并 1 次、统筹 1 次、写稿 1 次");
+  assert.equal(s1.profile, "wire", "每篇报道记下用的读法");
   const saved = saveEdition(db, ed, { runId: "r1" });
+  assert.equal(db.prepare("SELECT profile FROM stories WHERE story_id = ?").get(s1.id).profile, "wire", "故事线记下读法");
   assert.equal(db.prepare("SELECT COUNT(*) n FROM edition_items WHERE edition_id = ?").get(saved.id).n, 4);
   assert.equal(latestEdition(db, "all").content.headline, "沙特遇袭牵动地区局势");
   assert.equal(notesFromEdition(db, ed), 2);
@@ -287,5 +289,17 @@ test("模型服务断连：等一会儿重试一次，不直接退回程序稿",
   assert.deepEqual(ed.stats.fallbacks, []);
   assert.ok(ed.stats.errors.some((e) => /Connection error.*重试/.test(e)));
   assert.match(ed.stories[ed.front[0]].lead, /^模型导语/);
+  db.close();
+});
+
+test("读法：源声明的读法传到报道（程序编排与模型编排都认）", async () => {
+  const db = tmpDb();
+  db.prepare("UPDATE sources SET profile = 'tech-frontier' WHERE id = 'moe'").run();
+  const ed = ruleEdition(db, base());
+  assert.equal(Object.values(ed.stories).find((s) => s.lead_event_id === "e2").profile, "tech-frontier", "这篇只有教育部一家，用它声明的读法");
+  assert.equal(Object.values(ed.stories).find((s) => s.lead_event_id === "e1").profile, "wire");
+  const { m } = fakeModel({});
+  const ed2 = await llmEdition(db, m, base());
+  assert.equal(Object.values(ed2.stories).find((s) => s.title === "教育部发布留学安全预警").profile, "tech-frontier");
   db.close();
 });

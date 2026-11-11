@@ -93,13 +93,31 @@ engine/
 ## 主题包
 源带 `pack`；`sources.json` 里有 `packs.<包>`（名称、消息标题、默认定时）和 `push.<包>`（门槛、可选 `require_labels`）。`--packs <包>` 只跑一个包，本轮记为该包（`runs.pack`），隔夜判断和回看只看这个包的上一轮。隔夜 = 本地时间 10 点前，且距该包上一轮 ≥6 小时（或首轮）。`--lock-wait-ms` 让本轮等锁而不是放弃（插件最多等 15 分钟），两个包的定时轮次撞上时依次执行。
 
+## 读法（profile）
+不同类型的报道用不同的写法（参考 Horizon 的 profile，按故事线改写）。读法在**报道**层面决定，写稿、核对、影响分析都按它来；版块、篇数仍由 `layout.json` 管。
+
+目录：内置 `engine/config/profiles/<id>/`，数据目录 `profiles/<id>/` 覆盖同名的（整个目录替换），也可以新增；坏的目录跳过并退回内置。改完在面板点「重新编排」。
+
+`profile.json`：
+| 字段 | 含义 |
+|---|---|
+| `id` / `name` / `version` | 标识、名称（写稿时标在报道前）、版本（改了写法就加一，旧稿缓存失效） |
+| `priority` | 一篇报道命中多个读法时取高的 |
+| `match.labels` / `match.sources` | 分类 id（一级含其下二级）、源 id |
+| `focus` | 重点领域（只认第一个）：`boost` 挑材料加权；头版留一篇、版块多留 3 个位置、不做规则分诊。`layout.json` 的 `focus` 覆盖它的名称、分类和加权 |
+| `content` | 材料：`materials` 条数（2–10）、`body_chars` 正文截多少字、`summary_chars` 摘要截多少字、`sampling`（`prefix` 取开头；`head-middle-tail` 按 4:3:3 取开头、中段、结尾） |
+| `blocks` | 写哪几块（不写就是导语、要点、各方说法、影响四块） |
+| `prompts` | `rubric`（归并时的评分要求）、`plan`（统筹）、`write`（写稿）、`analysis`（影响分析的侧重），各是一个 Markdown 文件；`{name}` 换成读法名称 |
+
+一篇报道用哪个读法：报道里每条新闻的源都在 `sources.json` 里声明了 `profile` → 用声明的（多数的那个）；否则按分类与源命中的、优先级最高的；都不命中用默认读法 `wire`。故事线记下读法（`stories.profile`），影响分析按它的侧重。写稿时一批里的报道用同一个读法，提示词的固定部分相同，生产环境的前缀缓存才命中。
+
 ## 从链接推断时间
 源头没给时间时看链接：完整时间戳（`/2026101415255489242/`）记为 `page_text`；只有日期（`t20261107_`、`/20261029/`、`/2026/11-08/`）记为 `url_date`（北京时间零点），用于显示和数据集，但断点衔接和聚类不把它当可信时间。合并时时间可信度只升不降：fetched < url_date < page_text < feed。主条目的时间（含链接日期）早于回看范围一天以上的事件不推送，新源首轮列表里的旧条目不会被当成新闻。
 
-## 数据模型（schema v21）
+## 数据模型（schema v24）
 | 表 | 内容 |
 |---|---|
-| `sources` | 源配置快照（含 weight / tier / grp / pack / adapter / removed_at） |
+| `sources` | 源配置快照（含 weight / tier / grp / pack / adapter / removed_at / profile） |
 | `runs` | 每轮：起止时间、模式、主题包、成败源数、新增 / 重复 |
 | `articles` | 去重后的文章。去重键 `id = sha1(canonical_url + 归一化标题)`；`time_confidence` = feed（源头给的时间）/ page_text（页面文字或链接里的时间戳推断）/ url_date（只有日期，来自链接）/ fetched（以抓取时间近似，`published_at` 为 NULL）；`parser_version`；`pack` |
 | `observations` | **每轮每条**：`rank`、`section`、`views/comments/likes/shares/favorites`、`hot`（JSON 数组，源头原文）、`level`、`signals_raw`。同一条在多轮出现即形成热度时间序列 |
@@ -117,7 +135,7 @@ engine/
 | `briefings` | 模型简报（v8）：主题包、轮次、时间、模型、回看小时数、总括、内容（points / watch，各带 event_ids）、参与的事件、成败与错误、耗时。失败也记一行 |
 | `editions` | 版面（v9）：主题包、轮次、时间、模式（llm / rules）、模型、版式版本、时段、阅读条数、总括、整份内容（头版、版块、报道、值得关注、待核实）、错误、耗时、调用次数 |
 | `edition_items` | 每条新闻在版面里的归属：报道、规则事件、版块、标签、重要度（LLM 模式下是模型的判断） |
-| `stories` | 故事线（v10）：跨版面延续的报道——标题、版块、标签、重要度、状态（active / merged 及并入谁）、模型写的稿（含写稿时的新闻条数，用于判断能否沿用）、首末版面 |
+| `stories` | 故事线（v10）：跨版面延续的报道——标题、版块、标签、重要度、状态（active / merged 及并入谁）、模型写的稿（含写稿时的新闻条数，用于判断能否沿用）、首末版面、读法（v24） |
 | `story_items` | 每条新闻属于哪条故事线（一条新闻只属于一条）、对应规则事件、何时归入 |
 | `story_updates` | 故事线进展（v11）：哪份版面、何时、进展文字、新增几篇、模型还是程序写的 |
 | `kv` | 简单状态，如每个包的上次查看时间（`seen:<包>`） |

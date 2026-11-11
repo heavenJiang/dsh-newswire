@@ -93,13 +93,31 @@ Extraction: plain request → JSON-LD `articleBody` → the longest body field i
 ## Topic packs
 Sources carry `pack`; `sources.json` holds `packs.<pack>` (name, message title, default schedule) and `push.<pack>` (thresholds, optional `require_labels`). `--packs <pack>` runs one pack; the round is recorded with that pack (`runs.pack`), and the overnight check and look-back use only that pack's previous cycle. Overnight means before 10:00 local time and 6 hours or more since the pack's last cycle (or its first cycle). `--lock-wait-ms` makes a round wait for the lock instead of giving up (the plugin waits up to 15 minutes), so two packs' scheduled rounds that meet run one after the other.
 
+## Profiles
+Different kinds of stories are written differently (after Horizon's profiles, adapted to storylines). A profile is chosen per **story**; writing, checking and impact analysis follow it. Sections and counts are still set by `layout.json`.
+
+Location: built-in `engine/config/profiles/<id>/`; a `profiles/<id>/` directory in the data directory replaces the built-in profile with the same id (the whole directory), or adds a new one. A broken directory is skipped and the built-in one is used. Click Re-lay out in the panel after editing.
+
+`profile.json`:
+| Field | Meaning |
+|---|---|
+| `id` / `name` / `version` | Id, name (shown before the story in the writing prompt), version (bump it when the writing changes; cached copy is then rewritten) |
+| `priority` | When a story matches several profiles, the higher one wins |
+| `match.labels` / `match.sources` | Category ids (a top-level id covers its children), source ids |
+| `focus` | Focus area (only the first counts): `boost` raises its items when picking material; a front-page slot, 3 extra section slots, no rule triage. `focus` in `layout.json` overrides its name, categories and boost |
+| `content` | Material: `materials` count (2–10), `body_chars` body excerpt length, `summary_chars` summary length, `sampling` (`prefix` takes the start; `head-middle-tail` takes start, middle and end at 4:3:3) |
+| `blocks` | Which parts to write (default: lead, points, views, impact) |
+| `prompts` | `rubric` (scoring when grouping), `plan`, `write`, `analysis` (impact analysis focus), each a Markdown file; `{name}` becomes the profile name |
+
+Which profile a story uses: if every item's source declares a `profile` in `sources.json`, the declared one (the most common); otherwise the highest-priority profile whose categories or sources match; otherwise the default `wire`. The storyline records its profile (`stories.profile`) and impact analysis follows it. Each writing batch holds one profile, so the fixed part of the prompt is identical and hosted models' prefix cache hits.
+
 ## Times from links
 When a source gives no time, the link is checked: a full timestamp (`/2026101415255489242/`) counts as `page_text`; a date only (`t20261107_`, `/20261029/`, `/2026/11-08/`) is stored as `url_date` (Beijing midnight) for display and datasets, but continuity and clustering treat it as untrusted. Time confidence only rises on merge: fetched < url_date < page_text < feed. Push selection skips events whose lead article's time (including a link date) is more than a day before the look-back window, so a new source's old list items are not pushed.
 
-## Data model (schema v21)
+## Data model (schema v24)
 | Table | Contents |
 |---|---|
-| `sources` | Source config snapshot (with weight / tier / grp / pack / adapter / removed_at) |
+| `sources` | Source config snapshot (with weight / tier / grp / pack / adapter / removed_at / profile) |
 | `runs` | Each round: start and end, mode, pack, sources ok and failed, new and duplicate items |
 | `articles` | Deduplicated articles. Key `id = sha1(canonical_url + normalized title)`; `time_confidence` = feed (time from the source) / page_text (inferred from page text or a timestamp in the link) / url_date (date only, from the link) / fetched (approximated by fetch time; `published_at` is NULL); `parser_version`; `pack` |
 | `observations` | **Every item, every round**: `rank`, `section`, `views/comments/likes/shares/favorites`, `hot` (JSON array, as the source wrote it), `level`, `signals_raw`. An item seen in several rounds forms a heat series |
@@ -117,7 +135,7 @@ When a source gives no time, the link is checked: a full timestamp (`/2026101415
 | `briefings` | Model briefings (v8): pack, round, time, model, look-back hours, headline, content (points / watch, each with event_ids), events considered, success and error, duration. Failures get a row too |
 | `editions` | Editions (v9): pack, round, time, mode (llm / rules), model, layout version, period, items read, headline, full content (front page, sections, stories, worth watching, to verify), error, duration, calls |
 | `edition_items` | Where each item landed in an edition: story, rule event, section, topics, importance (the model's judgment in LLM mode) |
-| `stories` | Storylines (v10): stories that persist across editions — title, section, topics, importance, status (active / merged and into which), the model's copy (with the item count when written, to decide reuse), first and last edition |
+| `stories` | Storylines (v10): stories that persist across editions — title, section, topics, importance, status (active / merged and into which), the model's copy (with the item count when written, to decide reuse), first and last edition, profile (v24) |
 | `story_items` | Which storyline each item belongs to (one per item), its rule event, when it joined |
 | `story_updates` | Storyline developments (v11): edition, time, text, reports added, written by model or program |
 | `kv` | Simple state such as the last viewing time per pack (`seen:<pack>`) |

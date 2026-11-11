@@ -1,0 +1,11 @@
+{
+  "id": "tech-frontier",
+  "name": "AI 与新技术",
+  "version": 1,
+  "note": "重点领域：挑材料时优先、不做规则分诊，按技术影响力评重要度，头版至少留一篇，版块满了也多留位置，影响分析优先。layout.json 里的 focus（name / labels / boost）会覆盖这里的名称、匹配分类与加权，focus.labels 设为 [] 即关闭。",
+  "priority": 10,
+  "match": { "labels": ["tech", "industry.ai_semis"] },
+  "focus": { "boost": 20 },
+  "content": { "materials": 6, "body_chars": 900, "summary_chars": 240, "sampling": "prefix" },
+  "prompts": { "rubric": "rubric.md", "plan": "plan.md", "write": "write.md", "analysis": "analysis.md" }
+}
