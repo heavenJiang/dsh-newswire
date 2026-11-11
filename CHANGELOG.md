@@ -2,6 +2,11 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.26 (2026-11-11)
+
+- **Themes carry their own search keywords.** A theme tracker ("Nvidia turmoil", "AI and data centers") has no ready-made aliases the way a company does, and after the stricter linking rule in the last release it could only grow through a same-named edition theme, so it stalled easily. Keywords are now taken from the name (dropping tails such as 风波 or 进展), and new reports whose titles carry one are linked. A keyword must be specific: generic words (AI, market, tech…) are refused, and so is anything found in more than 6% of the last 7 days' storyline titles. This happens when a theme is created; existing themes without aliases get theirs when the next edition comes out. On a copy of real data, 5 of 6 themes got a keyword and linked 1 to 26 on-topic stories from the last two days.
+- Not adopted: having the model read a theme's existing headlines and propose keywords. It also returned words that merely co-occurred (Iran and UFC for a Trump theme, the foreign ministry and Congress for an Nvidia theme), which pulled in unrelated stories. You can still add aliases to a theme by hand.
+
 ## 1.1.25 (2026-11-11)
 
 Housekeeping, no behaviour change:

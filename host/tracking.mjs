@@ -85,6 +85,8 @@ export function addTracker(db, o) {
     ON CONFLICT(id) DO UPDATE SET status = 'active', kind = excluded.kind, ticker = COALESCE(excluded.ticker, trackers.ticker), aliases = excluded.aliases`)
     .run(id, name, kind, str(o.ticker, 12) || null, JSON.stringify(aliases), o.origin || "manual", nowSql());
   for (const sid of o.stories || []) db.prepare("INSERT OR IGNORE INTO tracker_stories (tracker_id, story_id, linked_at, how) VALUES (?,?,?,?)").run(id, sid, nowSql(), "theme");
+  // 主线没给别名的：先从名字里拆出检索关键词，回填时就用得上
+  if (kind === "theme") try { ensureThemeKeywords(db, id); } catch { /* 照旧按带进来的报道 */ }
   linkStories(db, id, { days: o.backfillDays ?? 90 });
   return id;
 }
@@ -148,6 +150,50 @@ export function linkStories(db, id, o) {
   return added;
 }
 
+// ------------------------------------------------------------------ 主线的检索关键词
+// 主线（「英伟达风波」「AI与数据中心」）不像公司有现成的别名：没有关键词就只能靠版面里同名的主线带新报道，很容易断档。
+// 关键词从名字里拆（「英伟达风波」→ 英伟达，「AI与数据中心」→ 数据中心），要够具体：近 7 天的故事线标题里出现它的不超过 6%。
+// 试过让模型读已有报道的标题来给关键词：它会把碰巧同现的词也给出来（给「特朗普」加「伊朗」、给「英伟达风波」加「外交部」），
+// 带进来一堆不相干的报道，所以不用。读者可以自己给主线加别名。
+const GENERIC = new Set(["ai", "人工智能", "科技", "技术", "市场", "股市", "公司", "企业", "行业", "产业", "经济", "政策", "新闻", "美国", "中国", "全球", "国际", "进展", "动态", "风波", "局势", "趋势", "影响"]);
+const NAME_TAIL = /(风波|进展|动态|扩张|波动|局势|趋势|博弈|之争|竞争|危机|事件|问题|热潮|浪潮|行情|走势|变局|升级|降温)$/;
+
+/** 名字里拆出的候选词：按「与、和、及、顿号、斜杠、空格」分开，去掉「风波」「进展」这类尾巴。 */
+export function nameKeywords(name) {
+  const out = [];
+  for (const part of String(name || "").split(/[与和及、/／·\s]+/)) {
+    const x = part.replace(NAME_TAIL, "").trim();
+    if (usable(x) && !out.includes(x)) out.push(x);
+  }
+  return out;
+}
+
+/** 这个词够不够具体：不是泛词，2–12 个字，近 7 天的故事线标题里出现它的不超过 6%（且总数够多时才按比例卡）。 */
+export function keywordOk(db, kw) {
+  const x = String(kw || "").trim();
+  if (!usable(x) || [...x].length > 12 || GENERIC.has(x.toLowerCase())) return false;
+  const since = daysAgo(7);
+  const total = db.prepare("SELECT COUNT(*) n FROM stories WHERE updated_at >= ?").get(since).n;
+  const hit = db.prepare("SELECT COUNT(*) n FROM stories WHERE updated_at >= ? AND title LIKE ?").get(since, "%" + x + "%").n;
+  return total < 50 || hit / total <= 0.06;
+}
+
+function addAliases(db, t, words) {
+  const cur = parseJ(t.aliases, []);
+  const next = cur.slice();
+  for (const w of words) if (!next.some((x) => x.toLowerCase() === w.toLowerCase())) next.push(w);
+  if (next.length === cur.length) return [];
+  db.prepare("UPDATE trackers SET aliases = ? WHERE id = ?").run(JSON.stringify(next.slice(0, 12)), t.id);
+  return next.slice(cur.length, 12);
+}
+
+/** 没有关键词的主线：从名字里拆（不调用模型）。@returns 新加的关键词 */
+export function ensureThemeKeywords(db, id) {
+  const t = db.prepare("SELECT * FROM trackers WHERE id = ? AND kind = 'theme' AND status = 'active'").get(id);
+  if (!t || parseJ(t.aliases, []).length) return [];
+  return addAliases(db, t, nameKeywords(t.name).filter((w) => keywordOk(db, w)).slice(0, 3));
+}
+
 /**
  * 一次性修复（1.1.24）：以前主线只要和版面里的某条主线重叠一篇，就把那条主线的报道全挂过来，
  * 几天下来每个主线对象都挂了一百多条、互相几乎一样。这里把这样挂上的（how = 'theme'、不是建立时带进来的）摘掉；
@@ -166,6 +212,7 @@ export function repairThemeLinks(db) {
 export function linkAll(db, themes) {
   const out = {};
   for (const t of db.prepare("SELECT id FROM trackers WHERE status = 'active'").all()) {
+    try { ensureThemeKeywords(db, t.id); } catch { /* 没有关键词照旧按主线名和核心主体挂 */ }
     const a = linkStories(db, t.id, { days: 2, themes });
     if (a.length) out[t.id] = a;
   }

@@ -152,3 +152,30 @@ test("一次性修复：摘掉按旧规则挂到主线上的故事线；建立�
   assert.equal(repairThemeLinks(db), 0);
   db.close();
 });
+
+test("主线的检索关键词：从名字里拆，泛词和太常见的词不要；有了关键词，标题带它的新报道就挂得上", async () => {
+  const { nameKeywords, keywordOk, ensureThemeKeywords } = await import("../../host/tracking.mjs");
+  assert.deepEqual(nameKeywords("英伟达风波"), ["英伟达"]);
+  assert.deepEqual(nameKeywords("AI与数据中心"), ["数据中心"], "两个字母的英文太短，不当关键词");
+  assert.deepEqual(nameKeywords("中东局势、油价"), ["中东", "油价"]);
+  const db = db0();
+  assert.equal(keywordOk(db, "AI"), false, "泛词");
+  assert.equal(keywordOk(db, "市"), false, "太短");
+  assert.equal(keywordOk(db, "数据中心"), true);
+  // 太常见：60 条故事线里 10 条标题都有它（超过 6%）
+  for (let i = 0; i < 60; i++) story(db, "c" + i, (i < 10 ? "芯片" : "别的") + "新闻" + i, { msAgo: 3600000 });
+  assert.equal(keywordOk(db, "芯片"), false);
+  assert.equal(keywordOk(db, "数据中心"), true);
+
+  const id = addTracker(db, { name: "AI与数据中心", kind: "theme", entities: ENT, stories: [] });
+  assert.deepEqual(JSON.parse(db.prepare("SELECT aliases FROM trackers WHERE id = ?").get(id).aliases), ["数据中心"], "建立时就拆好");
+  assert.deepEqual(ensureThemeKeywords(db, id), [], "已有关键词的不动");
+  story(db, "dc1", "美参议员拟提数据中心征税草案", { msAgo: 600000 });
+  story(db, "dc2", "苹果发布新机", { msAgo: 600000 });
+  assert.deepEqual(linkStories(db, id, { days: 1, themes: [] }), ["dc1"]);
+  // 老的主线没有关键词：每轮挂故事线前补上
+  db.prepare("UPDATE trackers SET aliases = '[]' WHERE id = ?").run(id);
+  story(db, "dc3", "某地数据中心用电创新高", { msAgo: 300000 });
+  assert.deepEqual(linkAll(db, [])[id], ["dc3"]);
+  db.close();
+});
