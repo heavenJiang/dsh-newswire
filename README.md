@@ -6,7 +6,7 @@
 >
 > Read less. Know more.
 
-English | [中文](README.zh.md)
+English | [中文](README.zh.md) · [![check](https://github.com/heavenJiang/dsh-newswire/actions/workflows/check.yml/badge.svg)](https://github.com/heavenJiang/dsh-newswire/actions/workflows/check.yml)
 
 Hundreds of wire flashes a day, and maybe ten things you actually need to know. **见微知著** (*jiàn wēi zhī zhù*, a Chinese idiom: "from the small signs, know the whole") picks those ten, explains them, connects them, and works out where they are heading.
 

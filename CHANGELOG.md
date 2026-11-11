@@ -2,6 +2,13 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.29 (2026-11-12)
+
+Housekeeping, no behaviour change:
+- **The edition module is split.** `host/edition.mjs` (1641 lines) becomes four files by responsibility: `edition_base.mjs` (layout, materials, fact checks, assembly, the program-made edition), `edition_llm.mjs` (the model's prompts and incremental layout), `edition_store.mjs` (storage, diffs, storyline detail) and `edition_push.mjs` (picking pushes, numbering, composing messages, the ticker board). `edition.mjs` stays as the entry and re-exports everything, so imports elsewhere are unchanged. The last three depend only on the base and not on each other. Like the entry file, the split was mechanical; afterwards the 237 tests, the smoke tests and a call to each of the 37 routes and 23 tools all pass.
+- `client.js` is not split: the host wants the panel as one file with no build step, and adding a bundler is not worth it.
+- The README shows the check status badge.
+
 ## 1.1.28 (2026-11-12)
 
 - **Sources that keep failing are throttled.** After 3 failed rounds in a row (timeout, blocked, redesigned page) a source is skipped in normal rounds and retried every 6 hours; one successful fetch puts it back to normal. Before, every round tried again: each timeout cost at least 30 seconds, the panel kept showing "1 source failed", and every push ended with the same warning. In real data one X account source had timed out 10 rounds in a row. The Sources page says how many rounds a throttled source has failed, why, and when it will be retried. Fetching a source by name and the panel's test fetch are not affected; no extra state is stored, it is derived from each round's continuity records.

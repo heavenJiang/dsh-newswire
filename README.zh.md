@@ -6,7 +6,7 @@
 >
 > 少看一点，多懂一些。
 
-[English](README.md) | 中文
+[English](README.md) | 中文 · [![check](https://github.com/heavenJiang/dsh-newswire/actions/workflows/check.yml/badge.svg)](https://github.com/heavenJiang/dsh-newswire/actions/workflows/check.yml)
 
 每天几百条快讯刷不完，真正值得知道的也许只有十件事。**见微知著**把它们挑出来、讲清楚、串起来，再推演接下来会怎样。
 
