@@ -2,6 +2,12 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.28 (2026-11-12)
+
+- **Sources that keep failing are throttled.** After 3 failed rounds in a row (timeout, blocked, redesigned page) a source is skipped in normal rounds and retried every 6 hours; one successful fetch puts it back to normal. Before, every round tried again: each timeout cost at least 30 seconds, the panel kept showing "1 source failed", and every push ended with the same warning. In real data one X account source had timed out 10 rounds in a row. The Sources page says how many rounds a throttled source has failed, why, and when it will be retried. Fetching a source by name and the panel's test fetch are not affected; no extra state is stored, it is derived from each round's continuity records.
+- **Checks run on every commit.** GitHub Actions now runs the syntax check, 237 unit tests, the panel render smoke test and the grouping quality baseline, with no network and no model. The tests pass under UTC, Beijing and US Eastern time.
+- Fixed: two digest tests failed during the first ten minutes after midnight Beijing time (test data dated "ten minutes ago" fell on the previous day). Tests only; the feature was not affected.
+
 ## 1.1.27 (2026-11-11)
 
 - **When the story moves on, so does the headline.** A storyline's headline was fixed when it was first grouped; later reports only rewrote the lead and points, so a headline could say "shares plunge" over a lead about the rebound. When a storyline with new developments is rewritten, the model may now give a headline that fits the present (none if the old one still holds). A new headline must pass three checks: 6 to 24 characters; its numbers and names appear in the sources; and it is about what the new lead says (at least 30% text overlap). Otherwise the old headline stays. The edition where it changed shows the previous headline under the story. Measured on a local model with three storylines: the two whose direction had not changed got no new headline, the one that had changed got one that passed the checks. It rides on the same writing call, so no extra model calls.

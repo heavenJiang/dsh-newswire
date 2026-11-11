@@ -22,7 +22,9 @@ function tmpDb() {
   return db;
 }
 function add(db, id, title, summary, src, ev, imp, msAgo) {
-  const t = iso(msAgo ?? 600000);
+  // 默认「10 分钟前」；北京时间刚过零点的那几分钟里要落在今天，不然「今天的日报」里没有它
+  const sinceMidnight = (Date.now() + 8 * 3600000) % 86400000;
+  const t = iso(msAgo ?? Math.max(1000, Math.min(600000, sinceMidnight - 1000)));
   db.prepare("INSERT INTO articles (id, url, title, summary, published_at, first_seen_at, last_seen_at, source_id, pack) VALUES (?,?,?,?,?,?,?,?,?)").run(id, "https://x/" + id, title, summary, t, t, t, src, "core");
   db.prepare("INSERT OR IGNORE INTO events (event_id, pack, title, lead_article_id, first_seen_at, last_seen_at, member_count, source_count, importance, credibility, labels, outlets, factors) VALUES (?,?,?,?,?,?,1,1,?,'single',?,?,'{}')").run(ev, "core", title, id, t, t, imp || 60, JSON.stringify(["politics.conflict"]), JSON.stringify([{ source_id: src }]));
   db.prepare("INSERT INTO event_members (event_id, article_id, source_id, grp, method) VALUES (?,?,?,?,?)").run(ev, id, src, src, "seed");

@@ -208,7 +208,7 @@ The panel follows the harness's light and dark themes and works at phone width.
 
 **Study abroad** is a separate pack with its own pushes at 08:30 and 20:30. It covers only visas and immigration, institutions, admissions, language tests, scholarships and work abroad, and can go to a different chat.
 
-**Fetching**: each source tries several channels in order: your logged-in Chrome (browse), then agent-reach, then a direct request. Every failure is recorded with its reason. Verification pages and login walls are never bypassed.
+**Fetching**: each source tries several channels in order: your logged-in Chrome (browse), then agent-reach, then a direct request. Every failure is recorded with its reason. Verification pages and login walls are never bypassed. A source that fails 3 rounds in a row is throttled: skipped in normal rounds, retried every 6 hours, and back to normal once a fetch works.
 
 ## Built on these open-source projects
 

@@ -1,0 +1,23 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Only the config schema library is needed; the plugin itself has no runtime dependencies.
+      - run: npm install --no-audit --no-fund
+      # Syntax, unit tests, panel render smoke test, and the grouping quality baseline. No network, no model.
+      - run: npm run check

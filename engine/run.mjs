@@ -42,6 +42,7 @@ import { compileTaxonomy } from "./taxonomy.mjs";
 import { bodyCandidates, fetchBodies, bodyProfiles, fillCandidates, fillBodies } from "./pipeline/bodies.mjs";
 import { exportDataset } from "./export.mjs";
 import { applyRetention } from "./retention.mjs";
+import { coolingMap } from "./pipeline/cooling.mjs";
 import { acquireLock, acquireLockWait } from "./lock.mjs";
 import { findBin } from "./bins.mjs";
 import { loadConfig, readJson, loadTaxonomyFile } from "./config.mjs";
@@ -253,6 +254,12 @@ let sel = cfg.sources.filter((s) => s.enabled !== false && !s.removed_at).map((s
 const packs = cfg.packs || {};
 sel = sel.filter((s) => !packs[s.pack || "core"] || packs[s.pack || "core"].enabled !== false);
 if (str(A.sources)) { const ids = A.sources.split(","); sel = sel.filter((s) => ids.includes(s.id)); }
+// 连续失败的源降频：平时跳过，隔几小时试一次（指名抓的不跳）
+const cooled = [];
+if (!str(A.sources) && A["no-cooling"] !== true) {
+  const cm = coolingMap(db, sel.map((s) => s.id), { now: now.getTime() });
+  sel = sel.filter((s) => { const c = cm.get(s.id); if (!c || c.probe_due) return true; cooled.push(Object.assign({ id: s.id }, c)); return false; });
+}
 if (str(A.categories)) { const cs = A.categories.split(","); sel = sel.filter((s) => cs.includes(s.category)); }
 if (str(A.packs)) { const ps = A.packs.split(","); sel = sel.filter((s) => ps.includes(s.pack || "core")); }
 
@@ -268,6 +275,7 @@ const pre = await preflight(sel);
 console.log("[preflight] browse:", pre.ok ? "OK browser=" + pre.browser : "不可用 reason=" + pre.reason + (pre.detail ? " " + pre.detail : ""));
 if (MODE === "cycle") console.log("[cycle] " + (PACK !== "all" ? "主题包 " + PACK + " " : "") + (overnight ? "隔夜模式 " : "") + "规模×" + scale + (gapHours != null ? " 距上一整轮 " + gapHours.toFixed(1) + "h" : " 首轮"));
 
+for (const c of cooled) console.log("SKIP  " + c.id.padEnd(18) + " 连续 " + c.fails + " 轮失败（" + c.reason + "），降频中，下次尝试 " + c.next_probe + " UTC");
 startRun(db, runId, nowIso, MODE, PACK);
 const rawDir = path.join(RAW, stamp(now, TZ).slice(0, 8), stamp(now, TZ).slice(8, 10));
 fs.mkdirSync(rawDir, { recursive: true });

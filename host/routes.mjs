@@ -12,6 +12,7 @@ import { addTracker, listTrackers, removeTracker, suggestions as trackSuggestion
 import { PRIORITY } from "./queue.mjs";
 import { CADENCES, FORMATS, LEVELS, feedbackStats, loadPush, noteInterest, recentPushes as pushHistory, savePush, sectionPenalties } from "./push.mjs";
 import { markKind } from "../engine/pipeline/quality.mjs";
+import { coolingMap } from "../engine/pipeline/cooling.mjs";
 import path from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
@@ -430,7 +431,7 @@ export function registerRoutes(app) {
     methods: ["GET", "HEAD"],
     fetch: async (request) => {
       const days = Number(new URL(request.url, "http://x").searchParams.get("days")) || 7;
-      return jsonResponse({ sources: withDb(p, (db) => (db ? sourceScores(db, { days }) : [])), thin: withDb(p, (db) => (db ? thinCoverage(db) : [])) }, 200);
+      return jsonResponse({ sources: withDb(p, (db) => (db ? sourceScores(db, { days }) : [])), thin: withDb(p, (db) => (db ? thinCoverage(db) : [])), cooling: withDb(p, (db) => (db ? [...coolingMap(db, db.prepare("SELECT id FROM sources WHERE enabled = 1 AND removed_at IS NULL").all().map((r) => r.id))].map(([id, c]) => Object.assign({ id, name: (db.prepare("SELECT name FROM sources WHERE id = ?").get(id) || {}).name || id }, c)) : [])) }, 200);
     },
   });
   route({
