@@ -58,7 +58,8 @@ function fakeModel(o) {
       if (o.writeFail) return "乱写";
       if (o.dropOnce && !o.dropped) { o.dropped = true; return { error: "Connection error." }; }
       const refs = (prompt.match(/【报道\d+】/g) || []).length;
-      return JSON.stringify({ stories: Array.from({ length: refs }, (_, i) => ({ ref: i + 1, lead: "模型导语" + (i + 1) + "：利雅得金融区周六遇袭。", points: ["要点甲", "要点乙"], views: [{ who: "路透", says: "导弹被拦截" }], impact: "牵动油价" })) });
+      const debate = prompt.includes("debate 社区观点") ? { debate: [{ text: "有评论认为提醒很及时", refs: ["M1"] }, { text: "有人说涉及 9999 人", refs: ["M1"] }] } : {};
+      return JSON.stringify({ stories: Array.from({ length: refs }, (_, i) => Object.assign({ ref: i + 1, lead: "模型导语" + (i + 1) + "：利雅得金融区周六遇袭。", points: ["要点甲", "要点乙"], views: [{ who: "路透", says: "导弹被拦截" }], impact: "牵动油价" }, debate)) });
     }
     return "{}";
   };
@@ -301,5 +302,31 @@ test("读法：源声明的读法传到报道（程序编排与模型编排都�
   const { m } = fakeModel({});
   const ed2 = await llmEdition(db, m, base());
   assert.equal(Object.values(ed2.stories).find((s) => s.title === "教育部发布留学安全预警").profile, "tech-frontier");
+  db.close();
+});
+
+test("读法：社区讨论的报道按它的块写稿——社区观点逐条核对、不写影响，标「社区」；稿件沿用时块也在", async () => {
+  const db = tmpDb();
+  db.prepare("UPDATE sources SET profile = 'community' WHERE id = 'moe'").run();
+  db.prepare("UPDATE articles SET comments = '评论：提醒很及时' WHERE id = 'a3'").run();
+  const { m, calls } = fakeModel({});
+  const ed = await llmEdition(db, m, base());
+  const s = Object.values(ed.stories).find((x) => x.title === "教育部发布留学安全预警");
+  assert.equal(s.profile, "community");
+  assert.equal(s.badge, "社区");
+  assert.equal(s.impact, "", "社区读法没有影响块");
+  assert.deepEqual(s.views, []);
+  assert.deepEqual(s.extra.map((b) => [b.id, b.name, b.items.map((x) => x.text)]), [["debate", "社区观点", ["有评论认为提醒很及时"]]], "编出来的数字整条丢掉");
+  const other = Object.values(ed.stories).find((x) => x.title === "沙特利雅得金融区遇袭");
+  assert.equal(other.extra, undefined, "新闻读法没有自定义块");
+  assert.equal(calls.filter((c) => c.startsWith("请按版式")).length, 2, "不同读法分两批写");
+  saveEdition(db, ed, { runId: "r1" });
+  const copy = JSON.parse(db.prepare("SELECT copy FROM stories WHERE story_id = ?").get(s.id).copy);
+  assert.equal(copy.extra[0].id, "debate");
+  const { m: m2 } = fakeModel({});
+  const ed2 = await llmEdition(db, m2, base());
+  const s2 = ed2.stories[s.id];
+  assert.equal(s2.reused, true);
+  assert.equal(s2.extra[0].items[0].text, "有评论认为提醒很及时");
   db.close();
 });

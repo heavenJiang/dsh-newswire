@@ -82,12 +82,15 @@ export function checkText(text, sources) {
  * @param sources 材料文本数组；refs 为材料下标（0 起）
  * @returns { copy（新结构）, check: { checked, passed, dropped, flagged, missing } }
  */
-export function verifyCopy(copy, sources) {
+export function verifyCopy(copy, sources, o) {
   const n = sources.length;
+  // 能依据社区评论的块（读法里 materials 含 community）：对照带评论的材料核对；其余只认报道原文
+  const wideSrc = (o && o.wide) || sources;
+  const wideIds = new Set((o && o.wideBlocks) || []);
   const okRefs = (r) => uniq((Array.isArray(r) ? r : []).map(Number).filter((i) => Number.isInteger(i) && i >= 0 && i < n));
   const stat = { checked: 0, passed: 0, dropped: 0, flagged: 0, missing: [] };
-  const judge = (text, refs) => {
-    const r = checkText(text, sources);
+  const judge = (text, refs, block) => {
+    const r = checkText(text, block && wideIds.has(block) ? wideSrc : sources);
     if (r.claims) { stat.checked++; if (r.ok) stat.passed++; }
     const refsOut = r.claims && r.hits.size ? [...r.hits].sort((a, b) => a - b).slice(0, 3) : okRefs(refs);
     return { r, refs: refsOut };
@@ -107,13 +110,33 @@ export function verifyCopy(copy, sources) {
   }
   for (const v of copy.views || []) {
     if (!v || !v.who || !v.says) continue;
-    const j = judge(v.says, v.refs);
+    const j = judge(v.says, v.refs, "views");
     if (!j.r.ok) { stat.dropped++; stat.missing.push(...j.r.missing); continue; }
     out.views.push({ who: v.who, says: v.says, refs: j.refs });
   }
   if (copy.impact) {
     const j = judge(copy.impact, []);
     if (j.r.ok) out.impact = copy.impact; else { stat.dropped++; stat.missing.push(...j.r.missing); }
+  }
+  // 读法自定义的块：一段文字（text）核对不过整段撤下；几条短句（list）逐条核对，不过的丢弃
+  if (Array.isArray(copy.extra)) {
+    out.extra = [];
+    for (const b of copy.extra) {
+      if (!b || !b.id) continue;
+      if (b.kind === "list") {
+        const items = [];
+        for (const x of b.items || []) {
+          if (!x || !x.text) continue;
+          const j = judge(x.text, x.refs, b.id);
+          if (!j.r.ok) { stat.dropped++; stat.missing.push(...j.r.missing); continue; }
+          items.push({ text: x.text, refs: j.refs });
+        }
+        if (items.length) out.extra.push({ id: b.id, name: b.name, kind: "list", items });
+      } else if (b.text) {
+        const j = judge(b.text, b.refs, b.id);
+        if (j.r.ok) out.extra.push({ id: b.id, name: b.name, kind: "text", text: b.text, refs: j.refs }); else { stat.dropped++; stat.missing.push(...j.r.missing); }
+      }
+    }
   }
   stat.missing = uniq(stat.missing).slice(0, 8);
   return { copy: out, check: stat };

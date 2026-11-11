@@ -87,6 +87,8 @@ export function normalizeProfile(json, readPrompt) {
     priority: num(j.priority, -100, 100, 0),
     match: { labels: strs(m.labels, LABEL_RE, 12), sources: strs(m.sources, /^[a-z0-9][a-z0-9_-]{1,39}$/, 40) },
     focus: f ? { boost: num(f.boost, 0, 50, 20) } : null,
+    // 面板上标在报道标题前的小字（如「长文」「社区」），提醒读者这不是一般新闻；不写就不标
+    badge: typeof j.badge === "string" && j.badge.trim() ? j.badge.trim().slice(0, 6) : "",
     content: {
       materials: num(c.materials, 2, 10, 6),
       body_chars: num(c.body_chars, 200, 6000, 900),

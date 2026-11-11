@@ -2,6 +2,14 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.16 (2026-11-11)
+
+- **Profiles can write their own parts.** Besides lead, points, views and impact, a profile can add a paragraph (`text`) or a few short lines (`list`), such as Background, Takeaways or Community views. Every part is checked sentence by sentence and failing sentences are removed. The panel shows them under More, and readers can flag these sentences too.
+- **Two new built-in profiles**, used when a source declares them:
+  - Long-form tech (`tech-deep`): tech blogs and long articles. Lead, technical points, background and takeaways; 3,000 characters of body, excerpted from start, middle and end. Tagged "长文" in the panel.
+  - Community discussion (`community`): Hacker News-style threads. Lead and points rest only on the linked item, Community views only on the comments; numbers from comments cannot enter the lead. Tagged "社区" in the panel.
+- Community comments are stored separately (database v25, `articles.comments`), not mixed into the body.
+
 ## 1.1.15 (2026-11-11)
 
 - **Profiles: different kinds of stories are written differently.** After Horizon's profiles, adapted to storylines. A profile sets a story's scoring guidance, writing guidance, how its material is excerpted, and what impact analysis looks at.

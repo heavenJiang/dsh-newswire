@@ -764,7 +764,9 @@ window.__ModuleLoader__.load({
         postJson(API.feedback, { kind: 'error', story_id: s.id, edition_id: props.editionId, text: text, note: (rep && rep.note) || undefined })
           .then(function () { setRep({ note: '', done: true }); if (props.onChanged) props.onChanged() }).catch(function (e) { setRep({ note: '', error: e.message }) })
       }
-      var sentences = [s.lead].concat(points.map(function (x) { return x.text }), (s.views || []).map(function (x) { return x.who + '：' + x.says }), s.impact ? [s.impact] : [], s.update_text ? [s.update_text] : []).filter(Boolean)
+      var xblocks = s.extra || []
+      var xlines = [].concat.apply([], xblocks.map(function (b) { return b.kind === 'list' ? (b.items || []).map(function (x) { return x.text }) : [b.text] }))
+      var sentences = [s.lead].concat(points.map(function (x) { return x.text }), (s.views || []).map(function (x) { return x.who + '：' + x.says }), s.impact ? [s.impact] : [], xlines, s.update_text ? [s.update_text] : []).filter(Boolean)
       var acts = props.onFollow ? h('span', { className: 'nw-acts' },
         h('button', { className: 'nw-act' + (props.followed ? ' nw-on' : ''), onClick: function () { props.onFollow(props.followed ? 'unfollow' : 'follow', 'story', s.id, s.title) } }, props.followed ? t('fl.following') : t('fl.follow')),
         h('button', { className: 'nw-act', onClick: function () { props.onFollow('mute', 'story', s.id, s.title) } }, t('fl.mute')),
@@ -780,13 +782,19 @@ window.__ModuleLoader__.load({
         v === 'brief' ? null : h(Refs, { refs: s.lead_refs, mats: mats }),
         (s.lead_missing || []).length ? h('span', { className: 'nw-unver', title: t('ck.missing', { m: s.lead_missing.join('、') }) }, t('ck.unverified')) : null) : null
       var nPts = v === 'lead' ? points.length : v === 'normal' ? Math.min(points.length, 4) : 0
-      var extra = (s.views || []).length || s.impact || mats.length || points.length > nPts
+      var extra = (s.views || []).length || s.impact || xblocks.length || mats.length || points.length > nPts
       var allOpen = v === 'lead' || more
       var body = v === 'brief' || v === 'second' || v === 'mini' ? null : [
         nPts ? h('ul', { key: 'p', className: 'nw-rs-points' }, points.slice(0, allOpen ? points.length : nPts).map(function (p, i) { return h('li', { key: i }, p.text, h(Refs, { refs: p.refs, mats: mats })) })) : null,
         allOpen && (s.views || []).length ? h('div', { key: 'v', className: 'nw-rs-block' }, h('div', { className: 'nw-rs-k' }, t('ed.views')),
           h('ul', { className: 'nw-rs-views' }, s.views.map(function (x, i) { return h('li', { key: i }, h('b', null, x.who), '　' + x.says, h(Refs, { refs: x.refs, mats: mats })) }))) : null,
         allOpen && s.impact ? h('div', { key: 'i', className: 'nw-rs-block' }, h('div', { className: 'nw-rs-k' }, t('ed.impact')), h('p', { className: 'nw-rs-p' }, s.impact)) : null,
+        // 读法自定义的块（背景、可借鉴、社区观点……）：小标题来自读法
+        allOpen ? xblocks.map(function (b) {
+          return h('div', { key: 'x-' + b.id, className: 'nw-rs-block' }, h('div', { className: 'nw-rs-k' }, b.name),
+            b.kind === 'list' ? h('ul', { className: 'nw-rs-points' }, (b.items || []).map(function (x, i) { return h('li', { key: i }, x.text, h(Refs, { refs: x.refs, mats: mats })) }))
+              : h('p', { className: 'nw-rs-p' }, b.text, h(Refs, { refs: b.refs, mats: mats })))
+        }) : null,
         allOpen && mats.length ? h('ol', { key: 's', className: 'nw-rs-src' }, mats.map(function (m) { return h('li', { key: m.id }, h('a', { className: 'nw-link', href: m.url, target: '_blank', rel: 'noopener noreferrer' }, shortName({ name: m.name })), h('span', { className: 'nw-muted' }, ' ' + hhmm(m.t))) })) : null,
         allOpen && !mats.length && s.url ? h('a', { key: 'o', className: 'nw-link nw-xs', href: s.url, target: '_blank', rel: 'noopener noreferrer' }, t('ed.original') + ' ↗') : null,
         v === 'normal' && extra ? h('button', { key: 'm', className: 'nw-more-btn', onClick: function () { setMore(!more) } }, more ? t('rd.less') : t('rd.more')) : null]
@@ -795,6 +803,7 @@ window.__ModuleLoader__.load({
         h('div', { className: 'nw-rs-head' },
           tag ? h('span', { className: 'nw-rs-tag' + (tag === t('rd.developing') ? ' nw-rs-dev' : '') }, tag) : null,
           s.importance >= 70 && v !== 'lead' ? h('span', { className: 'nw-rs-key' }, t('rd.key')) : null,
+          s.badge ? h('span', { className: 'nw-rs-badge' }, s.badge) : null,
           (s.followed || []).length ? h('span', { className: 'nw-rs-star', title: s.followed.join('、') }, '★') : null,
           h('button', { className: 'nw-rs-title', onClick: function () { props.onOpen(s.id) } }, s.title)),
         h('div', { className: 'nw-rs-meta' }, h(Byline, { story: s }), acts),
@@ -2511,6 +2520,7 @@ window.__ModuleLoader__.load({
       '.nw-v-second .nw-rs-title{font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif;font-size:18px;font-weight:700;line-height:1.4}',
       '.nw-v-lead .nw-rs-title{font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif;font-size:clamp(20px,3.4cqi,26px);font-weight:700;line-height:1.35}',
       '.nw-v-lead > .nw-rs-lead{font-size:15px;line-height:1.85}',
+      '.nw-rs-badge{flex:none;font-size:11px;color:' + C.accent + ';border:1px solid ' + C.accent + ';border-radius:4px;padding:0 4px;line-height:16px;transform:translateY(-1px)}',
       '.nw-rs-tag{flex:none;font-size:11px;font-weight:700;color:' + C.err + ';letter-spacing:.04em;transform:translateY(-1px)} .nw-rs-tag.nw-rs-dev{color:' + C.accent + '}',
       '.nw-rs-star{flex:none;color:' + C.accent + ';font-size:12px}',
       '.nw-rs-meta{display:flex;align-items:center;gap:8px;min-height:20px;font-size:12px;color:' + C.l3 + ';font-variant-numeric:tabular-nums}',

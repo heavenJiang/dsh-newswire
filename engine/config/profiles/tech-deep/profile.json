@@ -1,0 +1,52 @@
+{
+  "id": "tech-deep",
+  "name": "技术长文",
+  "version": 1,
+  "note": "技术博客与长文：不是新闻，写成「讲了什么、怎么做的、能借鉴什么」。由源声明（sources.json 里 profile: \"tech-deep\"）。",
+  "priority": 21,
+  "badge": "长文",
+  "match": {},
+  "content": {
+    "materials": 4,
+    "body_chars": 3000,
+    "summary_chars": 600,
+    "sampling": "head-middle-tail"
+  },
+  "blocks": [
+    {
+      "kind": "lead",
+      "ask": "说清作者或机构、讲的是什么问题、核心结论"
+    },
+    {
+      "kind": "points",
+      "max": 4,
+      "chars": 50,
+      "ask": "写方法、关键数据、实验或实现细节"
+    },
+    {
+      "kind": "text",
+      "id": "background",
+      "name": "背景",
+      "chars": 100,
+      "ask": "这个问题为什么重要、以前通常怎么做",
+      "optional": true,
+      "materials": [
+        "source",
+        "history"
+      ]
+    },
+    {
+      "kind": "list",
+      "id": "takeaways",
+      "name": "可借鉴",
+      "max": 3,
+      "chars": 50,
+      "ask": "开发者或团队可以直接用上的做法或结论"
+    }
+  ],
+  "prompts": {
+    "rubric": "rubric.md",
+    "write": "write.md",
+    "analysis": "analysis.md"
+  }
+}

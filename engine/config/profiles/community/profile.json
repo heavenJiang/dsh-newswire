@@ -1,0 +1,42 @@
+{
+  "id": "community",
+  "name": "社区讨论",
+  "version": 1,
+  "note": "Hacker News 等社区的讨论帖：被讨论的原文写导语和要点，评论区写成「社区观点」。由源声明（sources.json 里 profile: \"community\"）。社区帖子不算独立信源。",
+  "priority": 22,
+  "badge": "社区",
+  "match": {},
+  "content": {
+    "materials": 3,
+    "body_chars": 1500,
+    "summary_chars": 400,
+    "sampling": "head-middle-tail",
+    "comments": 1500
+  },
+  "blocks": [
+    {
+      "kind": "lead",
+      "ask": "说清讨论的是什么（文章、项目、产品或问题）以及它本身的要点"
+    },
+    {
+      "kind": "points",
+      "max": 3,
+      "ask": "被讨论的对象本身的关键事实或数字"
+    },
+    {
+      "kind": "list",
+      "id": "debate",
+      "name": "社区观点",
+      "max": 4,
+      "chars": 60,
+      "ask": "评论区的主要看法与分歧，写明是赞同、质疑还是补充经验，不写评论者用户名",
+      "materials": [
+        "community"
+      ]
+    }
+  ],
+  "prompts": {
+    "rubric": "rubric.md",
+    "write": "write.md"
+  }
+}

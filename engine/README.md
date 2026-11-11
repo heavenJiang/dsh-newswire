@@ -107,14 +107,25 @@ Location: built-in `engine/config/profiles/<id>/`; a `profiles/<id>/` directory 
 | `focus` | Focus area (only the first counts): `boost` raises its items when picking material; a front-page slot, 3 extra section slots, no rule triage. `focus` in `layout.json` overrides its name, categories and boost |
 | `content` | Material: `materials` count (2–10), `body_chars` body excerpt length, `summary_chars` summary length, `sampling` (`prefix` takes the start; `head-middle-tail` takes start, middle and end at 4:3:3) |
 | `blocks` | Which parts to write (default: lead, points, views, impact) |
+| `badge` | Short tag shown before the title in the panel (up to 6 characters), such as "长文" or "社区"; none if omitted |
 | `prompts` | `rubric` (scoring when grouping), `plan`, `write`, `analysis` (impact analysis focus), each a Markdown file; `{name}` becomes the profile name |
+
+Each entry in `blocks`: `kind` is `lead` (required) / `points` / `views` / `impact` (the original four), or `text` (a paragraph) / `list` (a few short lines). Custom blocks need an `id` and a `name` (the subheading in the panel); `chars`, `max` and `ask` set length, count and instructions; `materials` says what the block may rest on: `source` only the reports, `community` also community comments (when the profile's `content.comments` is above 0, comments are appended to the material, marked 【社区评论】). Every block is checked sentence by sentence: the lead and points against the reports only, comment-based blocks against material including comments; sentences in custom blocks that fail are dropped.
+
+Built-in profiles:
+| id | Name | When | Writes |
+|---|---|---|---|
+| `wire` | News | Default | Lead, points, views, impact |
+| `tech-frontier` | AI and new technology | Category tech or AI & semiconductors (focus area) | Same, with impact on technology and technical points first |
+| `tech-deep` | Long-form tech | Source declares `profile: "tech-deep"` (tech blogs) | Lead, technical points, background, takeaways; 3,000 characters of body, excerpted from start, middle and end |
+| `community` | Community discussion | Source declares `profile: "community"` (Hacker News etc.) | Lead and points (from the linked item), community views (from comments) |
 
 Which profile a story uses: if every item's source declares a `profile` in `sources.json`, the declared one (the most common); otherwise the highest-priority profile whose categories or sources match; otherwise the default `wire`. The storyline records its profile (`stories.profile`) and impact analysis follows it. Each writing batch holds one profile, so the fixed part of the prompt is identical and hosted models' prefix cache hits.
 
 ## Times from links
 When a source gives no time, the link is checked: a full timestamp (`/2026101415255489242/`) counts as `page_text`; a date only (`t20261107_`, `/20261029/`, `/2026/11-08/`) is stored as `url_date` (Beijing midnight) for display and datasets, but continuity and clustering treat it as untrusted. Time confidence only rises on merge: fetched < url_date < page_text < feed. Push selection skips events whose lead article's time (including a link date) is more than a day before the look-back window, so a new source's old list items are not pushed.
 
-## Data model (schema v24)
+## Data model (schema v25)
 | Table | Contents |
 |---|---|
 | `sources` | Source config snapshot (with weight / tier / grp / pack / adapter / removed_at / profile) |

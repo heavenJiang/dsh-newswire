@@ -6,7 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadProfiles, builtinProfiles, profileFor, focusOf, withFocus, promptOf, normalizeProfile, BUILTIN_PROFILES_DIR } from "../../host/profiles.mjs";
-import { loadLayout, normalizeLayout, writePrompt, batchByProfile, sample, materialText, profilesOf, storyProfile, writeFingerprint } from "../../host/edition.mjs";
+import { loadLayout, normalizeLayout, writePrompt, batchByProfile, sample, materialText, profilesOf, storyProfile, writeFingerprint, blockSpec, parseCopy } from "../../host/edition.mjs";
+import { verifyCopy } from "../../host/factcheck.mjs";
 import { analysisPrompt } from "../../host/analysis.mjs";
 
 const CFG = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "engine", "config");
@@ -125,4 +126,58 @@ test("影响分析：侧重取读法的 analysis.md；旧写法只给 focus 名�
   assert.match(analysisPrompt({ title: "t", focus: "AI 与新技术" }, mats), /这是一条AI 与新技术新闻：着重分析这项技术/);
   assert.doesNotMatch(analysisPrompt({ title: "t" }, mats), /这是一条/);
   assert.equal(withFocus(builtinProfiles(), null), builtinProfiles());
+});
+
+test("内置读法：技术长文与社区讨论都有自定义块，由源声明", () => {
+  const r = builtinProfiles();
+  const deep = r.get("tech-deep"), com = r.get("community");
+  assert.deepEqual(deep.blocks.map((b) => b.id), ["lead", "points", "background", "takeaways"]);
+  assert.equal(deep.content.sampling, "head-middle-tail");
+  assert.deepEqual(com.blocks.find((b) => b.id === "debate").materials, ["community"]);
+  assert.ok(com.content.comments > 0);
+  assert.equal(com.badge, "社区");
+  assert.equal(profileFor(r, { section: "tech", labels: ["tech.frontier"] }).id, "tech-frontier", "没声明的不会被分到这两种");
+  assert.equal(profileFor(r, { section: "tech", declared: ["community", "tech-deep"] }).id, "community", "一样多时取优先级高的");
+});
+
+test("输出块 → 版式说明与 JSON：默认四块与原来一字不差；自定义块按 text / list 写", () => {
+  const S = normalizeLayout(null).story;
+  const def = blockSpec(builtinProfiles().def.blocks, S, false);
+  assert.match(def.text, /^lead 导语（不超过120字，说清谁、何时、何事）；points 要点（最多3条/);
+  assert.equal(def.json, '{"stories":[{"ref":1,"lead":"","lead_refs":["M1"],"points":[{"text":"","refs":["M2"]}],"views":[{"who":"","says":"","refs":["M1"]}],"impact":"","update":""}]}');
+  const com = blockSpec(builtinProfiles().get("community").blocks, S, true);
+  assert.match(com.text, /debate 社区观点（最多4条，每条不超过60字，评论区的主要看法与分歧[^）]*可以依据【社区评论】；没有就给空数组）/);
+  assert.doesNotMatch(com.text, /impact|views/);
+  assert.match(com.json, /"debate":\[\{"text":"","refs":\["M1"\]\}\]/);
+  const deep = blockSpec(builtinProfiles().get("tech-deep").blocks, S, false);
+  assert.match(deep.text, /background 背景（不超过100字，这个问题为什么重要/);
+  assert.match(deep.json, /"background":\{"text":"","refs":\["M1"\]\}/);
+});
+
+test("模型稿 → 报道：只收读法里有的块，自定义块进 extra，条数字数按块截", () => {
+  const S = normalizeLayout(null).story;
+  const ids = (r) => (Array.isArray(r) ? r : [r]).map((x) => String(x || "").replace(/^M/, "a")).filter((x) => x !== "a");
+  const w = { lead: "导语", lead_refs: ["M1"], points: ["p1", { text: "p2", refs: ["M2"] }], views: [{ who: "x", says: "y" }], impact: "影响", debate: [{ text: "有评论认为太贵", refs: ["M1"] }, "也有人指出好用", "c", "d", "e"], junk: "x" };
+  const out = parseCopy(w, builtinProfiles().get("community").blocks, S, ids);
+  assert.deepEqual(out.views, [], "社区读法没有各方说法块");
+  assert.equal(out.impact, "");
+  assert.equal(out.extra[0].id, "debate");
+  assert.equal(out.extra[0].items.length, 4);
+  assert.deepEqual(out.extra[0].items[0], { text: "有评论认为太贵", refs: ["a1"] });
+  const plain = parseCopy(w, builtinProfiles().def.blocks, S, ids);
+  assert.equal(plain.impact, "影响");
+  assert.equal(plain.extra, undefined);
+});
+
+test("社区评论：读法要看评论才附上；导语只能依据原文，社区观点可以依据评论", () => {
+  const it = { id: "h1", title: "Show HN: Foo 2.0", summary: "Foo is a database with 3x faster writes", comments: "One commenter says it costs $500 per month" };
+  const com = builtinProfiles().get("community");
+  assert.doesNotMatch(materialText(it, new Map()), /社区评论/);
+  assert.match(materialText(it, new Map(), com.content), /｜【社区评论】One commenter says it costs \$500/);
+  const src = [materialText(it, new Map(), { comments: 0 })];
+  const wide = [materialText(it, new Map(), com.content)];
+  const v = verifyCopy({ lead: "Foo 每月 500 美元", lead_refs: [0], points: ["月费 500 美元"], extra: [{ id: "debate", name: "社区观点", kind: "list", items: [{ text: "有评论认为每月 500 美元太贵", refs: [0] }, { text: "有人说要 900 美元", refs: [0] }] }] }, src, { wide, wideBlocks: ["debate"] });
+  assert.ok(v.copy.lead_missing, "导语里的 500 只在评论里：标待核");
+  assert.equal(v.copy.points.length, 0, "要点只认原文");
+  assert.deepEqual(v.copy.extra[0].items.map((x) => x.text), ["有评论认为每月 500 美元太贵"], "评论里有的留下，编的丢掉");
 });
