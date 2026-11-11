@@ -43,7 +43,7 @@ export function gatherDay(db, o) {
     out.push({ id, title: st.title, section: st.section, labels: parseJ(st.labels, []), importance: Math.round(st.importance || 0), copy: parseJ(st.copy, null), items, outlets, updates: upQ.all(id, r.from, r.to), url: items[0].url });
   }
   out.sort((a, b) => b.importance - a.importance || b.items.length - a.items.length);
-  const pushes = db.prepare("SELECT COUNT(*) n FROM pushes WHERE pushed_at >= ? AND pushed_at < ?").get(r.from, r.to).n;
+  const pushes = db.prepare("SELECT COUNT(*) n FROM pushes WHERE pushed_at >= ? AND pushed_at < ? AND COALESCE(reason, '') != 'unlisted'").get(r.from, r.to).n;
   return { range: r, stories: out, stats: { items: rows.length, storylines: out.length, sources: new Set(rows.map((x) => x.source_id)).size, pushes } };
 }
 

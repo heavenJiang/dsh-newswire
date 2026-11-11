@@ -89,3 +89,34 @@ test("展开与详细报道的消息；追踪对象命中；感兴趣算半票�
   assert.deepEqual(feedbackStats(db), { up: 0, down: 6, interest: 4, pushed: 0 });
   db.close();
 });
+
+test("一条推送写多少有上限：隔夜上百条时，前 12 条一句话、再 18 条只列标题、其余只报个数；条数不多时照旧", async () => {
+  const { tierPicks, restGroups, worthSaying } = await import("../../host/edition.mjs");
+  const many = Array.from({ length: 56 }, (_, i) => st("s" + i, i % 3 === 0 ? "tech" : i % 3 === 1 ? "markets" : "politics", 20 + i, i === 3 ? { followed: [{ kind: "keyword" }] } : {}));
+  const t = tierPicks(many);
+  assert.deepEqual([t.detail.length, t.titles.length, t.rest.length], [12, 18, 26]);
+  assert.equal(t.detail[0].id, "s55", "按重要度排");
+  assert.ok(!t.detail.some((s) => s.id === "s3") && !t.titles.some((s) => s.id === "s3"), "关注的只加 10 分：重要度 23 的琐碎关注项挤不进前面");
+  assert.equal(tierPicks([st("a", "tech", 50), st("b", "tech", 45, { followed: [{}] })]).detail[0].id, "b", "分数接近时关注的在前");
+  assert.equal(tierPicks(many.slice(0, 16)).titles.length, 0, "只多出 4 条以内：全部写一句话");
+  assert.deepEqual(restGroups(t.rest).map((g) => g.n).reduce((a, b) => a + b, 0), 26);
+
+  const db = tmp();
+  t.titles.forEach((s) => { s.title_only = true; });
+  const shown = t.detail.concat(t.titles);
+  numberPicks(db, orderPicks(t.detail).flatMap((g) => g.items).concat(t.titles));
+  const msg = composeEditionMessage({ hhmm: "07:16", md: "11-12", warnings: [], title: "要闻", format: "brief", rest: restGroups(t.rest), totals: { all: 56, fresh: 56 } }, shown, { mode: "llm", model: "m", items_read: 9 }, {});
+  const L = msg.split("\n");
+  assert.equal(L[1], "新报道 56 件", "总数按全部算");
+  assert.ok(L.includes("**还有这些**"));
+  assert.ok(L.some((l) => /^13\. 标题s\d+$/.test(l)), "第二档一行一条、只有序号和标题");
+  assert.ok(L.some((l) => /^另有 26 条没有列出（.*），在面板「今日」里看。$/.test(l)));
+  assert.equal(L.filter((l) => /^\*\*\d+\. /.test(l)).length, 12);
+  assert.ok(msg.length < 3200, "上百条也只有两三千字：" + msg.length);
+
+  assert.equal(worthSaying("俄罗斯称其在黑海击中一艘货船。", "俄罗斯称在黑海击中一艘货船"), false, "只是把标题再说一遍");
+  assert.equal(worthSaying("Nvidia's Asian Cloud Partners Have a Debt Problem X.PIN 长文分析", "英伟达主权AI战略带动数据中心热"), false, "没译过的外文摘要");
+  assert.equal(worthSaying("俄罗斯称在黑海击中一艘货船，船上 12 名船员获救，乌方尚未回应。", "俄罗斯称在黑海击中一艘货船"), true);
+  assert.equal(worthSaying("进展：新增 1 篇：承销商考虑上调估值", "Anthropic路演11月19日上市"), true);
+  db.close();
+});

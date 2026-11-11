@@ -2,6 +2,7 @@
  * 版面 · 推送：从版面里挑要推的报道、编当天的序号、拼发到手机的消息；行情速览。
  */
 import { CRED_RANK, PUB, tz } from "./edition_base.mjs";
+import { bigrams } from "../engine/pipeline/select.mjs";
 
 // ------------------------------------------------------------------ 推送
 /** 版面里要推的报道：新报道过门槛，或已推过但可信度升级 / 重要度大涨。规则与 select.mjs 一致。
@@ -67,12 +68,53 @@ export function recordEditionPushes(db, picks, runId, nowIso, pack) {
   for (const p of picks) st.run(runId, p.lead_article_id, p.lead_event_id, pack && pack !== "all" ? pack : "core", p.importance, p.reason, p.credibility, nowIso, p.id, Number.isInteger(p.n) ? p.n : null);
 }
 
+/**
+ * 这一句值不值得放在标题下面：几乎就是把标题再说一遍的不放；大半是外文的（没译过的原文摘要）不放。
+ * 短消息里每一行都占读者的时间，宁可只有标题。
+ */
+export function worthSaying(line, title) {
+  const t = String(line || "").replace(/^进展：/, "");
+  const cjk = (t.match(/[\u4e00-\u9fff]/g) || []).length;
+  const latin = (t.match(/[A-Za-z]/g) || []).length;
+  if (latin > cjk * 2 && latin > 20) return false;
+  const a = bigrams(t), b = bigrams(title);
+  if (!a.size || !b.size) return Boolean(t);
+  let hit = 0;
+  for (const g of b) if (a.has(g)) hit++;
+  // 标题的字几乎都在这句里，而这句也没比标题长多少：只是复述
+  return !(hit / b.size >= 0.8 && [...t].length <= [...String(title)].length + 8);
+}
+
 /** 只留第一句（n 字内；第一句太短、不到 12 个字时留到 n 字内的完整句子）。 */
 export function oneSentence(text, n) {
   const t = sentences(text, n);
   const m = /^[^。！？!?]{11,}?[。！？!?]/.exec(t);
   return m ? m[0] : t;
 }
+/**
+ * 一条推送最多写多少：前 detail 条带一句话和来源，再 titles 条只列标题，其余只报个数（在面板里看）。
+ * 隔夜或「全推」时一轮可能有上百条：全列出来是一万多字，手机上会变成文件附件，等于没法读。
+ */
+export const PUSH_TIERS = { detail: 12, titles: 18 };
+
+/**
+ * 把要推的报道分成三档：detail（一句话）、titles（只列标题）、rest（不列，只报个数）。
+ * 排序：按重要度，读者关注的加 10 分。总数只比 detail 多一点（不超过 4 条）时全部写一句话，不留一条小尾巴。
+ */
+export function tierPicks(picks, o) {
+  const T = Object.assign({}, PUSH_TIERS, o || {});
+  // 关注的加 10 分，不是无条件排最前：关注的词一多，琐碎的关注项会把真正的大事挤到后面
+  const rank = (s) => (s.importance || 0) + (s.followed && s.followed.length ? 10 : 0);
+  const ranked = picks.slice().sort((a, b) => rank(b) - rank(a));
+  if (ranked.length <= T.detail + 4) return { detail: ranked, titles: [], rest: [] };
+  return { detail: ranked.slice(0, T.detail), titles: ranked.slice(T.detail, T.detail + T.titles), rest: ranked.slice(T.detail + T.titles) };
+}
+
+/** 没列出来的那些按领域数一数：[{ title, n }]。 */
+export function restGroups(rest) {
+  return orderPicks(rest.map((s) => Object.assign({}, s, { importance: 0 }))).map((g) => ({ title: g.title.replace(/^\S+\s/, ""), n: g.items.length }));
+}
+
 /** 推送消息里的顺序：重点在前，其余按领域分组。编序号和拼消息都按它。 */
 export function orderPicks(picks) {
   const keys = picks.filter(isKeyStory);
@@ -135,9 +177,11 @@ export function composeEditionMessage(parts, picks, ed, names) {
   if (!picks.length) return [parts.hhmm + " " + head + "：暂无新的重点"].concat(warn ? [warn] : []).join("\n");
   const md = String(parts.md || "").split("-").map(Number);
   const L = ["📰 **" + head + "** · " + (md.length === 2 && md[0] ? md[0] + "月" + md[1] + "日 " : "") + parts.hhmm];
-  const nNew = picks.filter((x) => x.reason === "new").length;
+  // 总数按这一轮全部要推的算（含没列出来的）
+  const tot = parts.totals || { all: picks.length, fresh: picks.filter((x) => x.reason === "new").length };
+  const nNew = tot.fresh;
   const span = parts.from ? "汇总 " + parts.from + "–" + parts.hhmm + " · " : "";
-  L.push(span + "新报道 " + nNew + " 件" + (picks.length > nNew ? " · 有进展 " + (picks.length - nNew) + " 件" : ""));
+  L.push(span + "新报道 " + nNew + " 件" + (tot.all > nNew ? " · 有进展 " + (tot.all - nNew) + " 件" : ""));
   if (ed.headline) L.push("> " + mdText(ed.headline));
   // 读者追踪的对象里哪些有动静：放在最前面说
   const tracked = (parts.tracked || []).filter((t) => t && t.name && (t.stories || []).length);
@@ -157,7 +201,7 @@ export function composeEditionMessage(parts, picks, ed, names) {
     const lead = s.push_lead || s.lead;
     if (brief) {
       const one = again && s.update_text ? "进展：" + oneSentence(s.update_text, 70) : lead && same(lead) !== same(s.title) ? oneSentence(lead, 70) : "";
-      if (one) L.push(mdText(one));
+      if (one && worthSaying(one, s.title)) L.push(mdText(one));
     } else if (again && s.update_text) {
       L.push("进展：" + mdText(sentences(s.update_text, detailed ? 160 : 90)));
       if (detailed && lead && same(lead) !== same(s.title)) L.push("背景：" + mdText(sentences(lead, 100)));
@@ -176,7 +220,16 @@ export function composeEditionMessage(parts, picks, ed, names) {
       s.credibility === "confirmed" ? "权威确认" : s.credibility === "disputed" ? "说法有分歧" : "", !brief && h.views != null ? "阅读 " + fmtN(h.views) : ""].filter(Boolean).join(" · "));
     if (/^markets|^macro/.test(s.section || "")) markets = true;
   };
-  for (const g of orderPicks(picks)) { L.push("", "**" + g.title + "**"); for (const s of g.items) item(s, g.key && !brief); }
+  for (const g of orderPicks(picks.filter((s) => !s.title_only))) { L.push("", "**" + g.title + "**"); for (const s of g.items) item(s, g.key && !brief); }
+  // 第二档：只列标题（一行一条）
+  const titled = picks.filter((s) => s.title_only);
+  if (titled.length) {
+    L.push("", "**还有这些**");
+    for (const s of titled) { i++; const tag = s.reason === "followup" ? "【进展】" : s.reason === "upgraded" || s.reason === "jumped" ? "【升级】" : ""; L.push((Number.isInteger(s.n) ? s.n : i) + ". " + tag + mdText(s.title) + (s.followed && s.followed.length ? " ★" : "")); if (/^markets|^macro/.test(s.section || "")) markets = true; }
+  }
+  // 第三档：不列，只报个数
+  const restN = (parts.rest || []).reduce((n, g) => n + g.n, 0);
+  if (restN) L.push("", "另有 " + restN + " 条没有列出（" + parts.rest.map((g) => g.title + " " + g.n).join("、") + "），在面板「今日」里看。");
   L.push("");
   if (warn) L.push(warn);
   // 编了当天序号的（记了推送的）才能回复

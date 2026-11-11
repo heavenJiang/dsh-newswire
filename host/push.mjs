@@ -89,7 +89,7 @@ export function noteInterest(db, kind, storyId, now) {
 /** 近 14 天的反馈统计（面板显示用）：明确的有用 / 没用、感兴趣的次数、推了多少条。 */
 export function feedbackStats(db) {
   const r = db.prepare(`SELECT SUM(kind = 'push_up') up, SUM(kind = 'push_down') down, SUM(kind IN (${INTEREST_KINDS.map((k) => "'" + k + "'").join(",")})) interest FROM feedback WHERE at >= datetime('now', '-14 days')`).get() || {};
-  const p = db.prepare("SELECT COUNT(*) n FROM pushes WHERE pushed_at >= datetime('now', '-14 days')").get();
+  const p = db.prepare("SELECT COUNT(*) n FROM pushes WHERE pushed_at >= datetime('now', '-14 days') AND COALESCE(reason, '') != 'unlisted'").get();
   return { up: r.up || 0, down: r.down || 0, interest: r.interest || 0, pushed: p.n || 0 };
 }
 
@@ -105,7 +105,7 @@ export function rulesFor(rules, prefs) {
 
 /** 每天上限：今天已推的条数之外还能推几条。@returns { send, held } */
 export function applyDailyCap(db, picks, prefs, now) {
-  const today = db.prepare("SELECT COUNT(*) n FROM pushes WHERE pushed_at >= ?").get(bjMidnightUtc(now)).n;
+  const today = db.prepare("SELECT COUNT(*) n FROM pushes WHERE pushed_at >= ? AND COALESCE(reason, '') != 'unlisted'").get(bjMidnightUtc(now)).n;
   const left = Math.max(0, prefs.daily_max - today);
   // 关注的优先留下
   const ordered = picks.slice().sort((a, b) => (b.followed && b.followed.length ? 1 : 0) - (a.followed && a.followed.length ? 1 : 0));
@@ -116,7 +116,7 @@ export function applyDailyCap(db, picks, prefs, now) {
 /** 面板「推送记录」：最近推过的，带读者反馈。 */
 export function recentPushes(db, limit) {
   const rows = db.prepare(`SELECT p.id, p.pushed_at, p.reason, p.score, p.story_id, COALESCE(st.title, a.title) AS title, st.section, a.url
-    FROM pushes p LEFT JOIN stories st ON st.story_id = p.story_id LEFT JOIN articles a ON a.id = p.article_id ORDER BY p.id DESC LIMIT ?`).all(limit || 40);
+    FROM pushes p LEFT JOIN stories st ON st.story_id = p.story_id LEFT JOIN articles a ON a.id = p.article_id WHERE COALESCE(p.reason, '') != 'unlisted' ORDER BY p.id DESC LIMIT ?`).all(limit || 40);
   const fb = db.prepare("SELECT kind FROM feedback WHERE kind IN ('push_up', 'push_down') AND story_id = ? ORDER BY id DESC LIMIT 1");
   return rows.map((r) => Object.assign({}, r, { vote: r.story_id ? ((fb.get(r.story_id) || {}).kind || null) : null }));
 }

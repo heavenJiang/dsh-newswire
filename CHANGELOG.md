@@ -2,6 +2,13 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.30 (2026-11-12)
+
+What the first scheduled direct push showed in real use:
+- **A push now has a ceiling.** This morning's 07:16 push carried 111 items and 15,638 characters ("everything new" plus 9 hours overnight); Telegram turns a message that long into a file attachment, which nobody reads. The "short push" from the last releases had only been tried on two-hour daytime rounds. One message now spells out at most 12 items with a sentence and a source, then 18 as headlines only (one line each, still numbered and expandable by reply), and gives a count for the rest by area. When there are only a few more than 12 (up to 4), all get a sentence. Recomposed from this morning's edition: 56 items, 2,280 characters. Unlisted items are still recorded, so a later upgrade or development is pushed as usual.
+- **Ranked by importance, with 10 points for what you follow.** Followed items used to come first unconditionally; with many follows, trivial ones pushed real news down. After re-ranking, "dollar at an 18-month high" and "Trump open to resuming Iran talks" made the top 12, and a minor followed item moved to the headline-only tier.
+- **No sentence when there is nothing to add.** The line under a headline is dropped when it merely restates the headline, or when it is an untranslated foreign-language summary.
+
 ## 1.1.29 (2026-11-12)
 
 Housekeeping, no behaviour change:

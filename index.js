@@ -28,7 +28,7 @@ import { readLock } from "./engine/lock.mjs";
 import { createModel } from "./host/model.mjs";
 import { learnRecipe } from "./host/recipe.mjs";
 import { readSource, readTargets } from "./host/modelread.mjs";
-import { bodiesFor, composeEditionMessage, editionById, editionPicks, inFocus, latestEdition, llmEdition, loadLayout, notesFromEdition, orderPicks, profilesOf, reassemble, recordEditionPushes, ruleEdition, saveEdition, scrubStory, storyDetail, storyProfile, tickerBoard, updateEditionContent } from "./host/edition.mjs";
+import { bodiesFor, composeEditionMessage, editionById, editionPicks, inFocus, latestEdition, llmEdition, loadLayout, notesFromEdition, orderPicks, restGroups, tierPicks, profilesOf, reassemble, recordEditionPushes, ruleEdition, saveEdition, scrubStory, storyDetail, storyProfile, tickerBoard, updateEditionContent } from "./host/edition.mjs";
 import { promptOf } from "./host/profiles.mjs";
 import { buildDaily, saveDaily, todayBj } from "./host/daily.mjs";
 import { DEFAULT_RULES, recordPushes } from "./engine/pipeline/select.mjs";
@@ -858,7 +858,7 @@ export function apply(ctx, config) {
     else if (on && task) add("clock", false, "直接发可用，但还没接管时间表", task.kind !== "cron" ? "定时任务不是 cron 时间规则，插件接管不了：在「推送」里重新选一次节奏。" : "一分钟内会自动接管；一直不接管就在「推送」里重新选一次节奏。");
     const last = kvGet("push_last");
     if (last) add("last", Boolean(last.ok), "最近一次直接发送：" + bjHhmm(String(last.at).replace("T", " ").slice(0, 19)) + (last.ok ? " 已送出（" + last.chars + " 字）" : " 没发出去（" + (last.reason || "未知原因") + "）"));
-    const lastPush = withDb(p, (db) => (db ? db.prepare("SELECT MAX(pushed_at) t, COUNT(*) n FROM pushes WHERE pushed_at >= datetime('now', '-1 day')").get() : null));
+    const lastPush = withDb(p, (db) => (db ? db.prepare("SELECT MAX(pushed_at) t, COUNT(*) n FROM pushes WHERE pushed_at >= datetime('now', '-1 day') AND COALESCE(reason, '') != 'unlisted'").get() : null));
     if (lastPush && lastPush.t) add("recent", true, "近 24 小时记了 " + lastPush.n + " 条推送，最近一次 " + bjHhmm(lastPush.t));
     else add("recent", false, "近 24 小时没有推送记录");
     const pend = readPending("core");
@@ -1105,10 +1105,19 @@ export function apply(ctx, config) {
     parts = Object.assign({}, parts, { full, from: bjHhmm(new Date(Date.now() - lookbackHours * 3600000).toISOString().replace("T", " ").slice(0, 19)) });
     const all = editionPicks(db, ed, rulesFor(Object.assign({}, DEFAULT_RULES, rules || {}), pp), { nowIso, lookbackHours, penalties: sectionPenalties(db), full });
     const cap = full ? { send: all, held: 0, today: 0 } : applyDailyCap(db, all, pp);
-    const picks = cap.send;
+    // 一条消息写多少有上限：最重要的十来条写一句话，再十几条只列标题，其余只报个数（隔夜、「全推」时一轮可能上百条）
+    const tiers = tierPicks(cap.send);
+    tiers.titles.forEach((s) => { s.title_only = true; });
+    const picks = tiers.detail.concat(tiers.titles);
     // 记推送的这一次给每条编当天的序号（按消息里的顺序），读者在手机上回复序号来展开、反馈
-    if (record) { numberPicks(db, orderPicks(picks).flatMap((g) => g.items)); recordEditionPushes(db, picks, runId, nowIso, out.pack || ed.pack); }
-    parts = Object.assign({}, parts, { format: pp.format, tracked: trackedIn(db, picks.map((x) => x.id)) });
+    if (record) {
+      numberPicks(db, orderPicks(tiers.detail).flatMap((g) => g.items).concat(tiers.titles));
+      recordEditionPushes(db, picks, runId, nowIso, out.pack || ed.pack);
+      // 没列出来的也记一笔（原因记 unlisted、没有序号）：以后它升级或有进展时才认得出是「推过提了一句」的
+      if (tiers.rest.length) recordEditionPushes(db, tiers.rest.map((s) => Object.assign({}, s, { reason: "unlisted", n: null })), runId, nowIso, out.pack || ed.pack);
+    }
+    parts = Object.assign({}, parts, { format: pp.format, tracked: trackedIn(db, picks.map((x) => x.id)), rest: restGroups(tiers.rest), totals: { all: cap.send.length, fresh: cap.send.filter((x) => x.reason === "new").length } });
+    out.unlisted = tiers.rest.length;
     out.held = cap.held;
     out.picks = picks.map((x) => ({ story: x.id, event_id: x.lead_event_id, title: x.title, url: x.url, importance: x.importance, credibility: x.credibility, reason: x.reason, source_count: x.source_count, section: x.section, followed: x.followed || null }));
     return composeEditionMessage(parts, picks, ed, taxonomyNames()) + (cap.held ? "\n（今天已推 " + (cap.today + picks.length) + " 条，到了每天上限；另有 " + cap.held + " 条留在面板里）" : "");
