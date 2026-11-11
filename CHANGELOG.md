@@ -2,6 +2,14 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.20 (2026-11-11)
+
+Fixes from running the new profiles on real data with a local model:
+- Checking now counts the material's source name. Long-form tech leads say "NVIDIA Technical Blog 介绍…" as asked, and used to be flagged unverified because the source name isn't in the body. Sources not in the material are still flagged.
+- Profiles that need long material (long-form tech, open-source projects) always fetch the article body before writing. A GitHub project's one-line description used to count as complete, so its README was never fetched and the copy came out thin.
+- Long-form tech, community and open-source copy no longer says "材料称" ("the material says") or similar.
+- Reddit r/MachineLearning now takes the week's top posts with 30 points or more: it has few posts a day, so the daily 50-point bar often returned nothing and was logged as a failed fetch. Sources already in your config keep their settings; change the URL and threshold in the panel if you like.
+
 ## 1.1.19 (2026-11-11)
 
 - **Reddit and GitHub Trending**, also off by default and read through browse:

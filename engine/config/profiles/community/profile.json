@@ -1,7 +1,7 @@
 {
   "id": "community",
   "name": "社区讨论",
-  "version": 1,
+  "version": 2,
   "note": "Hacker News 等社区的讨论帖：被讨论的原文写导语和要点，评论区写成「社区观点」。由源声明（sources.json 里 profile: \"community\"）。社区帖子不算独立信源。",
   "priority": 22,
   "badge": "社区",

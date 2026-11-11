@@ -73,3 +73,15 @@ test("影响分析的联网材料：标明是网页搜索，提示词说清只�
   assert.equal(builtinProfiles().get("tech-deep").search.analysis, 1);
   assert.equal(builtinProfiles().get("wire").search.analysis, 0);
 });
+
+test("核对：模型写出材料的来源名称（如「NVIDIA Technical Blog 介绍……」）不算编造", () => {
+  const db = tmpDb();
+  const deep = builtinProfiles().get("tech-deep");
+  const story = { by: "llm", lead: "NVIDIA Technical Blog 介绍开源组件 Snapshot。", lead_refs: ["n1"], points: [], views: [], impact: "" };
+  verifyStory(db, story, [{ id: "n1", title: "NVIDIA Snapshot", summary: "Snapshot is an open-source component.", source_id: "nvidia_dev", source_name: "NVIDIA Technical Blog", grp: "nvidia" }], new Map(), deep.content, deep.blocks);
+  assert.equal(story.lead_missing, undefined);
+  const s2 = { by: "llm", lead: "Reuters 报道 Snapshot。", lead_refs: ["n1"], points: [], views: [], impact: "" };
+  verifyStory(db, s2, [{ id: "n1", title: "NVIDIA Snapshot", summary: "Snapshot is an open-source component.", source_id: "nvidia_dev", source_name: "NVIDIA Technical Blog", grp: "nvidia" }], new Map(), deep.content, deep.blocks);
+  assert.deepEqual(s2.lead_missing, ["reuters"], "材料里没有的来源照样标待核");
+  db.close();
+});

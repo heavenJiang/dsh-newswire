@@ -1,7 +1,7 @@
 {
   "id": "tech-deep",
   "name": "技术长文",
-  "version": 1,
+  "version": 2,
   "note": "技术博客与长文：不是新闻，写成「讲了什么、怎么做的、能借鉴什么」。由源声明（sources.json 里 profile: \"tech-deep\"）。",
   "priority": 21,
   "badge": "长文",

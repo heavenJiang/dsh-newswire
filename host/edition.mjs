@@ -329,8 +329,10 @@ export function verifyStory(db, story, items, bodies, content, blocks) {
   const histIdx = (refs) => (refs || []).map((r) => { const k = hist.findIndex((h) => "h:" + h.story_id === r); return k >= 0 ? mats.length + k : -1; }).filter((i) => i >= 0);
   const extra = (story.extra || []).map((b) => Object.assign({}, b, { refs: toIdx(b.refs).concat(histIdx(b.refs)), items: (b.items || []).map((x) => ({ text: x.text, refs: toIdx(x.refs).concat(histIdx(x.refs)) })) }));
   // 每一块能对照的材料：只认报道原文；能依据社区评论的块带上评论；能依据以前报道的块再接上前情（下标排在材料后面）
-  const srcTexts = mats.map((m) => materialText(m, bodies, sourceOnly(content)));
-  const wideTexts = mats.map((m) => materialText(m, bodies, content));
+  // 材料前面带上来源名称：模型看到了来源（「NVIDIA Technical Blog 介绍……」），写出来不算编造
+  const named = (m, t) => (m.source_name ? m.source_name + "｜" : "") + t;
+  const srcTexts = mats.map((m) => named(m, materialText(m, bodies, sourceOnly(content))));
+  const wideTexts = mats.map((m) => named(m, materialText(m, bodies, content)));
   const histTexts = hist.map(historyText);
   const byBlock = new Map((blocks || []).map((b) => [b.id, b.materials || ["source"]]));
   const sourcesFor = (id) => { const m = byBlock.get(id) || ["source"]; return (m.includes("community") ? wideTexts : srcTexts).concat(m.includes("history") ? histTexts : []); };
@@ -1011,7 +1013,9 @@ export async function llmEdition(db, model, o) {
   if (o.deepRead) {
     const have = bodiesFor(db, toWrite.flatMap((s) => s._g.items.map((it) => it.id)));
     const need = [];
-    for (const s of toWrite) for (const it of pickMaterials(s._g.items, 4)) if (it.completeness !== "full" && !have.has(it.id) && !need.some((x) => x.id === it.id)) need.push(it);
+    // 读法要长材料的（技术长文、开源项目：正文 2000 字以上）：列表里的一两句说明也算不上正文，同样去原文抓
+    const wantsBody = (s) => reg.get(s.profile).content.body_chars >= 2000;
+    for (const s of toWrite) for (const it of pickMaterials(s._g.items, 4)) if ((it.completeness !== "full" || wantsBody(s)) && !have.has(it.id) && !need.some((x) => x.id === it.id)) need.push(it);
     try { stats.deep = await o.deepRead(need); } catch (e) { stats.deep = { tried: 0, ok: 0, error: String(e.message || e).slice(0, 120) }; }
   }
   const bodies = bodiesFor(db, toWrite.flatMap((s) => s._g.items.map((it) => it.id)));

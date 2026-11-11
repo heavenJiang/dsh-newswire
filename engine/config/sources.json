@@ -1081,7 +1081,7 @@
       "lang": "en",
       "type": "html_index",
       "adapter": "reddit",
-      "url": "https://old.reddit.com/r/MachineLearning/top/?t=day",
+      "url": "https://old.reddit.com/r/MachineLearning/top/?t=week",
       "channels": [
         "browse"
       ],
@@ -1092,9 +1092,9 @@
       "pack": "core",
       "profile": "community",
       "continuity": "snapshot",
-      "min_points": 50,
+      "min_points": 30,
       "comment_items": 6,
-      "note": "Reddit r/MachineLearning 当天热门（论文与研究讨论）：50 分以上的帖子；分数最高的 6 条读帖子页取顶层评论。社区讨论，不算独立信源。只能用 browse",
+      "note": "Reddit r/MachineLearning 本周热门（论文与研究讨论；这个版块每天帖子少，按周取）：30 分以上的帖子；分数最高的 6 条读帖子页取顶层评论。社区讨论，不算独立信源。只能用 browse",
       "enabled": false,
       "added_in": 8
     },
