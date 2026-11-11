@@ -18,6 +18,7 @@ import { createHash } from "node:crypto";
 import { parseJsonLoose } from "./model.mjs";
 import { verifyCopy, checkText } from "./factcheck.mjs";
 import { applyFollows, matchList } from "./follows.mjs";
+import { relatedStories, historyText } from "./history.mjs";
 import { loadProfiles, builtinProfiles, withFocus, focusOf, profileFor, promptOf, BUILTIN_PROFILES_DIR, DEFAULT_PROFILE, DEFAULT_BLOCKS } from "./profiles.mjs";
 import path from "node:path";
 
@@ -314,20 +315,27 @@ function loadArticles(db, ids) {
  * 结果写回 story：lead / lead_refs / lead_missing / points / views / impact / materials / check / push_lead。
  */
 export function verifyStory(db, story, items, bodies, content, blocks) {
+  const hist = Array.isArray(story.history) ? story.history : [];
   const cited = [...new Set([].concat(story.lead_refs || [], ...(story.points || []).map((p) => (p && p.refs) || []), ...(story.views || []).map((v) => v.refs || []),
     ...(story.extra || []).flatMap((b) => [].concat(b.refs || [], ...(b.items || []).map((x) => x.refs || [])))).filter((x) => typeof x === "string"))];
   let mats = pickMaterials(items, content && content.materials);
   const missingIds = cited.filter((id) => !mats.some((m) => m.id === id));
   if (missingIds.length) mats = mats.concat(loadArticles(db, missingIds));
   const toIdx = (refs) => (refs || []).map((id) => mats.findIndex((m) => m.id === id)).filter((i) => i >= 0);
-  const toIds = (idx) => (idx || []).map((i) => mats[i] && mats[i].id).filter(Boolean);
+  // 下标超出材料的是以前的报道（前情）：记成 h:<故事线 id>
+  const toIds = (idx) => (idx || []).map((i) => (mats[i] ? mats[i].id : hist[i - mats.length] ? "h:" + hist[i - mats.length].story_id : null)).filter(Boolean);
   story.materials = mats.map(matView);
   if (story.by !== "llm") { story.check = null; return story; }
-  const extra = (story.extra || []).map((b) => Object.assign({}, b, { refs: toIdx(b.refs), items: (b.items || []).map((x) => ({ text: x.text, refs: toIdx(x.refs) })) }));
-  // 读法里能依据社区评论的块，对照带评论的材料核对；其余只认报道原文
-  const wideBlocks = (blocks || []).filter((b) => (b.materials || []).includes("community")).map((b) => b.id);
+  const histIdx = (refs) => (refs || []).map((r) => { const k = hist.findIndex((h) => "h:" + h.story_id === r); return k >= 0 ? mats.length + k : -1; }).filter((i) => i >= 0);
+  const extra = (story.extra || []).map((b) => Object.assign({}, b, { refs: toIdx(b.refs).concat(histIdx(b.refs)), items: (b.items || []).map((x) => ({ text: x.text, refs: toIdx(x.refs).concat(histIdx(x.refs)) })) }));
+  // 每一块能对照的材料：只认报道原文；能依据社区评论的块带上评论；能依据以前报道的块再接上前情（下标排在材料后面）
+  const srcTexts = mats.map((m) => materialText(m, bodies, sourceOnly(content)));
+  const wideTexts = mats.map((m) => materialText(m, bodies, content));
+  const histTexts = hist.map(historyText);
+  const byBlock = new Map((blocks || []).map((b) => [b.id, b.materials || ["source"]]));
+  const sourcesFor = (id) => { const m = byBlock.get(id) || ["source"]; return (m.includes("community") ? wideTexts : srcTexts).concat(m.includes("history") ? histTexts : []); };
   const v = verifyCopy({ lead: story.lead, lead_refs: toIdx(story.lead_refs), points: (story.points || []).map((p) => (typeof p === "string" ? p : { text: p.text, refs: toIdx(p.refs) })), views: (story.views || []).map((x) => ({ who: x.who, says: x.says, refs: toIdx(x.refs) })), impact: story.impact, extra },
-    mats.map((m) => materialText(m, bodies, sourceOnly(content))), { wide: mats.map((m) => materialText(m, bodies, content)), wideBlocks });
+    srcTexts, { sourcesFor });
   Object.assign(story, {
     lead: v.copy.lead, lead_refs: toIds(v.copy.lead_refs), points: v.copy.points.map((p) => ({ text: p.text, refs: toIds(p.refs) })),
     views: v.copy.views.map((x) => ({ who: x.who, says: x.says, refs: toIds(x.refs) })), impact: v.copy.impact, check: v.check,
@@ -423,7 +431,7 @@ export function storyRows(db, ids) {
 
 /** 稿件可以沿用：模型写的，且写稿后没有新报道加入。 */
 const copyFresh = (row, total) => Boolean(row && row.copy && row.copy.by === "llm" && row.copy.items >= total);
-const copyOf = (c) => Object.assign({ lead: c.lead || "", lead_refs: c.lead_refs || [], points: c.points || [], views: c.views || [], impact: c.impact || "" }, Array.isArray(c.extra) && c.extra.length ? { extra: c.extra } : {});
+const copyOf = (c) => Object.assign({ lead: c.lead || "", lead_refs: c.lead_refs || [], points: c.points || [], views: c.views || [], impact: c.impact || "" }, Array.isArray(c.extra) && c.extra.length ? { extra: c.extra } : {}, Array.isArray(c.history) && c.history.length ? { history: c.history } : {});
 
 // ------------------------------------------------------------------ 节省 token：程序编排
 export function ruleEdition(db, o) {
@@ -529,7 +537,7 @@ function sumChecks(stories) {
   return t;
 }
 
-const strip = (s) => { const c = Object.assign({}, s); delete c._g; delete c._total; delete c._k; return c; };
+const strip = (s) => { const c = Object.assign({}, s); delete c._g; delete c._total; delete c._k; if (Array.isArray(c.history) && !c.history.length) delete c.history; return c; };
 
 // ------------------------------------------------------------------ 模型：提示词
 /**
@@ -633,7 +641,10 @@ export function writePrompt(batch, layout) {
     const fbk = (b.errors || []).length ? "\n读者指出这些说法有误，不要再写：" + b.errors.map((e) => "『" + clip(e.text, 60) + "』" + (e.note ? "（" + clip(e.note, 40) + "）" : "")).join("；") : "";
     const p = profs[i];
     const star = p.id !== DEFAULT_PROFILE && promptOf(p, "write") ? "（" + p.name + "）" : "";
-    return "【报道" + (i + 1) + "】" + star + b.story.title + prev + fbk + "\n材料：\n" + b.mats.map((it, k) => "[M" + (k + 1) + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + materialText(it, b.bodies, p.content)).join("\n");
+    // 前情：以前的相关故事线（H 编号），只能写进读法里能依据以前报道的块
+    const hb = p.blocks.filter((x) => (x.materials || []).includes("history")).map((x) => x.name || x.id);
+    const hist = (b.history || []).length && hb.length ? "\n以前的相关报道（前情，只能用在「" + hb.join("」「") + "」里，引用写 H 编号；和这件事没有直接关系就不要用）：\n" + b.history.map((h) => "[" + h.ref + "] " + String(h.at || "").slice(0, 10) + "｜" + historyText(h)).join("\n") : "";
+    return "【报道" + (i + 1) + "】" + star + b.story.title + prev + fbk + "\n材料：\n" + b.mats.map((it, k) => "[M" + (k + 1) + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + materialText(it, b.bodies, p.content)).join("\n") + hist;
   });
   // 版式与输出格式：这一批的读法都一样时按它的输出块，否则用默认的四块
   const spec = blockSpec(profs.every((p) => p.blocks === profs[0].blocks) ? profs[0].blocks : DEFAULT_BLOCKS, S, profs.some((p) => p.content.comments > 0));
@@ -704,9 +715,10 @@ export function writeFingerprint(entry, layout) {
   const p = entry.profile || storyProfile(layout, entry.story, entry.items);
   // 读法的写法（名称、版本、写稿要求、材料设置、输出块）改了，旧稿就不能沿用
   const f = p.id === DEFAULT_PROFILE && !promptOf(p, "write") ? "" : [p.id, p.version, p.name, promptOf(p, "write"), JSON.stringify(p.content), JSON.stringify(p.blocks)].join("|");
-  return createHash("sha1").update(JSON.stringify({ v: WRITE_V, t: entry.story.title, m: entry.mats.map((it) => it.id), p: entry.prevLead || "", e: (entry.errors || []).map((x) => x.text), s: layout.story, y: layout.style, f })).digest("hex");
+  const h = (entry.history || []).map((x) => x.story_id);
+  return createHash("sha1").update(JSON.stringify(Object.assign({ v: WRITE_V, t: entry.story.title, m: entry.mats.map((it) => it.id), p: entry.prevLead || "", e: (entry.errors || []).map((x) => x.text), s: layout.story, y: layout.style, f }, h.length ? { h } : {}))).digest("hex");
 }
-const COPY_KEYS = ["lead", "lead_refs", "points", "views", "impact", "extra", "update_text", "update_by"];
+const COPY_KEYS = ["lead", "lead_refs", "points", "views", "impact", "extra", "history", "update_text", "update_by"];
 function cacheGet(db, fp) {
   try { const r = db.prepare("SELECT copy FROM write_cache WHERE fp = ? AND created_at >= datetime('now', '-3 days')").get(fp); return r ? JSON.parse(r.copy) : null; } catch { return null; }
 }
@@ -1014,7 +1026,9 @@ export async function llmEdition(db, model, o) {
     // 有进展的故事线：新材料优先放进去，模型才看得到新进展
     let mats = pickMaterials(g.items, M);
     if (prevLead) { const nf = pickMaterials(g.fresh, Math.min(3, M)); mats = nf.concat(pickMaterials(g.items.filter((it) => !nf.includes(it)), M - nf.length)); }
-    return { story, items: g.items, bodies, mats, fresh: g.fresh, prevLead, profile, errors: fb.errors.get(story.id) || [] };
+    // 读法有能依据以前报道的块（如「背景」）：找以前的相关故事线当前情（H 编号），只找一次
+    if (story.history === undefined) story.history = profile.blocks.some((b) => (b.materials || []).includes("history")) ? relatedStories(db, { id: story.id, title: story.title, entities: g.entities || [], first_seen_at: story.first_seen_at }) : [];
+    return { story, items: g.items, bodies, mats, fresh: g.fresh, prevLead, profile, history: story.history, errors: fb.errors.get(story.id) || [] };
   };
   // 断点续写：上一次（中断、重启或超时前）已经写好的同一份材料，直接用写好的稿
   try { db.prepare("DELETE FROM write_cache WHERE created_at < datetime('now', '-3 days')").run(); } catch { /* 旧库没有这张表 */ }
@@ -1039,7 +1053,14 @@ export async function llmEdition(db, model, o) {
           if (!b || !str(w.lead, 10)) continue;
           const S = layout.story;
           // 「M2」→ 文章 id
-          const ids = (r) => (Array.isArray(r) ? r : [r]).map((x) => /^M?(\d+)$/i.exec(String(x || "").trim())).filter(Boolean).map((m) => b.mats[Number(m[1]) - 1]).filter(Boolean).map((it) => it.id);
+          const ids = (r) => (Array.isArray(r) ? r : [r]).map((x) => {
+            const t = String(x || "").trim();
+            const h = /^H(\d+)$/i.exec(t);
+            if (h) { const x2 = (b.history || [])[Number(h[1]) - 1]; return x2 ? "h:" + x2.story_id : null; }
+            const m = /^M?(\d+)$/i.exec(t);
+            const it = m && b.mats[Number(m[1]) - 1];
+            return it ? it.id : null;
+          }).filter(Boolean);
           Object.assign(b.story, parseCopy(w, b.profile.blocks, S, ids));
           // 新进展同样要经得起核对（只认给模型看的报道原文）
           const up = b.prevLead ? str(w.update, 60) : "";
@@ -1094,7 +1115,7 @@ export async function llmEdition(db, model, o) {
   // 模型失败时按规则临时归并出的新故事线不登记：下一轮这些新闻再交给模型
   out._persist = allStories.filter((s) => !(s._g.isNew && s._g.by === "rules")).map((s) => ({
     id: s.id, isNew: s.is_new, title: s.title, section: s.section, labels: s.labels, importance: s.importance, profile: s.profile, absorbed: s._g.absorbed || [], entities: s._g.entities || [],
-    copy: written.has(s.id) ? Object.assign({ lead: s.lead, lead_refs: s.lead_refs, points: s.points, views: s.views, impact: s.impact, by: "llm", model: model.label(), at, items: s._total }, s.extra && s.extra.length ? { extra: s.extra } : {}) : null,
+    copy: written.has(s.id) ? Object.assign({ lead: s.lead, lead_refs: s.lead_refs, points: s.points, views: s.views, impact: s.impact, by: "llm", model: model.label(), at, items: s._total }, s.extra && s.extra.length ? { extra: s.extra } : {}, s.history && s.history.length ? { history: s.history } : {}) : null,
     update: s.updated && s.update_text ? { text: s.update_text, by: s.update_by, items: s._g.fresh.length } : null,
     resolve: written.has(s.id) && fb.errors.has(s.id),
     items: s._g.fresh.map((it) => ({ article_id: it.id, event_id: it.event_id || null })),

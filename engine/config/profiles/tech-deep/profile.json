@@ -12,6 +12,9 @@
     "summary_chars": 600,
     "sampling": "head-middle-tail"
   },
+  "search": {
+    "analysis": 1
+  },
   "blocks": [
     {
       "kind": "lead",

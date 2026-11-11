@@ -132,7 +132,8 @@ test("Hacker News：首页帖子按分数门槛收，链接是原文，时间是
   const first = items[0];
   assert.match(first.link, /^https:\/\/www\.vulncheck\.com\//);
   assert.match(first.published_at, /^2026-11-10T22:17:56Z$/);
-  assert.match(first.summary, /^Hacker News 讨论：319 分，144 条评论（vulncheck\.com）/);
+  assert.equal(first.summary, "", "分数、评论数是热度信号，不写进摘要");
+  assert.deepEqual([first.signals.likes, first.signals.comments, first.signals_raw.site], [319, 144, "vulncheck.com"]);
   assert.equal(first.signals_raw.discussion, "https://news.ycombinator.com/item?id=50447074");
   const pages = { "https://news.ycombinator.com/item?id=50447074": readFileSync(path.join(FIX, "hackernews_item.html.gz")) };
   const fetchHtml = async (u) => (pages[u] ? gunzipSync(pages[u]).toString("utf8") : null);

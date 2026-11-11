@@ -73,7 +73,8 @@ export default {
       title: x.title,
       link: x.link,
       published_at: x.time,
-      summary: "Hacker News 讨论：" + x.points + " 分，" + x.comments + " 条评论" + (x.site ? "（" + x.site + "）" : ""),
+      // 摘要留空：分数和评论数是热度信号，不是内容；正文由正文抓取去原文取（Ask HN 由 enrich 用帖子正文补）
+      summary: "",
       content: "",
       signals: { likes: x.points, comments: x.comments, hot: [], section: "首页", rank: i },
       signals_raw: { hn_id: x.id, site: x.site, points: x.points, comments: x.comments, discussion: x.discussion, rank: x.rank },

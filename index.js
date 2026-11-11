@@ -12,7 +12,7 @@ import { sourceScores, setSourceState } from "./host/sources.mjs";
 import { translateTitles } from "./host/translate.mjs";
 import { DEPTHS, depthOf, depthParams, recordCall, usageToday, makeGate } from "./host/runtime.mjs";
 import { searchNews, answerNews } from "./host/ask.mjs";
-import { analysisMaterials, analyzeStory, saveAnalysis, latestAnalysis, analysisBrief, autoAnalyzeTargets } from "./host/analysis.mjs";
+import { analysisMaterials, analyzeStory, saveAnalysis, latestAnalysis, analysisBrief, autoAnalyzeTargets, webMaterials, searchQuery } from "./host/analysis.mjs";
 import { listTrackers, addTracker, removeTracker, unlinkStory, linkAll, trackerDetail, synthesize, suggestions as trackSuggestions, synthTargets } from "./host/tracking.mjs";
 import { parseCron, cronMatches, nextCron, minuteKey } from "./host/clock.mjs";
 import { CADENCES, LEVELS, TIMINGS, SCOPES, DELIVERIES, loadPush, savePush, normalizePush, sectionPenalties, rulesFor, applyDailyCap, recentPushes as pushHistory } from "./host/push.mjs";
@@ -1041,6 +1041,17 @@ export function apply(ctx, config) {
       // 分析的侧重按故事线的读法（写稿时记下的；旧故事线没记的按版块与分类认）
       const reg = profilesOf(lay);
       const prof = row.profile && reg.byId.has(row.profile) ? reg.get(row.profile) : storyProfile(lay, { section: row.section, labels }, []);
+      // 读法要联网的（search.analysis > 0）：用 browse 搜一次，搜索结果作背景材料；搜不到照常分析
+      if (prof.search && prof.search.analysis > 0 && mats.length) {
+        const q = searchQuery(row.title);
+        if (q) {
+          try {
+            const res = await runEngine(ctx, cfg, p, ["--mode", "search", "--query", q, "--max", "5", ...binFlags(cfg, "newswire-search")], 90000);
+            const j = engineJson(res.stdout);
+            if (j && j.ok) mats.push(...webMaterials(j.results, 4));
+          } catch { /* 搜不到不影响分析 */ }
+        }
+      }
       const a = await analyzeStory(model, { title: row.title, lead: copy && copy.lead, hint: promptOf(prof, "analysis") }, mats, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
       return saveAnalysis(db, storyId, a, { model: model.label(), auto });
     } finally { db.close(); }

@@ -26,6 +26,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { openDb, upsertSource, startRun, finishRun } from "./store/db.mjs";
+import { bingResults, searchUrl } from "./parsers/search.mjs";
 import { configureBrowse, browseStatus, ensureSession, browseFetch } from "./channels/browse.mjs";
 import { configureAgentReach } from "./channels/agent_reach.mjs";
 import { fetchSource, DEFAULT_CHAIN } from "./pipeline/fetch.mjs";
@@ -122,6 +123,20 @@ if (MODE === "read") {
   // 输出可能很大：等写完再退出，否则管道里会被截断
   await new Promise((r) => process.stdout.write("NEWSWIRE_JSON " + JSON.stringify({ ok: Boolean(res.ok && d.text), url, page_url: v.page_url || null, title: v.doc_title || null, text: d.text || "", links: d.links || [], times: d.times || [], truncated: Boolean(d.truncated), scroll: d.scroll || null, error: res.ok ? null : res.error }) + "\n", r));
   process.exit(res.ok ? 0 : 2);
+}
+
+// ------------------------------------------------------------------ 网页搜索（影响分析与背景补充用；browse 打开 Bing 结果页，不用收费搜索接口）
+if (MODE === "search") {
+  const q = str(A.query);
+  if (!q) { console.log("NEWSWIRE_JSON " + JSON.stringify({ ok: false, error: "query_required" })); process.exit(2); }
+  const url = searchUrl(q);
+  const pre = await preflight([Object.assign({}, DEF, { id: "search", url, channels: ["browse"] })]);
+  if (!pre.ok) { console.log("NEWSWIRE_JSON " + JSON.stringify({ ok: false, error: "browse_unavailable", reason: pre.reason || null })); process.exit(2); }
+  const res = await browseFetch("html", url, 1, { timeoutMs: 45000, waitFor: "li.b_algo", raw: true });
+  const html = res.ok && res.data && typeof res.data.html === "string" ? res.data.html : "";
+  const results = html ? bingResults(html, Number(A.max) || 6) : [];
+  await new Promise((r) => process.stdout.write("NEWSWIRE_JSON " + JSON.stringify({ ok: results.length > 0, query: q, results, error: res.ok ? (results.length ? null : "no_results") : res.error }) + "\n", r));
+  process.exit(results.length ? 0 : 2);
 }
 
 // ------------------------------------------------------------------ 页面结构概要（给模型学解析规则用）

@@ -7,5 +7,6 @@
   "match": { "labels": ["tech", "industry.ai_semis"] },
   "focus": { "boost": 20 },
   "content": { "materials": 6, "body_chars": 900, "summary_chars": 240, "sampling": "prefix" },
+  "search": { "analysis": 1 },
   "prompts": { "rubric": "rubric.md", "plan": "plan.md", "write": "write.md", "analysis": "analysis.md" }
 }

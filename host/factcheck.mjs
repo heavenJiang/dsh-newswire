@@ -89,8 +89,10 @@ export function verifyCopy(copy, sources, o) {
   const wideIds = new Set((o && o.wideBlocks) || []);
   const okRefs = (r) => uniq((Array.isArray(r) ? r : []).map(Number).filter((i) => Number.isInteger(i) && i >= 0 && i < n));
   const stat = { checked: 0, passed: 0, dropped: 0, flagged: 0, missing: [] };
+  // sourcesFor(块 id)：这一块能对照的材料（带评论的、带以前报道的……）；给了就以它为准
+  const srcOf = (block) => (o && o.sourcesFor && block && o.sourcesFor(block)) || (block && wideIds.has(block) ? wideSrc : sources);
   const judge = (text, refs, block) => {
-    const r = checkText(text, block && wideIds.has(block) ? wideSrc : sources);
+    const r = checkText(text, srcOf(block));
     if (r.claims) { stat.checked++; if (r.ok) stat.passed++; }
     const refsOut = r.claims && r.hits.size ? [...r.hits].sort((a, b) => a - b).slice(0, 3) : okRefs(refs);
     return { r, refs: refsOut };

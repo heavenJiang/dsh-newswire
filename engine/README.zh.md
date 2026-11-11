@@ -107,10 +107,11 @@ engine/
 | `focus` | 重点领域（只认第一个）：`boost` 挑材料加权；头版留一篇、版块多留 3 个位置、不做规则分诊。`layout.json` 的 `focus` 覆盖它的名称、分类和加权 |
 | `content` | 材料：`materials` 条数（2–10）、`body_chars` 正文截多少字、`summary_chars` 摘要截多少字、`sampling`（`prefix` 取开头；`head-middle-tail` 按 4:3:3 取开头、中段、结尾） |
 | `blocks` | 写哪几块（不写就是导语、要点、各方说法、影响四块） |
+| `search` | `{ "analysis": n }`：影响分析前用 browse 搜 n 次（Bing 结果页，不用收费接口），搜索结果作背景材料；默认 0。内置的「AI 与新技术」「技术长文」是 1 |
 | `badge` | 面板上标在标题前的小字（不超过 6 字），如「长文」「社区」；不写就不标 |
 | `prompts` | `rubric`（归并时的评分要求）、`plan`（统筹）、`write`（写稿）、`analysis`（影响分析的侧重），各是一个 Markdown 文件；`{name}` 换成读法名称 |
 
-`blocks` 每一项：`kind` 为 `lead`（导语，必须有）/ `points` / `views` / `impact`（原有四块），或 `text`（一段话）/ `list`（几条短句）。自定义块要有 `id` 和 `name`（面板上的小标题）；`chars` 字数、`max` 条数、`ask` 写作要求；`materials` 这一块能依据什么：`source` 只认报道原文，`community` 也认社区评论（读法的 `content.comments` 大于 0 时，评论附在材料后面，标【社区评论】）。每一块都逐句核对：导语、要点只对照原文，能依据评论的块对照带评论的材料；自定义块里核对不过的句子丢掉。
+`blocks` 每一项：`kind` 为 `lead`（导语，必须有）/ `points` / `views` / `impact`（原有四块），或 `text`（一段话）/ `list`（几条短句）。自定义块要有 `id` 和 `name`（面板上的小标题）；`chars` 字数、`max` 条数、`ask` 写作要求；`materials` 这一块能依据什么：`source` 只认报道原文，`community` 也认社区评论（读法的 `content.comments` 大于 0 时，评论附在材料后面，标【社区评论】），`history` 也认以前的相关故事线（前情：按标题相似和共同主体，从近 90 天写过稿的故事线里找最多 2 条，编号 H1、H2，只能写进这一块；面板上点「前情」打开那条故事线）。每一块都逐句核对：导语、要点只对照原文，能依据评论的块对照带评论的材料；自定义块里核对不过的句子丢掉。
 
 内置读法：
 | id | 名称 | 何时用 | 写什么 |
@@ -183,6 +184,8 @@ engine/
 规则通常不是手写的：通用解析认不出页面时，插件用 `--mode outline --url <地址>` 取页面骨架（标签、少量 class、data-*、链接与时间属性、短文本，重复的兄弟只留 3 个），交给模型写选择器，再用试抓验证（至少 3 条、链接和标题各不相同），不过关带着结果让模型再改一次。见 `host/recipe.mjs`。
 
 ## 模型读页面（「不限」档）
+`--mode search --query <搜索词> [--max 6]` 用 browse 打开 Bing 结果页（读服务器给的原始 HTML），返回 `[{ title, url, snippet, site }]`，跳转链接已解开。影响分析按读法的 `search.analysis` 调用它，不用任何收费搜索接口。
+
 `--mode read --url <地址>` 取页面全文快照：按阅读顺序的文字，每个链接就地标号【n】，时间元素标成〈时间 …〉，另附链接表与时间列表。插件让模型列出 `[标题, 链接编号, 时间]`，核对后（编号存在、标题在页面原文里、时间取自页面）按源 id 存成 `<dir>/<id>.json`，再以 `--prefetched <dir>` 交给 fetch / cycle：有预读条目的源直接用（通道记为 `llm`），照常走入库、去重、衔接与事件聚类；没有的照常走通道。见 `host/modelread.mjs`。
 
 ## CLI

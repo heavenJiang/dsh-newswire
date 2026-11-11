@@ -2,6 +2,12 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.18 (2026-11-11)
+
+- **Background from earlier coverage for long-form tech.** After Horizon's history search, but over local storylines: up to 2 written storylines from the last 90 days, matched by title similarity and shared entities, are given to the model as H1, H2 and may be used only in Background. Only that block may rest on them when checking; the lead and points still rest on this story's reports alone. In the panel, "earlier" opens that storyline. No model call, no network. Any profile can use it by giving a block `materials: ["history"]`.
+- **Impact analysis can search the web first.** browse opens the Bing results page (original HTML, unaffected by auto-translate) and the top results become background material; the model is told these are search snippets, not reports of the event. Numbers must still be found in the material. No paid search API is used. Turn it on in a profile with `search: { analysis: n }`; "AI and new technology" and "Long-form tech" search once by default. New engine mode `--mode search`.
+- Hacker News points and comment counts are kept as heat only, not written into the summary; the body is fetched from the article. Before, an HN story not yet written showed a lead like "Hacker News 讨论：769 分…".
+
 ## 1.1.17 (2026-11-11)
 
 - **Overseas tech sources**: Hacker News and nine tech blogs (OpenAI News, Simon Willison, Hugging Face, NVIDIA Technical Blog, vLLM, Lil'Log, Ahead of AI, Interconnects, GitHub Blog). After upgrading they appear in the Sources tab, **off by default**; turn them on yourself. All are read through browse; no paid API is used.

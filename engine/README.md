@@ -107,10 +107,11 @@ Location: built-in `engine/config/profiles/<id>/`; a `profiles/<id>/` directory 
 | `focus` | Focus area (only the first counts): `boost` raises its items when picking material; a front-page slot, 3 extra section slots, no rule triage. `focus` in `layout.json` overrides its name, categories and boost |
 | `content` | Material: `materials` count (2–10), `body_chars` body excerpt length, `summary_chars` summary length, `sampling` (`prefix` takes the start; `head-middle-tail` takes start, middle and end at 4:3:3) |
 | `blocks` | Which parts to write (default: lead, points, views, impact) |
+| `search` | `{ "analysis": n }`: before impact analysis, search n times through browse (Bing results page, no paid API) and add the results as background material; default 0. The built-in "AI and new technology" and "Long-form tech" use 1 |
 | `badge` | Short tag shown before the title in the panel (up to 6 characters), such as "长文" or "社区"; none if omitted |
 | `prompts` | `rubric` (scoring when grouping), `plan`, `write`, `analysis` (impact analysis focus), each a Markdown file; `{name}` becomes the profile name |
 
-Each entry in `blocks`: `kind` is `lead` (required) / `points` / `views` / `impact` (the original four), or `text` (a paragraph) / `list` (a few short lines). Custom blocks need an `id` and a `name` (the subheading in the panel); `chars`, `max` and `ask` set length, count and instructions; `materials` says what the block may rest on: `source` only the reports, `community` also community comments (when the profile's `content.comments` is above 0, comments are appended to the material, marked 【社区评论】). Every block is checked sentence by sentence: the lead and points against the reports only, comment-based blocks against material including comments; sentences in custom blocks that fail are dropped.
+Each entry in `blocks`: `kind` is `lead` (required) / `points` / `views` / `impact` (the original four), or `text` (a paragraph) / `list` (a few short lines). Custom blocks need an `id` and a `name` (the subheading in the panel); `chars`, `max` and `ask` set length, count and instructions; `materials` says what the block may rest on: `source` only the reports, `community` also community comments (when the profile's `content.comments` is above 0, comments are appended to the material, marked 【社区评论】), `history` also related earlier storylines (up to 2 written storylines from the last 90 days, matched by title similarity and shared entities, numbered H1, H2 and usable only in that block; in the panel, "earlier" opens that storyline). Every block is checked sentence by sentence: the lead and points against the reports only, comment-based blocks against material including comments; sentences in custom blocks that fail are dropped.
 
 Built-in profiles:
 | id | Name | When | Writes |
@@ -183,6 +184,8 @@ A source can carry `extract`: `{ item, link?, title?, time?, summary?, wait_for?
 The rules are usually not hand-written: when the generic parser can't read a page, the plugin takes a page outline with `--mode outline --url <url>` (tags, a few classes, data-* attributes, link and time attributes, short text, at most three repeated siblings), has the model write selectors, and verifies them with a test fetch (at least 3 entries with distinct links and titles); if they fail, the model gets the results and tries once more. See `host/recipe.mjs`.
 
 ## Model page reading (Unlimited)
+`--mode search --query <terms> [--max 6]` opens the Bing results page through browse (reading the server's original HTML) and returns `[{ title, url, snippet, site }]` with redirect links unwrapped. Impact analysis calls it per the profile's `search.analysis`; no paid search API is used.
+
 `--mode read --url <url>` takes a full-text snapshot of the page: text in reading order with each link numbered in place as 【n】 and time elements marked 〈时间 …〉, plus the link table and time list. The plugin has the model list `[title, link number, time]`, checks each entry (the number exists, the title is in the page text, the time comes from the page), saves them per source as `<dir>/<id>.json`, and passes `--prefetched <dir>` to fetch / cycle: sources with pre-read items use them (channel `llm`) and go through the usual ingest, dedup, continuity and event clustering; the others use their channels as usual. See `host/modelread.mjs`.
 
 ## CLI

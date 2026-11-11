@@ -37,7 +37,19 @@ export function analysisPrompt(story, mats) {
     "\n- horizon：影响主要在 短期（几天）/中期（几周）/长期（几个月以上）" +
     '\n只输出一个 JSON 对象：{"summary":"","impacts":[{"area":"","target":"","ticker":"","direction":"","why":"","confidence":""}],"scenarios":[{"name":"","likelihood":"","what":"","signals":""}],"watch":[""],"horizon":""}' +
     "\n\n新闻：" + story.title + (story.lead ? "\n导语：" + story.lead : "") +
+    (mats.some((m) => m.web) ? "\n来源标「网页搜索」的是搜索结果摘要，只用来了解背景和前因，不是这件事的报道，不要把它说的当成这件事的事实。" : "") +
     "\n\n报道材料（编号｜来源｜时间｜标题｜内容）：\n" + mats.map((m, i) => "[" + (i + 1) + "] " + m.source + "｜" + String(m.t || "").slice(0, 16) + "｜" + m.title + "｜" + clip(m.text, 600)).join("\n");
+}
+
+/** 网页搜索结果 → 分析材料（标明是搜索结果，不是这件事的报道）。 */
+export function webMaterials(results, max) {
+  return (results || []).slice(0, max || 4).filter((r) => r && r.title && r.url).map((r) => ({ id: "w:" + r.url, title: r.title, source: "网页搜索·" + (r.site || ""), t: "", url: r.url, text: r.snippet || r.title, web: true }));
+}
+
+/** 搜索词：故事线标题去掉标点，太短的不搜。 */
+export function searchQuery(title) {
+  const q = String(title || "").replace(/[「」“”"'《》【】（）()：:，,。！？!?]/g, " ").replace(/\s+/g, " ").trim();
+  return q.length >= 4 ? q.slice(0, 60) : "";
 }
 
 /** 一条故事线的分析材料：最新的几篇报道，正文优先。 */

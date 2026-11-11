@@ -73,7 +73,7 @@ window.__ModuleLoader__.load({
         'rt.today': '今天', 'rt.todayLine': '调用 {c} 次 · 输入 {i} · 输出 {o} · 缓存命中 {k}', 'rt.cacheRate': '输入缓存命中 {p}%', 'rt.est': '（宿主没报用量，按字数估算）', 'rt.ofBudget': '已用上限的 {p}%',
         'rt.speed': '实测：输出约 {t} token/秒，单次中位 {s} 秒', 'rt.conc': '并发 {n}', 'rt.concProbe': '并发待测（下一份版面自动测）', 'rt.probe': '（实测并行效率 {e}）',
         'rt.step.group': '归并', 'rt.step.read': '读页面', 'rt.step.recipe': '学解析', 'rt.full': '不限', 'rt.fullDesc': '不限：在「深度」之上，网页类的源每轮都由模型直接读页面，不靠解析规则，网站改版也不受影响；模型只能指认页面上真实存在的链接，标题和时间由程序逐条核对。不受每日 token 预算限制。RSS、接口和专用适配器读的是结构化数据，照常由程序处理。模型慢时按时间预算读，读不完的源照常由程序抓。', 'rt.readLine': '模型读页面：{at} 读了 {r}/{n} 个源，{ok} 个读出 {i} 条，核对丢掉 {d} 条，用时 {s} 秒', 'rt.readSkip': '{n} 个来不及，交给程序', 'rt.readFail': '没读出：{w}', 'rt.step.plan': '统筹', 'rt.step.write': '写稿', 'rt.step.translate': '翻译', 'rt.step.analyze': '影响分析', 'rt.step.ask': '问答', 'rt.step.split': '拆合集', 'rt.step.daily': '日报', 'rt.step.notes': '事件解读', 'rt.step.brief': '简报', 'rt.step.track': '追踪综述', 'rt.step.other': '其它',
-        'rd.outletsN': '等 {n} 家', 'rd.community': '社区讨论：{w}', 'ev.indep': '{n} 家独立报道', 'ev.single': '只有一家报道', 'ev.reports': '各家报道 · {n}', 'ev.first': '首报', 'ev.repost': '转载', 'ev.views': '阅读 {n}', 'ev.why': '为什么排在这里（重要度 {n}）',
+        'rd.outletsN': '等 {n} 家', 'rd.community': '社区讨论：{w}', 'rd.history': '前情', 'rd.historyMark': '前情', 'ev.indep': '{n} 家独立报道', 'ev.single': '只有一家报道', 'ev.reports': '各家报道 · {n}', 'ev.first': '首报', 'ev.repost': '转载', 'ev.views': '阅读 {n}', 'ev.why': '为什么排在这里（重要度 {n}）',
         'ev.searchPh': '搜标题关键词', 'ev.h6': '6 小时', 'ev.h24': '24 小时', 'ev.h72': '3 天', 'ev.multi': '只看多家报道的', 'ev.moreFilters': '更多筛选', 'ev.hot': '热词：',
         'tl.hint': '每根柱子是一轮抓取，高度是这轮新增的条数；点一根看这一轮抓到了什么。', 'tl.night': '隔夜', 'tl.pushed': '已推送', 'tl.failed': '{n} 源失败', 'tl.gap': '有缺口', 'tl.gaps': '{n} 处缺口', 'tl.barTip': '{t} 这一轮：新增 {n} 条，其中 {m} 件多家报道',
         'tl.round': '{t} 这一轮', 'tl.srcs': '源 {a}/{b}', 'tl.newItems': '新增 {n} 条', 'tl.newEvents': '新事件 {n} 件', 'tl.pushes': '推送 {n} 条',
@@ -187,7 +187,7 @@ window.__ModuleLoader__.load({
         'rt.today': 'Today', 'rt.todayLine': '{c} calls · input {i} · output {o} · cache hits {k}', 'rt.cacheRate': '{p}% of input from cache', 'rt.est': '(estimated from text length; the host reported no usage)', 'rt.ofBudget': '{p}% of the limit',
         'rt.speed': 'Measured: about {t} output tokens/s, median call {s}s', 'rt.conc': 'concurrency {n}', 'rt.concProbe': 'concurrency not measured yet (next edition)', 'rt.probe': '(parallel efficiency {e})',
         'rt.step.group': 'grouping', 'rt.step.read': 'page reading', 'rt.step.recipe': 'learning parsers', 'rt.full': 'Unlimited', 'rt.fullDesc': 'Unlimited: on top of Deep, the model reads every web-page source directly each round, with no parsing rules, so site redesigns don\'t matter; the model can only point to links that really exist on the page, and the program checks every title and time. No daily token budget applies. RSS, APIs and dedicated adapters read structured data and stay with the program. With a slow model, reading follows a time budget and sources it can\'t reach are fetched by the program as usual.', 'rt.readLine': 'Page reading: {at}, read {r}/{n} sources, {ok} yielded {i} items, {d} dropped by checks, {s} s', 'rt.readSkip': '{n} left to the program for time', 'rt.readFail': 'nothing read: {w}', 'rt.step.plan': 'planning', 'rt.step.write': 'writing', 'rt.step.translate': 'translation', 'rt.step.analyze': 'impact', 'rt.step.ask': 'Q&A', 'rt.step.split': 'roundups', 'rt.step.daily': 'recap', 'rt.step.notes': 'event notes', 'rt.step.brief': 'briefs', 'rt.step.track': 'tracking', 'rt.step.other': 'other',
-        'rd.outletsN': ' and {n} outlets', 'rd.community': 'Discussed on {w}', 'ev.indep': '{n} independent outlets', 'ev.single': 'one outlet only', 'ev.reports': 'Reports · {n}', 'ev.first': 'first', 'ev.repost': 'repost', 'ev.views': '{n} views', 'ev.why': 'Why it ranks here (importance {n})',
+        'rd.outletsN': ' and {n} outlets', 'rd.community': 'Discussed on {w}', 'rd.history': 'Earlier', 'rd.historyMark': 'earlier', 'ev.indep': '{n} independent outlets', 'ev.single': 'one outlet only', 'ev.reports': 'Reports · {n}', 'ev.first': 'first', 'ev.repost': 'repost', 'ev.views': '{n} views', 'ev.why': 'Why it ranks here (importance {n})',
         'ev.searchPh': 'Search titles', 'ev.h6': '6 hours', 'ev.h24': '24 hours', 'ev.h72': '3 days', 'ev.multi': 'Several outlets only', 'ev.moreFilters': 'More filters', 'ev.hot': 'Trending: ',
         'tl.hint': 'Each bar is one fetch round; its height is the new items. Click one to see what that round brought.', 'tl.night': 'overnight', 'tl.pushed': 'pushed', 'tl.failed': '{n} failed', 'tl.gap': 'gap', 'tl.gaps': '{n} gaps', 'tl.barTip': 'Round at {t}: {n} new items, {m} stories with several outlets',
         'tl.round': 'Round at {t}', 'tl.srcs': 'sources {a}/{b}', 'tl.newItems': '{n} new items', 'tl.newEvents': '{n} new stories', 'tl.pushes': '{n} pushed',
@@ -576,10 +576,14 @@ window.__ModuleLoader__.load({
     function Refs(props) {
       var mats = props.mats || []
       var idx = (props.refs || []).map(function (id) { return mats.findIndex(function (m) { return m.id === id }) }).filter(function (i, k, a) { return i >= 0 && a.indexOf(i) === k }).sort(function (a, b) { return a - b })
-      if (!idx.length) return null
+      // 前情：引用以前的故事线（h:<id>），点开那条故事线
+      var hist = (props.refs || []).filter(function (r) { return typeof r === 'string' && r.indexOf('h:') === 0 }).map(function (r) { return (props.history || []).find(function (x) { return 'h:' + x.story_id === r }) }).filter(Boolean)
+      if (!idx.length && !hist.length) return null
       return h('sup', { className: 'nw-refs' }, idx.map(function (i) {
         var m = mats[i]
         return h('a', { key: m.id, className: 'nw-ref', href: m.url, target: '_blank', rel: 'noopener noreferrer', title: shortName({ name: m.name }) + ' ' + when(m.t) }, String(i + 1))
+      }), hist.map(function (x) {
+        return h('a', { key: x.story_id, className: 'nw-ref', href: '#', title: t('rd.history') + '：' + x.title, onClick: function (e) { e.preventDefault(); if (props.onOpen) props.onOpen(x.story_id) } }, t('rd.historyMark'))
       }))
     }
 
@@ -794,8 +798,8 @@ window.__ModuleLoader__.load({
         // 读法自定义的块（背景、可借鉴、社区观点……）：小标题来自读法
         allOpen ? xblocks.map(function (b) {
           return h('div', { key: 'x-' + b.id, className: 'nw-rs-block' }, h('div', { className: 'nw-rs-k' }, b.name),
-            b.kind === 'list' ? h('ul', { className: 'nw-rs-points' }, (b.items || []).map(function (x, i) { return h('li', { key: i }, x.text, h(Refs, { refs: x.refs, mats: mats })) }))
-              : h('p', { className: 'nw-rs-p' }, b.text, h(Refs, { refs: b.refs, mats: mats })))
+            b.kind === 'list' ? h('ul', { className: 'nw-rs-points' }, (b.items || []).map(function (x, i) { return h('li', { key: i }, x.text, h(Refs, { refs: x.refs, mats: mats, history: s.history, onOpen: props.onOpen })) }))
+              : h('p', { className: 'nw-rs-p' }, b.text, h(Refs, { refs: b.refs, mats: mats, history: s.history, onOpen: props.onOpen })))
         }) : null,
         allOpen && mats.length ? h('ol', { key: 's', className: 'nw-rs-src' }, mats.map(function (m) { return h('li', { key: m.id }, h('a', { className: 'nw-link', href: m.url, target: '_blank', rel: 'noopener noreferrer' }, shortName({ name: m.name })), h('span', { className: 'nw-muted' }, ' ' + hhmm(m.t))) })) : null,
         allOpen && !mats.length && s.url ? h('a', { key: 'o', className: 'nw-link nw-xs', href: s.url, target: '_blank', rel: 'noopener noreferrer' }, t('ed.original') + ' ↗') : null,
