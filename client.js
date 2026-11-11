@@ -90,6 +90,7 @@ window.__ModuleLoader__.load({
         'ask.ph': '搜索或提问，如：伊朗局势最近怎么样', 'ask.for': '「{q}」', 'ask.found': '近 {h} 小时找到 {n} 篇相关报道', 'ask.close': '× 回到版面', 'ask.answer': '回答', 'ask.reading': '模型正在读 {n} 篇相关报道作答（约 1 分钟）…', 'ask.notEnough': '找到的报道不足以回答这个问题。',
         'ask.by': '由 {m} 依据下列报道作答，每句标了出处', 'ask.dropped': '{n} 句与原文核对不上，已删去', 'ask.partial': '材料不全，回答可能不完整', 'ask.stories': '相关故事线', 'ask.reports': '{n} 篇', 'ask.items': '相关报道', 'ask.none': '没找到和「{t}」相关的报道。',
         'ps.title': '推送', 'ps.hint': '推到手机的每一条都会打扰你：先定好什么时候推、推多少。节奏会直接改定时任务的时间；每一轮里过了门槛的才推。', 'ps.cadence': '节奏', 'ps.level': '门槛', 'ps.fewer': '少而精', 'ps.normal': '适中', 'ps.more': '多一些', 'ps.limits': '上限', 'ps.perRound': '每轮最多', 'ps.daily': '每天最多', 'ps.timing': '时机', 'ps.onTime': '到点推送', 'ps.whenReady': '写完再推', 'ps.timingHint': '写完再推：到点只抓取，本轮版面写完（通常晚 10～20 分钟）再推一条，内容都是本轮的。到点推送：模型没写完时先推已编好的版面。', 'ps.delivery': '方式', 'ps.deliveryAuto': '直接发到手机', 'ps.deliveryTask': '经定时任务', 'ps.deliveryHint': '直接发：插件按定时任务的时间自己抓取、写版面，写完直接发到手机，不经过定时任务里的模型（模型转发长消息会改写、漏发）；这期间定时任务显示为暂停。', 'ps.deliveryNoSvc': '没装掌上指挥台（或它关了「允许其他插件发消息到手机」），现在经定时任务推送。', 'ps.direct': '由插件直接推送到手机，下一次 {n}', 'ps.scope': '内容', 'ps.picked': '挑重点', 'ps.full': '本轮新内容全推', 'ps.scopeHint': '全推：本轮所有新报道和有进展的报道都推，不看门槛和上限，消息会比较长。',
+        'ps.format': '长短', 'ps.brief': '短：标题加一句', 'ps.fullFmt': '长：重点带要点', 'ps.formatHint': '短消息每条只有标题、一句话和来源，前面有当天的序号。在手机上回复序号看要点（如「3」），「3 详」要详细报道，「3 有用 / 没用」调整以后推什么，「3 追踪」关注进展。', 'ps.fb': '近 14 天推了 {p} 条：你标了有用 {u}、没用 {d}，展开或点开看过 {i} 次。', 'ps.fbNone': '还没有反馈。在手机上回复「序号 有用 / 没用」，或在下面的推送记录里点一下，以后推什么会跟着调。',
         'ph.title': '推送链路', 'ph.fix': '怎么修：', 'mq.running': '模型正在跑：', 'mq.waiting': '排队：', 'mq.secs': '{n} 秒', 'mq.hint': '读者点的（详细报道、影响分析、问答）排在版面和后台任务前面',
         'ps.save': '保存', 'ps.saved': '已保存。', 'ps.noSvc': '当前宿主没有定时任务服务，只能保存偏好。', 'ps.noTask': '还没有安排定时推送：在对话里说「每 2 小时推送要闻」即可。', 'ps.task': '定时任务：{s}，下一次 {n}', 'ps.learned': '根据你对推送的反馈，这些版块的门槛已自动提高：{s}',
         'ps.log': '推送记录', 'ps.up': '有用', 'ps.down': '没用', 'ps.none': '还没有推送过。',
@@ -107,7 +108,7 @@ window.__ModuleLoader__.load({
         'ct.src': '来源', 'ct.state': '状态', 'ct.n': '条数', 'ct.full': '完整', 'ct.trunc': '截断', 'ct.titleOnly': '只有标题', 'ct.bodies': '正文补抓', 'ct.before': '此前 {p}%', 'ct.allOk': '各源内容完整。',
         'ct.st.degraded': '突然变少', 'ct.st.titles_only': '只有标题', 'ct.st.partial': '部分不全', 'ct.st.ok': '正常', 'ct.filtered': '已过滤 {n} 条（近 3 天）', 'ct.digest': '合集已拆条', 'ct.promo': '广告', 'ct.restore': '这是新闻，恢复', 'ct.restored': '已恢复',
         'st.thin': '{s} 内容变少', 'fb.promo': '这是广告或推广', 'fb.promoHint': '整条撤下；之后模型编排时会参照它识别同类内容', 'fb.promoDone': '已撤下，可在「运行 → 内容完整度」里恢复',
-        'sd.dek': '{n} 篇报道 · {o} 家媒体 · 始于 {t}', 'sd.why.new': '首次推送', 'sd.why.jumped': '重要度上升', 'sd.why.followup': '关注的故事线有进展', 'sd.why.corroborated': '获多家印证',
+        'sd.dek': '{n} 篇报道 · {o} 家媒体 · 始于 {t}', 'sd.why.new': '首次推送', 'sd.why.jumped': '重要度上升', 'sd.why.upgraded': '可信度升级', 'sd.why.followup': '故事线有进展', 'sd.why.corroborated': '获多家印证',
         'tab.today': '今日', 'tab.daily': '回顾', 'tab.follows': '关注与推送', 'tab.events': '事件', 'btn.runHint': '立即抓取各数据源并重新编排',
         'st.updated': '{t} 更新', 'st.failed': '{n} 个源失败', 'st.gaps': '{n} 处缺口', 'st.stale': '超过一天未更新',
         'rd.outlets': '{w}等 {n} 家', 'rd.developing': '进展', 'rd.more': '更多：各方说法、影响与来源', 'rd.less': '收起', 'rd.reportHint': '点出有误的那一句，它会立即撤下，下次重写时避开。',
@@ -205,6 +206,7 @@ window.__ModuleLoader__.load({
         'ask.ph': 'Search or ask, e.g. what is happening with Iran', 'ask.for': '“{q}”', 'ask.found': '{n} related reports in the last {h} hours', 'ask.close': '× Back to edition', 'ask.answer': 'Answer', 'ask.reading': 'The model is reading {n} related reports (about a minute)…', 'ask.notEnough': 'The reports found are not enough to answer this.',
         'ask.by': 'Answered by {m} from the reports below; every sentence is cited', 'ask.dropped': '{n} sentences did not match the sources and were removed', 'ask.partial': 'the material is incomplete', 'ask.stories': 'Related storylines', 'ask.reports': '{n} reports', 'ask.items': 'Related reports', 'ask.none': 'Nothing found for “{t}”.',
         'ps.title': 'Push', 'ps.hint': 'Every push interrupts you, so decide when and how much. Cadence changes the scheduled task itself; within each round only stories over the bar are pushed.', 'ps.cadence': 'Cadence', 'ps.level': 'Bar', 'ps.fewer': 'Fewer', 'ps.normal': 'Normal', 'ps.more': 'More', 'ps.limits': 'Limits', 'ps.perRound': 'Per round', 'ps.daily': 'Per day', 'ps.timing': 'Timing', 'ps.onTime': 'At the scheduled time', 'ps.whenReady': 'When the edition is ready', 'ps.timingHint': 'When ready: fetch at the scheduled time and push once this round\'s edition is written (usually 10–20 minutes later), so everything in it is from this round. At the scheduled time: if the model has not finished, push the latest written edition.', 'ps.delivery': 'Delivery', 'ps.deliveryAuto': 'Straight to the phone', 'ps.deliveryTask': 'Through the scheduled task', 'ps.deliveryHint': 'Straight to the phone: the plugin fetches and writes the edition on the scheduled task\'s timetable and posts it to the phone itself, with no model relaying it (a model relaying a long message may rewrite or drop it). The scheduled task shows as paused meanwhile.', 'ps.deliveryNoSvc': 'The Switchboard plugin is not installed (or its "Let other plugins post to the phone" is off), so pushes go through the scheduled task.', 'ps.direct': 'Posted straight to the phone by the plugin, next {n}', 'ps.scope': 'Content', 'ps.picked': 'Top stories', 'ps.full': 'Everything new this round', 'ps.scopeHint': 'Everything new: every new story and every story with new reports this round, ignoring the bar and limits. Messages get long.',
+        'ps.format': 'Length', 'ps.brief': 'Short: headline and one line', 'ps.fullFmt': 'Long: key stories with points', 'ps.formatHint': 'Short pushes carry a headline, one sentence and sources per item, each with a number for the day. On the phone, reply with the number to expand it ("3"), "3 详" for the detailed report, "3 有用 / 没用" to tune what is pushed, "3 追踪" to follow it.', 'ps.fb': 'Last 14 days, {p} pushed: you marked {u} useful and {d} not useful, and expanded or opened {i}.', 'ps.fbNone': 'No feedback yet. Reply "number 有用 / 没用" on the phone, or vote in the push log below, and pushes will adapt.',
         'ph.title': 'Push path', 'ph.fix': 'Fix: ', 'mq.running': 'Model is running: ', 'mq.waiting': 'Waiting: ', 'mq.secs': '{n}s', 'mq.hint': 'What you ask for (detailed report, impact analysis, Q&A) goes ahead of editions and background work',
         'ps.save': 'Save', 'ps.saved': 'Saved.', 'ps.noSvc': 'This host has no schedule service; only the preferences are saved.', 'ps.noTask': 'No scheduled push yet: say "push the news every 2 hours" in the chat.', 'ps.task': 'Scheduled task: {s}, next {n}', 'ps.learned': 'From your feedback, these sections now have a higher bar: {s}',
         'ps.log': 'Push history', 'ps.up': 'Useful', 'ps.down': 'Not useful', 'ps.none': 'Nothing pushed yet.',
@@ -222,7 +224,7 @@ window.__ModuleLoader__.load({
         'ct.src': 'Source', 'ct.state': 'State', 'ct.n': 'Items', 'ct.full': 'Full', 'ct.trunc': 'Cut off', 'ct.titleOnly': 'Title only', 'ct.bodies': 'Bodies fetched', 'ct.before': 'was {p}%', 'ct.allOk': 'All sources deliver full content.',
         'ct.st.degraded': 'dropped suddenly', 'ct.st.titles_only': 'titles only', 'ct.st.partial': 'partly cut off', 'ct.st.ok': 'ok', 'ct.filtered': '{n} filtered (last 3 days)', 'ct.digest': 'roundup, split', 'ct.promo': 'ad', 'ct.restore': 'This is news — restore', 'ct.restored': 'restored',
         'st.thin': '{s}: less content', 'fb.promo': 'This is an ad or promotion', 'fb.promoHint': 'removes it; the model uses it as an example to spot similar items', 'fb.promoDone': 'Removed; restore it under Runs → Content completeness',
-        'sd.dek': '{n} reports · {o} outlets · since {t}', 'sd.why.new': 'first push', 'sd.why.jumped': 'importance rose', 'sd.why.followup': 'followed storyline developed', 'sd.why.corroborated': 'corroborated',
+        'sd.dek': '{n} reports · {o} outlets · since {t}', 'sd.why.new': 'first push', 'sd.why.jumped': 'importance rose', 'sd.why.upgraded': 'credibility upgraded', 'sd.why.followup': 'storyline developed', 'sd.why.corroborated': 'corroborated',
         'tab.today': 'Today', 'tab.daily': 'Recap', 'tab.follows': 'Follow & push', 'tab.events': 'Events', 'btn.runHint': 'Fetch all sources now and lay out again',
         'st.updated': 'updated {t}', 'st.failed': '{n} sources failed', 'st.gaps': '{n} gaps', 'st.stale': 'not updated for over a day',
         'rd.outlets': '{w} and {n} outlets', 'rd.developing': 'Developing', 'rd.more': 'More: views, impact and sources', 'rd.less': 'Less', 'rd.reportHint': 'Pick the wrong sentence: it is removed now and avoided in the next rewrite.',
@@ -1215,6 +1217,8 @@ window.__ModuleLoader__.load({
       useEffect(function () {
         setD({ phase: 'busy', st: null, error: null })
         postJson(API.story, { id: props.id }).then(function (st) { setD({ phase: 'ready', st: st, error: null }) }).catch(function (e) { setD({ phase: 'error', st: null, error: e.message }) })
+        // 打开推送过的故事线算一次「感兴趣」（服务端判断推没推过，同一条一天只记一次）；记不上不影响阅读
+        postJson(API.feedback, { kind: 'open', story_id: props.id }).catch(function () {})
       }, [props.id])
       var opPair = useState({})
       var opened = opPair[0]
@@ -1497,6 +1501,8 @@ window.__ModuleLoader__.load({
           h('div', null, h(Seg, { value: draft.delivery || 'auto', onChange: function (x) { setDraft(function (d) { return Object.assign({}, d, { delivery: x }) }) }, options: [['auto', t('ps.deliveryAuto')], ['task', t('ps.deliveryTask')]] }), h('div', { className: 'nw-muted nw-xs' }, t((v.direct || {}).service ? 'ps.deliveryHint' : 'ps.deliveryNoSvc'))),
           h('div', { className: 'nw-ps-k' }, t('ps.scope')),
           h('div', null, h(Seg, { value: draft.scope || 'picked', onChange: function (x) { setDraft(function (d) { return Object.assign({}, d, { scope: x }) }) }, options: [['picked', t('ps.picked')], ['full', t('ps.full')]] }), h('div', { className: 'nw-muted nw-xs' }, t('ps.scopeHint'))),
+          h('div', { className: 'nw-ps-k' }, t('ps.format')),
+          h('div', null, h(Seg, { value: draft.format || 'brief', onChange: function (x) { setDraft(function (d) { return Object.assign({}, d, { format: x }) }) }, options: [['brief', t('ps.brief')], ['full', t('ps.fullFmt')]] }), h('div', { className: 'nw-muted nw-xs' }, t('ps.formatHint'))),
           h('div', { className: 'nw-ps-k' }, t('ps.limits')),
           h('div', { className: 'nw-ps-lim' },
             h('label', null, t('ps.perRound'), ' ', h('input', { className: 'nw-in nw-num', type: 'number', min: 1, max: 15, disabled: draft.scope === 'full', value: draft.per_round, onChange: function (e) { setDraft(Object.assign({}, draft, { per_round: Number(e.target.value) })) } })),
@@ -1507,6 +1513,7 @@ window.__ModuleLoader__.load({
           note ? h('span', { className: 'nw-saved' }, note) : null),
         pen.length ? h('p', { className: 'nw-note' }, t('ps.learned', { s: pen.map(function (k) { return ((props.names || {})[k] || k) + ' +' + v.penalties[k] }).join('、') })) : null,
         h('h2', { className: 'nw-sec-h nw-ps-log' }, t('ps.log')),
+        v.feedback ? h('p', { className: 'nw-muted nw-xs' }, v.feedback.up + v.feedback.down + v.feedback.interest > 0 ? t('ps.fb', { p: v.feedback.pushed, u: v.feedback.up, d: v.feedback.down, i: v.feedback.interest }) : t('ps.fbNone')) : null,
         (v.pushes || []).length ? h('ul', { className: 'nw-sb-list' }, v.pushes.map(function (x) {
           return h('li', { key: x.id, className: 'nw-sb-row' },
             h('div', { className: 'nw-sb-main' },

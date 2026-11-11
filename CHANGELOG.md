@@ -2,6 +2,13 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.23 (2026-11-11)
+
+Pushes were too long and feedback too rare (3 votes on 265 pushes). Both change together:
+- **Short pushes, expand by replying.** By default each pushed item is a headline, one sentence and one source link, with a number that is unique for the day (numbering continues through the day, so rounds never collide). On the phone, reply `3` for the lead, every point, views, impact, recent updates and sources; `3 详` for the detailed report, written in the background if there is none and then sent; `3 有用` / `3 没用` for feedback; `3 追踪` to follow the story. When the plugin can post to the phone it answers by itself (the tool returns `sent: true` and the model replies with just ✓); otherwise the message goes back for the model to relay verbatim. New tool `newswire_reply`; push preferences gain `format` (brief / full, default brief), and the long format is under Push → Length. The database moves to v27 (`pushes.n`).
+- **Trackers with movement come first.** Items in a round that belong to something you track are listed in one line under the headline; trackers with at most 3 hits are also tagged on their items.
+- **Feedback without extra taps.** Expanding an item, asking for its detailed report, following it, or opening a pushed storyline in the panel each count as interest, worth half a "useful" vote in the per-section threshold adjustment (once per storyline, kind and day). The Push page shows how many items were pushed in the last 14 days, how many were voted on, and how many were expanded or opened.
+
 ## 1.1.22 (2026-11-11)
 
 A slow local model with many things wanting it. This release sorts out who gets the model first, and which route a push really takes:

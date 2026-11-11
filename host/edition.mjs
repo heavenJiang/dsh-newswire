@@ -1459,8 +1459,31 @@ function heatOf(db, ids) {
 const fmtN = (n) => (n >= 10000 ? (n / 10000).toFixed(1).replace(/\.0$/, "") + "万" : String(n));
 
 export function recordEditionPushes(db, picks, runId, nowIso, pack) {
-  const st = db.prepare("INSERT INTO pushes (run_id, article_id, event_id, pack, score, reason, credibility, pushed_at, story_id) VALUES (?,?,?,?,?,?,?,?,?)");
-  for (const p of picks) st.run(runId, p.lead_article_id, p.lead_event_id, pack && pack !== "all" ? pack : "core", p.importance, p.reason, p.credibility, nowIso, p.id);
+  // n：当天的序号（消息里每条前面的数字，读者回复它来展开、反馈）；没编号的记空
+  const st = db.prepare("INSERT INTO pushes (run_id, article_id, event_id, pack, score, reason, credibility, pushed_at, story_id, n) VALUES (?,?,?,?,?,?,?,?,?,?)");
+  for (const p of picks) st.run(runId, p.lead_article_id, p.lead_event_id, pack && pack !== "all" ? pack : "core", p.importance, p.reason, p.credibility, nowIso, p.id, Number.isInteger(p.n) ? p.n : null);
+}
+
+/** 只留第一句（n 字内；第一句太短、不到 12 个字时留到 n 字内的完整句子）。 */
+export function oneSentence(text, n) {
+  const t = sentences(text, n);
+  const m = /^[^。！？!?]{11,}?[。！？!?]/.exec(t);
+  return m ? m[0] : t;
+}
+/** 推送消息里的顺序：重点在前，其余按领域分组。编序号和拼消息都按它。 */
+export function orderPicks(picks) {
+  const keys = picks.filter(isKeyStory);
+  const rest = picks.filter((s) => !isKeyStory(s));
+  const groups = [];
+  if (keys.length) groups.push({ title: "🔴 重点", key: true, items: keys });
+  const placed = new Set();
+  for (const g of PUSH_GROUPS) {
+    const xs = rest.filter((s) => !placed.has(s.id) && (!g.sections || g.sections.includes(s.section)));
+    if (!xs.length) continue;
+    xs.forEach((s) => placed.add(s.id));
+    groups.push({ title: g.title, key: false, items: xs });
+  }
+  return groups;
 }
 
 /** 推送消息分组：重点在前，其余按领域。 */
@@ -1513,15 +1536,26 @@ export function composeEditionMessage(parts, picks, ed, names) {
   const span = parts.from ? "汇总 " + parts.from + "–" + parts.hhmm + " · " : "";
   L.push(span + "新报道 " + nNew + " 件" + (picks.length > nNew ? " · 有进展 " + (picks.length - nNew) + " 件" : ""));
   if (ed.headline) L.push("> " + mdText(ed.headline));
+  // 读者追踪的对象里哪些有动静：放在最前面说
+  const tracked = (parts.tracked || []).filter((t) => t && t.name && (t.stories || []).length);
+  const trackOf = new Map();
+  // 每条后面标追踪对象：只标命中不多的（一个大主线命中十来条时，条条都标等于没标）
+  for (const t of tracked) if (t.stories.length <= 3) for (const sid of t.stories) if (!trackOf.has(sid)) trackOf.set(sid, t.name);
+  if (tracked.length) L.push("🔭 你追踪的有动静：" + tracked.slice(0, 4).map((t) => mdText(t.name) + (t.stories.length > 1 ? "（" + t.stories.length + " 条）" : "")).join("、"));
+  // 短消息（parts.format = "brief"）：每条只有标题、一句话和来源，想看哪条回复序号展开
+  const brief = parts.format === "brief";
   let markets = false;
   let i = 0;
   const item = (s, detailed) => {
     i++;
     const again = s.reason !== "new";
     const tag = s.reason === "followup" ? "【进展】" : s.reason === "upgraded" || s.reason === "jumped" ? "【升级】" : "";
-    L.push("", "**" + i + ". " + tag + mdText(s.title) + "**" + (s.followed && s.followed.length ? " ★" : ""));
+    L.push("", "**" + (Number.isInteger(s.n) ? s.n : i) + ". " + tag + mdText(s.title) + "**" + (s.followed && s.followed.length ? " ★" : "") + (trackOf.has(s.id) ? " 🔭" + mdText(trackOf.get(s.id)) : ""));
     const lead = s.push_lead || s.lead;
-    if (again && s.update_text) {
+    if (brief) {
+      const one = again && s.update_text ? "进展：" + oneSentence(s.update_text, 70) : lead && same(lead) !== same(s.title) ? oneSentence(lead, 70) : "";
+      if (one) L.push(mdText(one));
+    } else if (again && s.update_text) {
       L.push("进展：" + mdText(sentences(s.update_text, detailed ? 160 : 90)));
       if (detailed && lead && same(lead) !== same(s.title)) L.push("背景：" + mdText(sentences(lead, 100)));
     } else if (lead && same(lead) !== same(s.title)) L.push(mdText(sentences(lead, detailed ? 200 : 90)));
@@ -1533,24 +1567,17 @@ export function composeEditionMessage(parts, picks, ed, names) {
     }
     // 来源：媒体名就是链接（手机上点名字跳原文），最多列 3 家
     const links = (s.links && s.links.length ? s.links : [{ name: (s.outlets[0] || {}).name || (s.outlets[0] || {}).source_id, url: s.url }]).filter((x) => x && x.name);
-    const shown = links.slice(0, 3).map((x) => { const n = mdText(String(x.name).replace(/·.*$/, "")); return x.url ? "[" + n + "](" + x.url + ")" : n; });
+    const shown = links.slice(0, brief ? 1 : 3).map((x) => { const n = mdText(String(x.name).replace(/·.*$/, "")); return x.url ? "[" + n + "](" + x.url + ")" : n; });
     const h = s.heat || {};
     L.push([shown.join("、") + (s.outlets.length > shown.length ? " 等 " + s.outlets.length + " 家" : ""), tz(s.published_at || s.first_seen_at).slice(-5),
-      s.credibility === "confirmed" ? "权威确认" : s.credibility === "disputed" ? "说法有分歧" : "", h.views != null ? "阅读 " + fmtN(h.views) : ""].filter(Boolean).join(" · "));
+      s.credibility === "confirmed" ? "权威确认" : s.credibility === "disputed" ? "说法有分歧" : "", !brief && h.views != null ? "阅读 " + fmtN(h.views) : ""].filter(Boolean).join(" · "));
     if (/^markets|^macro/.test(s.section || "")) markets = true;
   };
-  const keys = picks.filter(isKeyStory);
-  const rest = picks.filter((s) => !isKeyStory(s));
-  if (keys.length) { L.push("", "**🔴 重点**"); for (const s of keys) item(s, true); }
-  const placed = new Set();
-  for (const g of PUSH_GROUPS) {
-    const xs = rest.filter((s) => !placed.has(s.id) && (!g.sections || g.sections.includes(s.section)));
-    if (!xs.length) continue;
-    L.push("", "**" + g.title + "**");
-    for (const s of xs) { placed.add(s.id); item(s, false); }
-  }
+  for (const g of orderPicks(picks)) { L.push("", "**" + g.title + "**"); for (const s of g.items) item(s, g.key && !brief); }
   L.push("");
   if (warn) L.push(warn);
+  // 编了当天序号的（记了推送的）才能回复
+  if (picks.some((s) => Number.isInteger(s.n))) { const eg = picks.find((s) => Number.isInteger(s.n)).n; L.push("回复序号看要点（如「" + eg + "」）；「" + eg + " 详」写详细报道；「" + eg + " 有用 / 没用」调整以后推什么。"); }
   L.push((ed.mode === "llm" ? "由 " + ed.model + " 阅读 " + ed.items_read + " 条新闻后编写，可能有误，以原文为准" : "按规则摘编自各家报道") + (markets ? "；财经内容非投资建议" : "") + "。");
   return L.join("\n");
 }

@@ -127,7 +127,7 @@ engine/
 ## 从链接推断时间
 源头没给时间时看链接：完整时间戳（`/2026101415255489242/`）记为 `page_text`；只有日期（`t20261107_`、`/20261029/`、`/2026/11-08/`）记为 `url_date`（北京时间零点），用于显示和数据集，但断点衔接和聚类不把它当可信时间。合并时时间可信度只升不降：fetched < url_date < page_text < feed。主条目的时间（含链接日期）早于回看范围一天以上的事件不推送，新源首轮列表里的旧条目不会被当成新闻。
 
-## 数据模型（schema v26）
+## 数据模型（schema v27）
 | 表 | 内容 |
 |---|---|
 | `sources` | 源配置快照（含 weight / tier / grp / pack / adapter / removed_at / profile） |
@@ -143,7 +143,7 @@ engine/
 | `events` | 事件：标题、主条目、首报 / 最近时间、成员数、独立媒体数、各源（outlets）、国内外分布、重要度、可信度、标签、地区、实体、打分因子、分歧、诞生轮次；`llm_notes`：模型解读（summary / why / watch、模型、时间、写时的成员数、提示词版本） |
 | `event_members` | 事件成员（每条至多属于一个事件）：相似度与合并方式（seed / title / title+number / entity） |
 | `event_scores` | 每轮的事件打分轨迹 |
-| `pushes` | 推送记录：event_id、主条目、当时的重要度与可信度、原因（new / upgraded / jumped） |
+| `pushes` | 推送记录：event_id、主条目、当时的重要度与可信度、原因（new / upgraded / jumped）；`n`（v27）是消息里的当天序号，读者在手机上回复它来展开、反馈 |
 | `article_bodies` | 正文：内容、长度、抽取方式（json-ld / next-data / paragraphs / browse / reader）、通道、是否付费墙、成败与错误 |
 | `briefings` | 模型简报（v8）：主题包、轮次、时间、模型、回看小时数、总括、内容（points / watch，各带 event_ids）、参与的事件、成败与错误、耗时。失败也记一行 |
 | `editions` | 版面（v9）：主题包、轮次、时间、模式（llm / rules）、模型、版式版本、时段、阅读条数、总括、整份内容（头版、版块、报道、值得关注、待核实）、错误、耗时、调用次数 |

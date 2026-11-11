@@ -259,7 +259,9 @@ const V26 = [
   "CREATE TABLE IF NOT EXISTS story_details (id INTEGER PRIMARY KEY AUTOINCREMENT, story_id TEXT, created_at TEXT, model TEXT, items INTEGER, content TEXT)",
   "CREATE INDEX IF NOT EXISTS idx_story_details ON story_details(story_id, id)",
 ];
-export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26];
+// v27：推送的当天序号（消息里每条前面的数字；读者在手机上回复序号来展开、要详细报道、反馈有用没用）
+const V27 = ["ALTER TABLE pushes ADD COLUMN n INTEGER", "CREATE INDEX IF NOT EXISTS idx_pushes_n ON pushes(n, id)"];
+export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26, V27];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
 export function migrate(db) {

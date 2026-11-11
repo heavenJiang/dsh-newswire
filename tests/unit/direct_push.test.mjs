@@ -167,3 +167,43 @@ test("推送链路自检：没装桥接插件、装了但没填聊天、直接�
   assert.ok(last && last.ok, "记下最近一次直接发送");
   c.dispose();
 });
+
+test("手机上回复序号：能直接发时插件自己发（不让模型转述）；不能时把消息交回；有用没用、追踪记下来", async () => {
+  const seed = (dir) => {
+    const db = openDb(path.join(dir, "news.sqlite"));
+    db.prepare("INSERT INTO stories (story_id, pack, title, section, labels, importance, status, copy, created_at, updated_at) VALUES ('s1','all','霍尔木兹海峡油轮起火','politics','[]',80,'active',?, datetime('now'), datetime('now'))").run(JSON.stringify({ lead: "伊朗称多艘油轮起火。", points: [{ text: "3 艘油轮起火" }], by: "llm" }));
+    db.prepare("INSERT INTO pushes (run_id, story_id, pack, score, reason, pushed_at, n) VALUES ('r1','s1','core',80,'new',datetime('now'),5)").run();
+    db.close();
+  };
+  const a = await mount({ phone: true });
+  seed(a.dir);
+  a.sent.length = 0;
+  const r = await a.call("/api/newswire/reply", { text: "5" });
+  assert.equal(r.sent, true);
+  assert.equal(r.message, "");
+  assert.equal(r.action, "expand");
+  assert.match(a.sent[0].text, /^\*\*5\. 霍尔木兹海峡油轮起火\*\*\n伊朗称多艘油轮起火。\n\n· 3 艘油轮起火/);
+  const viaTool = await a.tool("newswire_reply").execute({ text: "5 没用" });
+  assert.equal(viaTool.sent, true);
+  assert.match(a.sent.at(-1).text, /已记下：「霍尔木兹海峡油轮起火」没用/);
+  await a.call("/api/newswire/reply", { text: "5 追踪" });
+  assert.match(a.sent.at(-1).text, /已关注/);
+  assert.ok(JSON.parse(fs.readFileSync(path.join(a.dir, "follows.json"), "utf8")).follow.some((f) => f.kind === "story" && f.value === "s1"));
+  const d = await a.call("/api/newswire/reply", { text: "5 详" });
+  assert.equal(d.error, "no_model", "没有模型时说明白，不假装在写");
+  const miss = await a.call("/api/newswire/reply", { text: "42" });
+  assert.equal(miss.error, "no_such_number");
+  const db = openDb(path.join(a.dir, "news.sqlite"));
+  assert.deepEqual(db.prepare("SELECT kind FROM feedback WHERE story_id = 's1' ORDER BY id").all().map((x) => x.kind), ["push_open", "push_down", "push_follow", "push_detail"]);
+  db.close();
+  a.dispose();
+
+  const b = await mount({ phone: false });
+  seed(b.dir);
+  const rb = await b.call("/api/newswire/reply", { text: "5" });
+  assert.equal(rb.sent, false);
+  assert.match(rb.message, /^\*\*5\. 霍尔木兹海峡油轮起火/, "发不了就把消息交回去由模型原样回复");
+  const bad = await b.call("/api/newswire/reply", { text: "今天有什么新闻" });
+  assert.equal(bad.error, "not_a_reply");
+  b.dispose();
+});

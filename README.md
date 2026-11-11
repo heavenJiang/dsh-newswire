@@ -83,6 +83,10 @@ Pushes arrive through Telegram or Feishu. Each item has a headline, a lead, a so
 
 The evening digest has a one-line summary, the day's main threads, what to watch tomorrow, and the day's numbers.
 
+**Short pushes, expand by replying**: by default each item is a headline, one sentence and one source link, with a number that is unique for the day; trackers with movement are named at the top. Reply with the number on your phone: `3` for the lead, all points, views, impact and sources; `3 详` for the detailed report (written in the background if there is none, then sent to you); `3 有用` / `3 没用` to tune what is pushed; `3 追踪` to follow the story. When the plugin can post to the phone itself it answers these directly, with no model relaying the text. The long format is still there under Push → Length.
+
+**Feedback without extra taps**: expanding an item, asking for its detailed report, following it, or opening a pushed storyline in the panel each count as interest (half a "useful" vote); explicit useful / not useful votes work as before. A section with a net 3 or more "not useful" gets a higher push threshold.
+
 **Push path check**: "Follows & push" lists every step from the scheduled time to your phone (is the Switchboard direct-send service there, can it send, is there a schedule, has the plugin taken over the clock, did the last send go out) and says what is broken and how to fix it. With Switchboard installed and its "schedule chats" filled in, the plugin fetches on schedule and posts to the phone itself when the edition is written: no model relays the text, and the host's 10-minute limit on a tool call does not apply.
 
 ### 🧠 Deep on the model, light on tokens
@@ -249,7 +253,8 @@ The panel follows the harness's light and dark themes and works at phone width.
 | `newswire_track` | Tracking: list, add (company / technology / person / theme, optional ticker), get, rewrite the synthesis, remove |
 | `newswire_analyze` | Impact and outlook analysis for one storyline |
 | `newswire_follow` | Follow or mute storylines, keywords, topics and sources |
-| `newswire_push_prefs` | Push cadence, thresholds, per-round and daily caps ("push less") |
+| `newswire_push_prefs` | Push cadence, thresholds, per-round and daily caps, message length ("push less"), plus the push path check |
+| `newswire_reply` | The reader's reply to a pushed item number: `3` expands it, `3 详` sends the detailed report, `3 有用` / `3 没用` is feedback, `3 追踪` follows the story |
 | `newswire_schedule_setup` | Create, show, pause, resume or delete the push or digest schedule; `pack` picks the pack |
 | `newswire_cycle` | The scheduled round: fetch → group and score → fetch bodies → pick → return the message |
 | `newswire_run` | Fetch one round without pushing |

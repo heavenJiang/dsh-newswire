@@ -127,7 +127,7 @@ Which profile a story uses: if every item's source declares a `profile` in `sour
 ## Times from links
 When a source gives no time, the link is checked: a full timestamp (`/2026101415255489242/`) counts as `page_text`; a date only (`t20261107_`, `/20261029/`, `/2026/11-08/`) is stored as `url_date` (Beijing midnight) for display and datasets, but continuity and clustering treat it as untrusted. Time confidence only rises on merge: fetched < url_date < page_text < feed. Push selection skips events whose lead article's time (including a link date) is more than a day before the look-back window, so a new source's old list items are not pushed.
 
-## Data model (schema v26)
+## Data model (schema v27)
 | Table | Contents |
 |---|---|
 | `sources` | Source config snapshot (with weight / tier / grp / pack / adapter / removed_at / profile) |
@@ -143,7 +143,7 @@ When a source gives no time, the link is checked: a full timestamp (`/2026101415
 | `events` | Events: title, lead article, first and last seen, members, independent outlets, outlets, home/abroad mix, importance, credibility, labels, regions, entities, score factors, dispute, round of birth; `llm_notes`: the model's explanation (summary / why / watch, model, time, member count when written, prompt version) |
 | `event_members` | Event members (an item belongs to at most one event): similarity and how it joined (seed / title / title+number / entity) |
 | `event_scores` | Event score trail per round |
-| `pushes` | Pushes: event_id, lead article, importance and credibility at the time, reason (new / upgraded / jumped) |
+| `pushes` | Pushes: event_id, lead article, importance and credibility at the time, reason (new / upgraded / jumped); `n` (v27) is the item's number for the day in the message, which the reader replies with to expand it or give feedback |
 | `article_bodies` | Bodies: text, length, extractor (json-ld / next-data / paragraphs / browse / reader), channel, paywalled, success and error |
 | `briefings` | Model briefings (v8): pack, round, time, model, look-back hours, headline, content (points / watch, each with event_ids), events considered, success and error, duration. Failures get a row too |
 | `editions` | Editions (v9): pack, round, time, mode (llm / rules), model, layout version, period, items read, headline, full content (front page, sections, stories, worth watching, to verify), error, duration, calls |

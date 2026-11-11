@@ -12,7 +12,9 @@ const iso = (msAgo) => new Date(Date.now() - msAgo).toISOString().replace("T", "
 const tmpDb = () => openDb(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "nw-v23-")), "n.sqlite"));
 
 test("偏好：坏值退回默认、范围夹住；存取往返", () => {
-  assert.deepEqual(normalizePush({ cadence: "hourly", level: "max", per_round: 99, daily_max: 0 }), { version: 1, cadence: "every2h", level: "normal", per_round: 15, daily_max: 24, timing: "on_time", scope: "picked", delivery: "auto" });
+  assert.deepEqual(normalizePush({ cadence: "hourly", level: "max", per_round: 99, daily_max: 0 }), { version: 1, cadence: "every2h", level: "normal", per_round: 15, daily_max: 24, timing: "on_time", scope: "picked", delivery: "auto", format: "brief" });
+  assert.equal(normalizePush({ format: "long" }).format, "brief");
+  assert.equal(normalizePush({ format: "full" }).format, "full");
   assert.equal(normalizePush({ delivery: "pigeon" }).delivery, "auto");
   assert.equal(normalizePush({ delivery: "task" }).delivery, "task");
   assert.deepEqual([normalizePush({ timing: "later", scope: "all" }).timing, normalizePush({ timing: "when_ready", scope: "full" }).scope], ["on_time", "full"]);

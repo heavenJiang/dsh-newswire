@@ -18,7 +18,8 @@ import { listTrackers, addTracker, removeTracker, unlinkStory, linkAll, trackerD
 import { createQueue, PRIORITY } from "./host/queue.mjs";
 import { prune } from "./host/retention.mjs";
 import { parseCron, cronMatches, nextCron, minuteKey } from "./host/clock.mjs";
-import { CADENCES, LEVELS, TIMINGS, SCOPES, DELIVERIES, loadPush, savePush, normalizePush, sectionPenalties, rulesFor, applyDailyCap, recentPushes as pushHistory } from "./host/push.mjs";
+import { parseReply, numberPicks, storyOfNumber, trackedIn, composeExpand, composeDetail, REPLY_HELP } from "./host/reply.mjs";
+import { FORMATS, noteInterest, feedbackStats, CADENCES, LEVELS, TIMINGS, SCOPES, DELIVERIES, loadPush, savePush, normalizePush, sectionPenalties, rulesFor, applyDailyCap, recentPushes as pushHistory } from "./host/push.mjs";
 import { markKind } from "./engine/pipeline/quality.mjs";
 import os from "node:os";
 import path from "node:path";
@@ -31,7 +32,7 @@ import { readLock } from "./engine/lock.mjs";
 import { createModel, analyzeEvents } from "./host/model.mjs";
 import { cleanExtract, learnRecipe, judgeRecipe } from "./host/recipe.mjs";
 import { readSource, readTargets } from "./host/modelread.mjs";
-import { loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, storyDetail, sinceSeen, editionDiff, reassemble, scrubStory, qualityRows, editionById, editionList, tickerBoard, updateEditionContent, bodiesFor, inFocus, profilesOf, storyProfile } from "./host/edition.mjs";
+import { loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, orderPicks, storyDetail, sinceSeen, editionDiff, reassemble, scrubStory, qualityRows, editionById, editionList, tickerBoard, updateEditionContent, bodiesFor, inFocus, profilesOf, storyProfile } from "./host/edition.mjs";
 import { promptOf } from "./host/profiles.mjs";
 import { buildDaily, saveDaily, latestDaily, dailyDates, composeDailyMessage, todayBj } from "./host/daily.mjs";
 import { recordPushes, DEFAULT_RULES } from "./engine/pipeline/select.mjs";
@@ -1075,11 +1076,67 @@ export function apply(ctx, config) {
   /** 正在写的详细报道：故事线 id → { at, error }（写完删掉；失败留下错误，下次查看时告诉读者）。 */
   const detailJobs = new Map();
   /** 后台写详细报道（本地模型要几分钟，不让面板的请求一直挂着）；同一条已在写就不重复开。 */
-  function startDetail(storyId) {
+  function startDetail(storyId, o) {
     const cur = detailJobs.get(storyId);
-    if (cur && !cur.error) return;
-    detailJobs.set(storyId, { at: Date.now(), error: null });
-    void runDetail(storyId).then(() => detailJobs.delete(storyId)).catch((err) => detailJobs.set(storyId, { at: Date.now(), error: errText(err) }));
+    // 已经在写：手机上要的也等这一篇，写完一并发过去
+    if (cur && !cur.error) { if (o && o.notify) cur.notify = o.notify; return; }
+    const job = { at: Date.now(), error: null, notify: (o && o.notify) || null };
+    detailJobs.set(storyId, job);
+    void runDetail(storyId).then((d) => {
+      detailJobs.delete(storyId);
+      // 手机上回复「N 详」要的：写完直接发过去
+      if (job.notify) void background(sendDirect(composeDetail(job.notify.n, job.notify.title, d)), "detail to phone");
+    }).catch((err) => {
+      detailJobs.set(storyId, { at: Date.now(), error: errText(err) });
+      if (job.notify) void background(sendDirect("第 " + job.notify.n + " 条的详细报道没写成（" + errText(err) + "），可以稍后再回复「" + job.notify.n + " 详」试一次。"), "detail to phone");
+    });
+  }
+
+  /**
+   * 手机上回复序号：「3」展开要点，「3 详」详细报道，「3 有用 / 没用」反馈，「3 追踪」关注进展。
+   * 能直接发到手机时由插件自己发（返回 sent: true、message 为空，模型不用再转述）；不能时把 message 交回去由模型原样回复。
+   */
+  async function handleReply(text) {
+    const r = parseReply(text);
+    if (!r) return { ok: false, error: "not_a_reply", message: "没看懂这条回复。" + REPLY_HELP };
+    const hit = withDb(p, (db) => (db ? storyOfNumber(db, r.n) : null));
+    if (!hit) return finishReply({ ok: false, error: "no_such_number", n: r.n, message: "没找到第 " + r.n + " 条（序号每天从 1 重新编，只认推送过的）。" });
+    const d = withDb(p, (db) => (db ? storyDetail(db, hit.story_id) : null));
+    if (!d) return finishReply({ ok: false, error: "not_found", n: r.n, message: "第 " + r.n + " 条的故事线找不到了。" });
+    const base = { ok: true, n: r.n, action: r.action, story_id: d.id, title: d.title };
+    const note = (kind) => { try { withDb(p, (db) => { if (db) noteInterest(db, kind, d.id); }); } catch { /* 只是记录 */ } };
+    if (r.action === "up" || r.action === "down") {
+      const kind = r.action === "up" ? "push_up" : "push_down";
+      withDb(p, (db) => {
+        db.prepare("DELETE FROM feedback WHERE story_id = ? AND kind IN ('push_up', 'push_down')").run(d.id);
+        db.prepare("INSERT INTO feedback (at, kind, story_id, note) VALUES (?,?,?,?)").run(nowIsoUtc(), kind, d.id, d.section || null);
+      });
+      const sec = taxonomyNames()[d.section] || d.section || "";
+      return finishReply(Object.assign(base, { message: r.action === "up" ? "已记下：「" + d.title + "」有用。" : "已记下：「" + d.title + "」没用。" + (sec ? "「" + sec + "」这类没用的多了会自动少推。" : "") }));
+    }
+    if (r.action === "follow") {
+      note("push_follow");
+      await editFollows((f) => updateFollows(f, "follow", "story", d.id, d.title));
+      return finishReply(Object.assign(base, { message: "已关注「" + d.title + "」：有进展会标 ★ 并优先推给你。" }));
+    }
+    if (r.action === "detail") {
+      note("push_detail");
+      const have = withDb(p, (db) => (db ? latestDetail(db, d.id) : null));
+      if (have && !have.newer) return finishReply(Object.assign(base, { message: composeDetail(r.n, d.title, have) }));
+      if (!(modeNow() === "llm" && llmReady())) return finishReply(Object.assign(base, { ok: false, error: "no_model", message: have ? composeDetail(r.n, d.title, have) : "详细报道要模型来写，现在没有可用的模型。先回复「" + r.n + "」看要点。" }));
+      if (direct()) {
+        startDetail(d.id, { notify: { n: r.n, title: d.title } });
+        return finishReply(Object.assign(base, { running: true, message: "正在写第 " + r.n + " 条「" + d.title + "」的详细报道，写好直接发给你（本地模型约 2–4 分钟）。" }));
+      }
+      startDetail(d.id);
+      return finishReply(Object.assign(base, { running: true, message: "正在写第 " + r.n + " 条「" + d.title + "」的详细报道，约 2–4 分钟。写好后再回复「" + r.n + " 详」来取。" }));
+    }
+    note("push_open");
+    return finishReply(Object.assign(base, { message: composeExpand(r.n, d) }));
+  }
+  async function finishReply(out) {
+    if (out.message && direct() && (await sendDirect(out.message))) return Object.assign(out, { sent: true, message: "", note: "已直接发到手机，不要再回复任何文字" });
+    return Object.assign(out, { sent: false });
   }
   /** 详细报道：模型读这条故事线的全部报道写一篇分块的长稿，逐句核对，存档并返回。 */
   function runDetail(storyId) { return queue.run({ kind: "detail", label: "详细报道：" + storyTitle(storyId), priority: PRIORITY.reader }, () => runDetailNow(storyId)); }
@@ -1629,7 +1686,9 @@ export function apply(ctx, config) {
     const all = editionPicks(db, ed, rulesFor(Object.assign({}, DEFAULT_RULES, rules || {}), pp), { nowIso, lookbackHours, penalties: sectionPenalties(db), full });
     const cap = full ? { send: all, held: 0, today: 0 } : applyDailyCap(db, all, pp);
     const picks = cap.send;
-    if (record) recordEditionPushes(db, picks, runId, nowIso, out.pack || ed.pack);
+    // 记推送的这一次给每条编当天的序号（按消息里的顺序），读者在手机上回复序号来展开、反馈
+    if (record) { numberPicks(db, orderPicks(picks).flatMap((g) => g.items)); recordEditionPushes(db, picks, runId, nowIso, out.pack || ed.pack); }
+    parts = Object.assign({}, parts, { format: pp.format, tracked: trackedIn(db, picks.map((x) => x.id)) });
     out.held = cap.held;
     out.picks = picks.map((x) => ({ story: x.id, event_id: x.lead_event_id, title: x.title, url: x.url, importance: x.importance, credibility: x.credibility, reason: x.reason, source_count: x.source_count, section: x.section, followed: x.followed || null }));
     return composeEditionMessage(parts, picks, ed, taxonomyNames()) + (cap.held ? "\n（今天已推 " + (cap.today + picks.length) + " 条，到了每天上限；另有 " + cap.held + " 条留在面板里）" : "");
@@ -2089,6 +2148,12 @@ export function apply(ctx, config) {
           });
           return jsonResponse({ ok: true }, 200);
         }
+        // 面板里打开了推送过的故事线：算一次「感兴趣」（没推过的不记，同一条一天一次）
+        if (body.kind === "open") {
+          if (!sid) return jsonResponse({ error: "story_required" }, 400);
+          const noted = withDb(p, (db) => (db && db.prepare("SELECT 1 FROM pushes WHERE story_id = ? LIMIT 1").get(sid) ? noteInterest(db, "open", sid) : false));
+          return jsonResponse({ ok: true, noted: Boolean(noted) }, 200);
+        }
         // 读者判定「这不是新闻」（广告、引流）或「这是新闻」（被误过滤）：立即生效，读者的判断不被规则与模型覆盖
         if (body.kind === "promo" || body.kind === "not_promo") {
           const aid = strOrNull(body.article_id);
@@ -2160,7 +2225,7 @@ export function apply(ctx, config) {
       let health = null;
       try { health = await pushHealth(); } catch { health = null; }
       return { prefs, direct: dp, health, cadences: Object.fromEntries(Object.entries(CADENCES).map(([k, v]) => [k, v.label])), levels: Object.keys(LEVELS), task, schedule_available: Boolean(optional.schedule),
-        penalties: withDb(p, (db) => (db ? sectionPenalties(db) : {})), pushes: withDb(p, (db) => (db ? pushHistory(db, 40) : [])) };
+        penalties: withDb(p, (db) => (db ? sectionPenalties(db) : {})), feedback: withDb(p, (db) => (db ? feedbackStats(db) : null)), formats: FORMATS, pushes: withDb(p, (db) => (db ? pushHistory(db, 40) : [])) };
     }
     async function applyPush(next) {
       await ensureData(p);
@@ -2273,6 +2338,16 @@ export function apply(ctx, config) {
         }
         startDetail(id);
         return jsonResponse({ ok: true, running: true }, 202);
+      },
+    });
+    // 手机上回复序号（「3」「3 详」「3 没用」）：和工具 newswire_reply 同一个处理
+    route({
+      path: "/api/newswire/reply",
+      methods: ["POST"],
+      fetch: async (request) => {
+        const body = await bodyOf(request);
+        await ensureData(p);
+        return jsonResponse(await handleReply(String(body.text || "")), 200);
       },
     });
 
@@ -2757,10 +2832,10 @@ export function apply(ctx, config) {
 
     tool({
       name: "newswire_push_prefs",
-      description: "Read or change how often and how much news is pushed to the phone. cadence: every2h (07–21) / every4h (8, 12, 16, 20) / thrice (8, 12, 18) / daily_only (no rounds, only the evening recap) — changing it updates the scheduled task if one exists. level: fewer (higher bar) / normal / more. per_round: max stories per push (1–15). daily_max: max stories per day (1–100). timing: on_time (push at the scheduled time; if the model has not finished, push the latest written edition) / when_ready (fetch at the scheduled time, push once this round's edition is written, usually 10–20 minutes later). scope: picked (stories over the bar, within the limits) / full (every new story and every story with new reports this round, ignoring the bar and limits). delivery: auto (when the chat bridge plugin offers its phonePush service, the plugin posts to the phone itself on the task's schedule and pauses the scheduled task, so no model relays the text; otherwise through the scheduled task) / task (always through the scheduled task). With no arguments, returns the current settings, per-section adjustments learned from the reader's feedback, and `health`: a step-by-step check of the push path (which route is in use, what is broken and how to fix it).",
+      description: "Read or change how often and how much news is pushed to the phone. cadence: every2h (07–21) / every4h (8, 12, 16, 20) / thrice (8, 12, 18) / daily_only (no rounds, only the evening recap) — changing it updates the scheduled task if one exists. level: fewer (higher bar) / normal / more. per_round: max stories per push (1–15). daily_max: max stories per day (1–100). timing: on_time (push at the scheduled time; if the model has not finished, push the latest written edition) / when_ready (fetch at the scheduled time, push once this round's edition is written, usually 10–20 minutes later). scope: picked (stories over the bar, within the limits) / full (every new story and every story with new reports this round, ignoring the bar and limits). format: brief (each item is a headline, one sentence and its sources; the reader replies with the item number to expand it) / full (key stories carry points and impact). delivery: auto (when the chat bridge plugin offers its phonePush service, the plugin posts to the phone itself on the task's schedule and pauses the scheduled task, so no model relays the text; otherwise through the scheduled task) / task (always through the scheduled task). With no arguments, returns the current settings, per-section adjustments learned from the reader's feedback, and `health`: a step-by-step check of the push path (which route is in use, what is broken and how to fix it).",
       parameters: { type: "object", additionalProperties: false, properties: {
         cadence: { type: "string", enum: Object.keys(CADENCES) }, level: { type: "string", enum: Object.keys(LEVELS) },
-        per_round: { type: "number" }, daily_max: { type: "number" }, timing: { type: "string", enum: TIMINGS }, scope: { type: "string", enum: SCOPES }, delivery: { type: "string", enum: DELIVERIES } } },
+        per_round: { type: "number" }, daily_max: { type: "number" }, timing: { type: "string", enum: TIMINGS }, scope: { type: "string", enum: SCOPES }, delivery: { type: "string", enum: DELIVERIES }, format: { type: "string", enum: FORMATS } } },
       timeoutMs: 30000,
       output: {
         schema: { type: "object", additionalProperties: true, required: ["prefs"], properties: { prefs: { type: "object" } } },
@@ -2768,11 +2843,23 @@ export function apply(ctx, config) {
       },
       async execute(args) {
         const a = args || {};
-        const changed = ["cadence", "level", "per_round", "daily_max", "timing", "scope", "delivery"].some((k) => a[k] !== undefined);
+        const changed = ["cadence", "level", "per_round", "daily_max", "timing", "scope", "delivery", "format"].some((k) => a[k] !== undefined);
         if (!changed) { const v = await pushView(); return { prefs: v.prefs, penalties: v.penalties, task: v.task, health: v.health }; }
         const r = await applyPush(a);
         return { prefs: r.prefs, schedule_note: r.schedule ? r.schedule.note : null };
       },
+    });
+
+    tool({
+      name: "newswire_reply",
+      description: "Handle the reader's reply to a news push. Every pushed item carries a number that is unique for the day; the reader replies with that number, optionally followed by a short word: `3` expands item 3 (lead, all points, views, impact, sources); `3 详` sends its detailed report (written in the background if there is none yet, a few minutes on a local model); `3 有用` / `3 没用` records feedback that tunes what gets pushed; `3 追踪` follows the story. Pass the reader's message verbatim as `text`. When the result has `sent: true` the plugin has already posted the answer to the phone itself: do not repeat it, reply with just `✓`. Otherwise reply with `message` verbatim.",
+      parameters: { type: "object", additionalProperties: false, required: ["text"], properties: { text: { type: "string", description: "The reader's message, verbatim, e.g. \"3\" or \"12 没用\"" } } },
+      timeoutMs: 60000,
+      output: {
+        schema: { type: "object", additionalProperties: true, required: ["ok"], properties: { ok: { type: "boolean" }, message: { type: "string" }, sent: { type: "boolean" } } },
+        render: (_a, v) => [{ type: "text", text: v.sent ? "已直接发到手机（第 " + v.n + " 条：" + (v.title || "") + "）" : v.message || "" }],
+      },
+      async execute(args) { await ensureData(p); return handleReply(String((args && args.text) || "")); },
     });
 
     tool({
@@ -3073,7 +3160,7 @@ export function apply(ctx, config) {
     disposers.push(ctx.systemPrompt.section({
       name: "dsh-newswire",
       order: ctx.systemPrompt.getSectionOrder("DEPLOYMENT_PERSONA_SUFFIX") + 1,
-      text: "The dsh-newswire plugin keeps a local news store. For news, read newswire_snapshot / newswire_items first (stored items with source-reported heat signals); fetch a round with newswire_run only when that is not enough. To see which stories several outlets carry and how credible they are, use newswire_events / newswire_event; for a laid-out overview of what happened and what is worth watching, read newswire_edition (sections, leads, key points, items to verify; in LLM mode written by a model from the stored news, so check facts against the events). Scheduled pushes are set up with newswire_schedule_setup and each round runs newswire_cycle; when the user asks for a nightly news recap (e.g. 「每晚推送新闻回顾」), call newswire_schedule_setup with kind \"daily\"; when they want fewer, more, or differently timed pushes (e.g. 「推少一点」「晚上别推」「一天三次就行」), use newswire_push_prefs. To explain what an important story could lead to (impact on markets, companies, technology; possible scenarios), use newswire_analyze. To follow a company, technology, person or theme over weeks and get a synthesized view of its trend and implications (e.g. 「追踪英伟达」「帮我盯着固态电池」), use newswire_track. Add or remove sources with newswire_source_upsert / newswire_source_remove after trying them with newswire_source_test. Fetching tries browse first and falls back per source, recording error_kind and hint. Cite the outlet and data time for every news item (time_confidence=fetched means the time is approximated by the fetch time); mark financial content as not investment advice.",
+      text: "The dsh-newswire plugin keeps a local news store. For news, read newswire_snapshot / newswire_items first (stored items with source-reported heat signals); fetch a round with newswire_run only when that is not enough. To see which stories several outlets carry and how credible they are, use newswire_events / newswire_event; for a laid-out overview of what happened and what is worth watching, read newswire_edition (sections, leads, key points, items to verify; in LLM mode written by a model from the stored news, so check facts against the events). Scheduled pushes are set up with newswire_schedule_setup and each round runs newswire_cycle; when the user asks for a nightly news recap (e.g. 「每晚推送新闻回顾」), call newswire_schedule_setup with kind \"daily\"; when they want fewer, more, or differently timed pushes (e.g. 「推少一点」「晚上别推」「一天三次就行」), use newswire_push_prefs. To explain what an important story could lead to (impact on markets, companies, technology; possible scenarios), use newswire_analyze. To follow a company, technology, person or theme over weeks and get a synthesized view of its trend and implications (e.g. 「追踪英伟达」「帮我盯着固态电池」), use newswire_track. Add or remove sources with newswire_source_upsert / newswire_source_remove after trying them with newswire_source_test. Fetching tries browse first and falls back per source, recording error_kind and hint. Cite the outlet and data time for every news item (time_confidence=fetched means the time is approximated by the fetch time); mark financial content as not investment advice. Pushed news items are numbered; when the user's whole message is such a number, optionally followed by one short word (e.g. `3`, `3 详`, `12 没用`, `5 有用`, `7 追踪`), call newswire_reply with the message verbatim, then reply with just `✓` if the result has sent=true, otherwise with its `message` verbatim.",
       interpolate: false,
     }));
 
