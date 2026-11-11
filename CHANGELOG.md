@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.27 (2026-11-11)
+
+- **When the story moves on, so does the headline.** A storyline's headline was fixed when it was first grouped; later reports only rewrote the lead and points, so a headline could say "shares plunge" over a lead about the rebound. When a storyline with new developments is rewritten, the model may now give a headline that fits the present (none if the old one still holds). A new headline must pass three checks: 6 to 24 characters; its numbers and names appear in the sources; and it is about what the new lead says (at least 30% text overlap). Otherwise the old headline stays. The edition where it changed shows the previous headline under the story. Measured on a local model with three storylines: the two whose direction had not changed got no new headline, the one that had changed got one that passed the checks. It rides on the same writing call, so no extra model calls.
+
 ## 1.1.26 (2026-11-11)
 
 - **Themes carry their own search keywords.** A theme tracker ("Nvidia turmoil", "AI and data centers") has no ready-made aliases the way a company does, and after the stricter linking rule in the last release it could only grow through a same-named edition theme, so it stalled easily. Keywords are now taken from the name (dropping tails such as 风波 or 进展), and new reports whose titles carry one are linked. A keyword must be specific: generic words (AI, market, tech…) are refused, and so is anything found in more than 6% of the last 7 days' storyline titles. This happens when a theme is created; existing themes without aliases get theirs when the next edition comes out. On a copy of real data, 5 of 6 themes got a keyword and linked 1 to 26 on-topic stories from the last two days.

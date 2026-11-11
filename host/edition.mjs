@@ -676,7 +676,7 @@ export function blockSpec(blocks, S, comments) {
     else if (b.kind === "text") { desc.push(b.id + " " + b.name + "（不超过" + (b.chars || 80) + "字，" + (b.ask || "") + wide(b) + "；材料不足就给空字符串）"); json.push('"' + b.id + '":{"text":"","refs":["M1"]}'); }
     else if (b.kind === "list") { desc.push(b.id + " " + b.name + "（最多" + (b.max || 3) + "条，每条不超过" + (b.chars || 40) + "字，" + (b.ask || "") + wide(b) + "；没有就给空数组）"); json.push('"' + b.id + '":[{"text":"","refs":["M1"]}]'); }
   }
-  json.push('"update":""');
+  json.push('"update":""', '"title":""');
   return { text: desc.join("；"), json: '{"stories":[{' + json.join(",") + "}]}" };
 }
 
@@ -708,8 +708,25 @@ export function writePrompt(batch, layout) {
     "\n版式：" + spec.text + "。" +
     asks.join("") + "\n\n" +
     "update：只对给了「上次导语」的报道写，说清相比上次有什么新进展（不超过40字，依据新增材料；没有实质进展给空字符串）。" +
+    "\ntitle：只对给了「上次导语」的报道写。事情的走向已经和原标题不符时（原标题说大跌、现在已经反弹；原标题说「将」「拟」、现在已经发生；原标题里的数字已经过时），依据材料给一个符合现状的新标题（不超过20字）；原标题仍然成立就给空字符串。" +
     "\n只输出一个 JSON 对象：" + spec.json +
     "\n\n" + blocks.join("\n\n");
+}
+
+/**
+ * 模型给的新标题能不能用：6–24 个字、和原标题不同、里面的数字和专名在材料里找得到，
+ * 而且说的是导语那件事（和新导语有足够的字面重叠）——不然宁可留着原标题。
+ */
+export function acceptTitle(next, old, lead, sources) {
+  const t = String(next || "").replace(/\s+/g, " ").trim().replace(/[。.]$/, "");
+  const n = [...t].length;
+  if (n < 6 || n > 24 || t === String(old || "").trim()) return "";
+  if (!checkText(t, sources).ok) return "";
+  const tb = bigrams(t);
+  const lb = bigrams(String(lead || ""));
+  let hit = 0;
+  for (const g of tb) if (lb.has(g)) hit++;
+  return tb.size && hit / tb.size >= 0.3 ? t : "";
 }
 
 // ------------------------------------------------------------------ 模型编排（增量）
@@ -772,7 +789,7 @@ export function writeFingerprint(entry, layout) {
   const h = (entry.history || []).map((x) => x.story_id);
   return createHash("sha1").update(JSON.stringify(Object.assign({ v: WRITE_V, t: entry.story.title, m: entry.mats.map((it) => it.id), p: entry.prevLead || "", r: entry.rich || null, e: (entry.errors || []).map((x) => x.text), s: layout.story, y: layout.style, f }, h.length ? { h } : {}))).digest("hex");
 }
-const COPY_KEYS = ["lead", "lead_refs", "points", "views", "impact", "extra", "history", "update_text", "update_by"];
+const COPY_KEYS = ["lead", "lead_refs", "points", "views", "impact", "extra", "history", "update_text", "update_by", "title", "retitled"];
 function cacheGet(db, fp) {
   try { const r = db.prepare("SELECT copy FROM write_cache WHERE fp = ? AND created_at >= datetime('now', '-3 days')").get(fp); return r ? JSON.parse(r.copy) : null; } catch { return null; }
 }
@@ -1142,7 +1159,11 @@ export async function llmEdition(db, model, o) {
           Object.assign(b.story, parseCopy(w, b.profile.blocks, S, ids, b.rich));
           // 新进展同样要经得起核对（只认给模型看的报道原文）
           const up = b.prevLead ? str(w.update, 60) : "";
-          if (up && checkText(up, b.mats.map((m) => materialText(m, b.bodies, sourceOnly(b.profile.content)))).ok) Object.assign(b.story, { update_text: up, update_by: "llm" });
+          const srcText = b.mats.map((m) => materialText(m, b.bodies, sourceOnly(b.profile.content)));
+          if (up && checkText(up, srcText).ok) Object.assign(b.story, { update_text: up, update_by: "llm" });
+          // 事情的走向变了：标题跟着改（原标题记在 retitled 里），免得标题说大跌、导语说反弹
+          const nt = b.prevLead ? acceptTitle(w.title, b.story.title, b.story.lead, srcText) : "";
+          if (nt) { b.story.retitled = b.story.title; b.story.title = nt; stats.retitled = (stats.retitled || 0) + 1; }
           written.add(b.story.id);
           cachePut(db, writeFingerprint(b, layout), b.story);
         }

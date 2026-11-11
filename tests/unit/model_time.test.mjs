@@ -127,3 +127,18 @@ test("三轮版面：快讯不写；新报道少时沿用旧稿和上次的统�
   assert.equal(log.plan, 2, "来了排得进头版的新闻：重新统筹");
   db.close();
 });
+
+test("事情走向变了才换标题：新标题要和导语说的是一件事、数字在材料里找得到；不合格的留原标题", async () => {
+  const { acceptTitle, writePrompt } = await import("../../host/edition.mjs");
+  const src = ["财联社｜11-11 17:00｜英伟达盘前涨幅扩大至5%，报177.4美元/股，芯片半导体板块全线大涨。"];
+  const lead = "11月11日美股盘前，英伟达涨幅扩大至5%，报177.4美元/股，芯片半导体板块全线大涨。";
+  assert.equal(acceptTitle("英伟达盘前反弹涨5% 芯片股大涨", "英伟达股价大跌 市值蒸发约1.76万亿美元", lead, src), "英伟达盘前反弹涨5% 芯片股大涨");
+  assert.equal(acceptTitle("英伟达盘前涨8%", "英伟达股价大跌", lead, src), "", "8% 材料里没有");
+  assert.equal(acceptTitle("苹果发布新款手机和平板电脑", "英伟达股价大跌", lead, src), "", "和导语不是一件事");
+  assert.equal(acceptTitle("英伟达股价大跌", "英伟达股价大跌", lead, src), "", "没变");
+  assert.equal(acceptTitle("涨了", "英伟达股价大跌", lead, src), "", "太短");
+  assert.equal(acceptTitle("", "英伟达股价大跌", lead, src), "");
+  const p = writePrompt([{ story: { title: "T", section: "markets", labels: [] }, mats: [{ id: "a", title: "x", summary: "y", source_id: "cls" }], bodies: new Map(), fresh: [], prevLead: "旧导语" }], LAYOUT);
+  assert.match(p, /title：只对给了「上次导语」的报道写。事情的走向已经和原标题不符时/);
+  assert.match(p, /"update":"","title":""/);
+});

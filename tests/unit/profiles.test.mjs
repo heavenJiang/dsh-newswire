@@ -144,7 +144,7 @@ test("输出块 → 版式说明与 JSON：默认四块与原来一字不差；�
   const S = normalizeLayout(null).story;
   const def = blockSpec(builtinProfiles().def.blocks, S, false);
   assert.match(def.text, /^lead 导语（不超过120字，说清谁、何时、何事）；points 要点（最多3条/);
-  assert.equal(def.json, '{"stories":[{"ref":1,"lead":"","lead_refs":["M1"],"points":[{"text":"","refs":["M2"]}],"views":[{"who":"","says":"","refs":["M1"]}],"impact":"","update":""}]}');
+  assert.equal(def.json, '{"stories":[{"ref":1,"lead":"","lead_refs":["M1"],"points":[{"text":"","refs":["M2"]}],"views":[{"who":"","says":"","refs":["M1"]}],"impact":"","update":"","title":""}]}');
   const com = blockSpec(builtinProfiles().get("community").blocks, S, true);
   assert.match(com.text, /debate 社区观点（最多4条，每条不超过60字，评论区的主要看法与分歧[^）]*可以依据【社区评论】；没有就给空数组）/);
   assert.doesNotMatch(com.text, /impact|views/);
