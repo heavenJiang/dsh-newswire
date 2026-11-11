@@ -45,6 +45,10 @@ test("栏目名不是新闻", () => {
   assert.equal(isNavTitle("国际新闻"), true);
   assert.equal(isNavTitle("Israel's president taps Eisenkot to form government"), false);
   assert.equal(isNavTitle("沙特首都利雅得传出剧烈爆炸声"), false);
+  assert.equal(isNavTitle("Stripe完成收购OpenRouter"), false);
+  assert.equal(isNavTitle("XXYY宣布停运"), false);
+  assert.equal(isNavTitle("国际 World"), true);
+  assert.equal(isNavTitle("AI 前沿"), true);
 });
 
 const view = (title, t, extra) => {

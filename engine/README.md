@@ -24,12 +24,12 @@ engine/
     classify.mjs        Failure classes (error_kind + hint); error text scrubbed of local paths
     exa.mjs             Backfill search (Exa through mcporter)
   adapters/             Site adapters (whole page HTML → items + source heat)
-    techflow.mjs jiemian.mjs thepaper.mjs apnews.mjs   index.mjs registry   _util.mjs
+    techflow.mjs jiemian.mjs thepaper.mjs apnews.mjs telegram.mjs   index.mjs registry   _util.mjs
   parsers/generic.mjs   Generic parsers: RSS/Atom, HTML links, Markdown, JSON API (with signal field mapping)
   pipeline/
     fetch.mjs           Channel chain for one source (no database; shared by trial and real fetches)
     ingest.mjs          One source, one round: fetch → continuity → paging / search backfill → store → continuity, gaps, checkpoint
-    paging.mjs          Paging backfill: param / cursor / id_walk
+    paging.mjs          Paging backfill: param / cursor / id_walk / before
     events.mjs          Classify → cluster events → cross-validate and score; reprocess
     bodies.mjs          Body fetching and extraction for top events
     select.mjs          Source heat, event selection for push, the phone message
@@ -62,7 +62,7 @@ config → browse preflight → per source, try the channel chain (browse → ag
 ## Continuity
 | Source kind | Check | On a gap |
 |---|---|---|
-| Stream (`continuity: "stream"`; default for rss / json_api / cls_api) | One of the previous round's 50 newest items appears → connected; otherwise the oldest trusted time ≤ the previous newest trusted time → connected by time; id_walk sources check whether ids connect | Page back per `paging`: `param` (page number), `cursor` (API cursor), `id_walk` (detail pages by id), `native` (the source script pages back by time, as for 财联社); still a gap and `backfill` not off → Exa search (at most 3 sources per round) |
+| Stream (`continuity: "stream"`; default for rss / json_api / cls_api) | One of the previous round's 50 newest items appears → connected; otherwise the oldest trusted time ≤ the previous newest trusted time → connected by time; id_walk / before sources check whether ids connect | Page back per `paging`: `param` (page number), `cursor` (API cursor), `id_walk` (detail pages by id), `before` (page back from the smallest message id on the page, as with Telegram's `?before=`), `native` (the source script pages back by time, as for 财联社); still a gap and `backfill` not off → Exa search (at most 3 sources per round) |
 | Snapshot (`continuity: "snapshot"`; default for list pages) | Curated front pages, not checked | — |
 
 Each source looks back from its last success plus 15 minutes (1–48 hours); 财联社 sizes its paging from that. In `cycle` mode, 6 hours or more since the last cycle, or before 08:00, is overnight mode: item and page limits ×4.
@@ -105,7 +105,7 @@ When a source gives no time, the link is checked: a full timestamp (`/2026101415
 | `observations` | **Every item, every round**: `rank`, `section`, `views/comments/likes/shares/favorites`, `hot` (JSON array, as the source wrote it), `level`, `signals_raw`. An item seen in several rounds forms a heat series |
 | `signal_availability` | Which signals each source has actually provided, how often, and when last |
 | `fetch_attempts` | Every channel attempt: channel, backend, ok, http_status, items, latency_ms, error_kind, error (scrubbed of local paths), hint, note |
-| `source_cursors` | Checkpoint per source: last_ok_at, head_keys (dedup keys of the newest 50), head_time / tail_time (trusted time range), max_id (id_walk) |
+| `source_cursors` | Checkpoint per source: last_ok_at, head_keys (dedup keys of the newest 50), head_time / tail_time (trusted time range), max_id (id_walk / before) |
 | `continuity` | Continuity status per round and source, overlap, pages, recovered items, gap range |
 | `coverage_gaps` | Gaps and recovery (backfilled / partial / open; by paging or agent_reach_search) |
 | `article_labels` | Item labels and regions (label, confidence, origin, rules_version) |
@@ -144,6 +144,8 @@ Only values the source actually gives; missing values are NULL (not 0). Per sour
 
 ## Site adapters
 `adapters/<id>.mjs` exports `{ id, browseMode: "html", waitFor, parse(html, { url, max }) }`. The browse channel reads the rendered page in `html` mode (waiting up to 15 seconds for the `waitFor` selector); the http channel passes the response body to the same `parse`.
+The `telegram` adapter reads the public web preview of a Telegram channel, `https://t.me/s/<channel>`, with no login. A channel that posts one story per message gives one item per message: the bold first line is the title and the 信源 (source) link is kept as the original source. A roundup posted in parts (`[1/3] [2/3] …`) is joined back together and split into items by its `━━ section ━━` headers and `N、title` numbering. Each item links to its message plus `?i=<item number>`. To configure a source, set `url` to `https://t.me/s/<channel>` and `paging` to `{ "mode": "before", "param": "before", "id_pattern": "t\\.me/[A-Za-z0-9_]+/(\\d+)" }`. Private channels (`t.me/+…` invite links) and channels with the web preview turned off cannot be read, and the machine needs network access to t.me.
+
 To add one: write the module → register it in `adapters/index.mjs` → save a snapshot as `tests/fixtures/<id>.html.gz` → add assertions to `tests/unit/adapters.test.mjs`.
 
 ## Parsing rules (learned by the model, run by the program)

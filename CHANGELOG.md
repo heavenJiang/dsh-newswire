@@ -2,6 +2,31 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.14 (2026-11-11)
+
+- **Pushes go straight to the phone instead of through a model.** Until now the local model in the scheduled task had to copy the whole push into its reply. It failed to copy a 14,000-character push and sent stray `<tool_call>` markup to the phone instead, and did the same in rounds that had nothing to push. With dsh-switchboard 0.5.23 or later installed:
+  - The plugin fetches and writes the edition on the scheduled task's timetable and posts it itself to the chats that get scheduled results.
+  - The host's scheduled task is paused so no model steps in; it still sets the times.
+  - If switchboard is missing, its "Let other plugins post to the phone" setting is off, or the panel's delivery is set to "Through the scheduled task", the scheduled task is resumed and pushes work as before. Neither plugin depends on the other.
+  - The panel's Push settings have a new Delivery choice, Straight to the phone or Through the scheduled task; `newswire_push_prefs` takes it as `delivery`.
+- **Model results are no longer lost.**
+  - Each story is saved as soon as the model writes it. After a restart, interruption or timeout, the edition is laid out again and stories with the same material reuse what was written instead of asking the model again.
+  - When the plugin restarts with a push still waiting for its edition, it carries on writing that edition instead of pushing an older one.
+  - When the local model server drops the connection ("Connection error"), the call is retried once after 20 seconds instead of falling back to program-written copy.
+- The 科技 section now holds up to 8 stories by default (was 3).
+
+- **Telegram channels as sources.** A new `telegram` adapter reads a public channel's web preview (`https://t.me/s/<channel>`), with no login or API key. A channel that posts one story per message gives one item per message: the bold first line is the title, the 信源 link is kept as the original source, and views and reactions are recorded as signals. A roundup posted in parts (`[1/3] [2/3] [3/3]`) is joined back together and split into one item per story, and each item keeps the outlets it cites.
+- Two channels are added to the built-in source list as trial sources: 币圈新闻汇总 (CryptoMarketAggregator, 市场与交易) and 动察 Beating AI (OneMillion_AI, 科技与AI). An existing install's source list is not changed. Add them in the panel to use them.
+- **Adding a source recognises Telegram links.** Paste `t.me/<channel>`, `t.me/s/<channel>`, `@<channel>` or a link to any message, and the source is set up with the Telegram adapter, paging and continuity checks. Invite links (`t.me/+…`) are private channels and are not accepted.
+- **AI and new technology come first.** The layout has a new `focus` setting, on by default for 科技 and AI 与半导体:
+  - These items are picked first for the model to read, so the item limit does not cut them, and they skip rule-based triage, so a story with a single report is not missed.
+  - The model rates them by the technology's impact rather than the number of outlets: how new it is, who released it, and what it changes for competition, developers, users, compute supply and related companies.
+  - The front page keeps at least one such story when one scores 45 or more (the lead story stays), and a full section keeps up to 3 extra places for them.
+  - Their impact line and points describe what the technology changes, and impact analysis looks at them first, from 10 points lower.
+  - Set `focus.labels` to `[]` in layout.json to turn it off, or list other category ids.
+- New paging mode `before` for gaps: the plugin pages back with `?before=<smallest message id>` until it reaches the previous round.
+- Titles that mix Chinese and English, such as "Stripe完成收购OpenRouter", are no longer dropped as navigation links.
+
 ## 1.1.13 (2026-11-10)
 
 - A story is a key story (🔴 重点) when the model rates its importance 60 or more. Tech, industry and followed stories no longer get a lower bar, so the model alone decides how much a story matters.

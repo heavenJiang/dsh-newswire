@@ -9,7 +9,9 @@
  * 推送时机 timing：on_time 到点推（来不及就先推已编好的版面）/ when_ready 到点只抓取，本轮版面写完再推一条。
  * 推送内容 scope：picked 按门槛和上限挑重点 / full 本轮所有新报道和有进展的报道都推（不受门槛和上限限制）。
  *
- * 偏好存 dataDir/push.json：{ version, cadence, level, per_round, daily_max, timing, scope }
+ * 推送方式 delivery：auto 有桥接插件的 phonePush 服务时由插件直接发到手机（不经过定时任务里的模型），没有时经定时任务 / task 总是经定时任务。
+ *
+ * 偏好存 dataDir/push.json：{ version, cadence, level, per_round, daily_max, timing, scope, delivery }
  */
 import fs from "node:fs";
 
@@ -22,7 +24,8 @@ export const CADENCES = {
 export const LEVELS = { fewer: 12, normal: 0, more: -8 };
 export const TIMINGS = ["on_time", "when_ready"];
 export const SCOPES = ["picked", "full"];
-export const PUSH_DEFAULTS = { version: 1, cadence: "every2h", level: "normal", per_round: 6, daily_max: 24, timing: "on_time", scope: "picked" };
+export const DELIVERIES = ["auto", "task"];
+export const PUSH_DEFAULTS = { version: 1, cadence: "every2h", level: "normal", per_round: 6, daily_max: 24, timing: "on_time", scope: "picked", delivery: "auto" };
 
 export function normalizePush(p) {
   const x = Object.assign({}, PUSH_DEFAULTS, p && typeof p === "object" ? p : {});
@@ -32,7 +35,8 @@ export function normalizePush(p) {
   x.daily_max = Math.max(1, Math.min(100, Math.round(Number(x.daily_max) || PUSH_DEFAULTS.daily_max)));
   if (!TIMINGS.includes(x.timing)) x.timing = PUSH_DEFAULTS.timing;
   if (!SCOPES.includes(x.scope)) x.scope = PUSH_DEFAULTS.scope;
-  return { version: 1, cadence: x.cadence, level: x.level, per_round: x.per_round, daily_max: x.daily_max, timing: x.timing, scope: x.scope };
+  if (!DELIVERIES.includes(x.delivery)) x.delivery = PUSH_DEFAULTS.delivery;
+  return { version: 1, cadence: x.cadence, level: x.level, per_round: x.per_round, daily_max: x.daily_max, timing: x.timing, scope: x.scope, delivery: x.delivery };
 }
 
 export function loadPush(file) {

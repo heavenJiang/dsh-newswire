@@ -1,7 +1,7 @@
 /* 添加数据源的推断（id、类型、地区、试用）与主线关注的来源标记。 */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { draftSource } from "../../index.js";
+import { draftSource, telegramChannel, validateSources } from "../../index.js";
 import { updateFollows, normalizeFollows, emptyFollows } from "../../host/follows.mjs";
 
 test("添加数据源：id 取主域名加栏目，按后缀和标题判断地区，新源先试用", () => {
@@ -37,4 +37,18 @@ test("主线关注：每条故事线一项，带来源标记，读写都保留",
   const back = normalizeFollows(JSON.parse(JSON.stringify(f)));
   assert.deepEqual(back.follow.filter((x) => x.via === "tracker:7").map((x) => x.value), ["st-1", "st-2"]);
   assert.equal(back.follow.find((x) => x.kind === "keyword").via, undefined);
+});
+
+test("添加数据源：Telegram 频道链接统一成网页预览，用 telegram 适配器并按消息 id 翻页", () => {
+  for (const u of ["https://t.me/OneMillion_AI", "t.me/s/OneMillion_AI", "https://t.me/OneMillion_AI/5844", "@OneMillion_AI", "telegram.me/OneMillion_AI"]) assert.equal(telegramChannel(u), "OneMillion_AI", u);
+  assert.equal(telegramChannel("https://t.me/+7an-Jv86Tc1hMmU1"), null, "邀请链接不是公开频道");
+  assert.equal(telegramChannel("https://t.me/joinchat/abc"), null);
+  const s = draftSource({ url: "https://t.me/OneMillion_AI/5844" }, [{ id: "tg_onemillion_ai" }]);
+  assert.equal(s.id, "tg_onemillion_ai_2");
+  assert.equal(s.url, "https://t.me/s/OneMillion_AI");
+  assert.equal(s.adapter, "telegram");
+  assert.equal(s.paging.mode, "before");
+  assert.equal(s.continuity, "stream");
+  assert.ok(s.trial);
+  assert.deepEqual(validateSources({ sources: [s] }, { allowSingle: true }), []);
 });

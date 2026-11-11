@@ -7,6 +7,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb } from "../../engine/store/schema.mjs";
 import { createModel } from "../../host/model.mjs";
+import { groupPrompt, planPrompt, writePrompt, taxonomyIndex, inFocus } from "../../host/edition.mjs";
+import { autoAnalyzeTargets } from "../../host/analysis.mjs";
 import { normalizeLayout, loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, gatherItems } from "../../host/edition.mjs";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "engine", "config");
@@ -54,12 +56,15 @@ function fakeModel(o) {
     if (prompt.includes("headline：一句话总括")) return o.planFail ? "乱写" : JSON.stringify({ merge: [], headline: "沙特遇袭牵动地区局势", front: [1, 2], watch: [{ text: "沙特官方后续通报", refs: [1] }] });
     if (prompt.includes("按版式为以下每篇报道写稿")) {
       if (o.writeFail) return "乱写";
+      if (o.dropOnce && !o.dropped) { o.dropped = true; return { error: "Connection error." }; }
       const refs = (prompt.match(/【报道\d+】/g) || []).length;
       return JSON.stringify({ stories: Array.from({ length: refs }, (_, i) => ({ ref: i + 1, lead: "模型导语" + (i + 1) + "：利雅得金融区周六遇袭。", points: ["要点甲", "要点乙"], views: [{ who: "路透", says: "导弹被拦截" }], impact: "牵动油价" })) });
     }
     return "{}";
   };
-  const llm = { stream(opts) { const text = opts.messages[0].content[0].text; calls.push(text.slice(0, 30)); const r = reply(text); return (async function* () { yield { type: "text-delta", text: r }; yield { type: "finish", reason: { kind: "stop" } }; })(); } };
+  const llm = { stream(opts) { const text = opts.messages[0].content[0].text; calls.push(text.slice(0, 30)); const r = reply(text); return (async function* () {
+    if (r && typeof r === "object") { yield { type: "finish", reason: { kind: "error", failure: { message: r.error } } }; return; }
+    yield { type: "text-delta", text: r }; yield { type: "finish", reason: { kind: "stop" } }; })(); } };
   const m = createModel({ getLlm: () => llm, getDefault: () => ({ currentSelection: () => ({ provider: "fake", model: "m" }) }) });
   return { m, calls };
 }
@@ -186,4 +191,101 @@ test("程序导语截到整句，不在半句话处加省略号", async () => {
   assert.equal(clipSentence(body, 80), "外交部发言人郭嘉昆主持例行记者会。法新社记者提问，路透社报道，60万块美国英伟达高级芯片正在香港，即将被送往中国大陆。请问外交部对此有何评论？");
   assert.equal(clipSentence("短句。", 80), "短句。");
   assert.ok(clipSentence("一".repeat(200), 80).endsWith("…"));
+});
+
+/** 再加一条只有一家报道、规则分低的 AI 新闻（a6，条目标签 tech.frontier）。 */
+function tmpDbAi() {
+  const db = tmpDb();
+  const t = iso(3600000);
+  db.prepare("INSERT INTO articles (id, url, title, summary, published_at, first_seen_at, last_seen_at, source_id, pack) VALUES (?,?,?,?,?,?,?,?,?)").run("a6", "https://cls/6", "某实验室发布新一代推理模型", "性能大幅提升", t, t, t, "cls", "core");
+  db.prepare("INSERT INTO article_labels (article_id, label, confidence, origin) VALUES (?,?,?,?)").run("a6", "tech.frontier", 1, "rule");
+  db.prepare("INSERT INTO events (event_id, pack, title, lead_article_id, first_seen_at, last_seen_at, member_count, source_count, importance, credibility, labels, outlets, factors, updated_run) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    .run("e6", "core", "某实验室发布新一代推理模型", "a6", t, t, 1, 1, 10, "single", JSON.stringify(["tech.frontier"]), JSON.stringify([{ source_id: "cls", name: "财联社电报" }]), "{}", "r1");
+  db.prepare("INSERT INTO event_members (event_id, article_id, source_id, grp, method) VALUES (?,?,?,?,?)").run("e6", "a6", "cls", "cls", "seed");
+  return db;
+}
+
+test("重点领域（AI 与新技术）：默认开启，可关闭；一级 id 含其下二级", () => {
+  assert.deepEqual(LAYOUT.focus.labels, ["tech", "industry.ai_semis"]);
+  assert.deepEqual(normalizeLayout({}).focus.labels, ["tech", "industry.ai_semis"], "旧版式文件没有 focus 也默认开启");
+  assert.deepEqual(normalizeLayout({ focus: { labels: [] } }).focus.labels, []);
+  assert.ok(inFocus(LAYOUT.focus, ["tech.frontier"]));
+  assert.ok(inFocus(LAYOUT.focus, ["industry.ai_semis"]));
+  assert.ok(!inFocus(LAYOUT.focus, ["industry.consumer", "politics"]));
+  assert.ok(!inFocus(normalizeLayout({ focus: { labels: [] } }).focus, ["tech"]));
+});
+
+test("重点领域：挑材料时加分排前，免得被条数上限截掉", () => {
+  const db = tmpDbAi();
+  const all = gatherItems(db, { since: SINCE, focus: LAYOUT.focus });
+  const ai = all.find((x) => x.id === "a6");
+  assert.ok(ai.focus);
+  assert.ok(all.indexOf(ai) < all.findIndex((x) => x.id === "a4"), "规则 10 分的 AI 新闻加分后排在 20 分的公告前");
+  assert.ok(gatherItems(db, { since: SINCE, limit: 4, focus: LAYOUT.focus }).some((x) => x.id === "a6"));
+  assert.ok(!gatherItems(db, { since: SINCE, limit: 4 }).some((x) => x.id === "a6"), "不开重点领域时会被截掉");
+  db.close();
+});
+
+test("重点领域：提示词要求按技术影响力评分、标 ★、头版留位、影响写技术变化", () => {
+  const tax = taxonomyIndex(TAX);
+  const g = groupPrompt([{ n: 1, title: "新模型发布", source_name: "s", focus: true }, { n: 2, title: "油价上涨", source_name: "t" }], tax, [], [], LAYOUT.focus);
+  assert.match(g, /\[1\] ★s/);
+  assert.match(g, /\[2\] t/);
+  assert.match(g, /按技术影响力评/);
+  assert.doesNotMatch(groupPrompt([{ n: 1, title: "x", source_name: "s", focus: true }], tax, [], []), /★|技术影响力/, "不给重点领域时提示词不变");
+  const p = planPrompt([{ section: "tech", labels: [], importance: 50, source_count: 1, title: "新模型" }, { section: "politics", labels: [], importance: 80, source_count: 3, title: "会谈" }], LAYOUT);
+  assert.match(p, /\[1\] ★tech/);
+  assert.match(p, /头版至少放 1 篇/);
+  const w = writePrompt([{ story: { title: "新模型", section: "tech", labels: [] }, mats: [{ source_name: "s", title: "t", summary: "x" }], bodies: new Map(), fresh: [] }], LAYOUT);
+  assert.match(w, /【报道1】（AI 与新技术）新模型/);
+  assert.match(w, /竞争格局/);
+});
+
+test("重点领域：头版至少一篇 AI 报道（换掉最后一篇，头条不动）", () => {
+  const db = tmpDbAi();
+  db.prepare("UPDATE events SET importance = 50 WHERE event_id = 'e6'").run();
+  db.prepare("UPDATE events SET importance = 60 WHERE event_id = 'e2'").run();
+  const lay = Object.assign({}, LAYOUT, { front: { count: 2 }, sections: LAYOUT.sections.map((s) => Object.assign({}, s, { max: 1 })) });
+  const ed = ruleEdition(db, base({ layout: lay }));
+  const ai = Object.values(ed.stories).find((s) => s.lead_event_id === "e6");
+  assert.equal(ed.front.length, 2);
+  assert.equal(ed.stories[ed.front[0]].lead_event_id, "e1", "头条不动");
+  assert.equal(ed.front[1], ai.id);
+  const off = ruleEdition(db, base({ layout: Object.assign({}, lay, { focus: { name: "", labels: [], boost: 0 } }) }));
+  assert.ok(!off.front.includes(Object.values(off.stories).find((s) => s.lead_event_id === "e6").id), "关闭后按重要度");
+  db.close();
+});
+
+test("重点领域：影响分析优先 AI 报道，门槛低 10 分", () => {
+  const ed = { front: ["a", "b"], sections: [], stories: { a: { importance: 75, section: "politics" }, b: { importance: 62, section: "tech" } } };
+  const db = { prepare: () => ({ get: () => null }) };
+  const isFocus = (s) => inFocus(LAYOUT.focus, [s.section]);
+  assert.deepEqual(autoAnalyzeTargets(db, ed, { max: 2, isFocus }), ["b", "a"]);
+  assert.deepEqual(autoAnalyzeTargets(db, ed, { max: 2 }), ["a"]);
+});
+
+test("断点续写：同一份材料已经写过的稿直接复用，不再让模型重写", async () => {
+  const db = tmpDb();
+  const first = fakeModel({});
+  const a = await llmEdition(db, first.m, base());
+  assert.ok(first.calls.some((c) => c.includes("请按版式")), "第一次要写稿");
+  // 模拟中断：没存版面就重来一遍
+  const again = fakeModel({});
+  const b = await llmEdition(db, again.m, base());
+  assert.ok(!again.calls.some((c) => c.includes("请按版式")), "第二次不再调用写稿");
+  assert.equal(b.stats.cached, a.stats.written);
+  const s1 = b.stories[b.front[0]];
+  assert.match(s1.lead, /^模型导语/);
+  assert.equal(s1.by, "llm");
+  db.close();
+});
+
+test("模型服务断连：等一会儿重试一次，不直接退回程序稿", async () => {
+  const db = tmpDb();
+  const fm = fakeModel({ dropOnce: true });
+  const ed = await llmEdition(db, fm.m, base({ retryWaitMs: 10 }));
+  assert.deepEqual(ed.stats.fallbacks, []);
+  assert.ok(ed.stats.errors.some((e) => /Connection error.*重试/.test(e)));
+  assert.match(ed.stories[ed.front[0]].lead, /^模型导语/);
+  db.close();
 });

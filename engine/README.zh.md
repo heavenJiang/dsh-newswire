@@ -24,12 +24,12 @@ engine/
     classify.mjs        失败分类 error_kind + hint；错误原文去本机信息
     exa.mjs             补抓搜索（Exa，经 mcporter）
   adapters/             站点适配器（整页 HTML → 条目 + 源头热度信号）
-    techflow.mjs jiemian.mjs thepaper.mjs apnews.mjs   index.mjs 注册表   _util.mjs
+    techflow.mjs jiemian.mjs thepaper.mjs apnews.mjs telegram.mjs   index.mjs 注册表   _util.mjs
   parsers/generic.mjs   通用解析：RSS/Atom、HTML 链接、Markdown、JSON API（含 signals 字段映射）
   pipeline/
     fetch.mjs           单源通道链（不碰数据库，试抓与正式抓取共用）
     ingest.mjs          单源一轮：抓取 → 衔接判定 → 翻页 / 搜索补抓 → 入库 → 记衔接状态、缺口、游标
-    paging.mjs          翻页补抓：param / cursor / id_walk
+    paging.mjs          翻页补抓：param / cursor / id_walk / before
     events.mjs          分类 → 事件聚类 → 交叉验证打分；重算
     bodies.mjs          重点事件的正文抓取与抽取
     select.mjs          源头热度、按事件选推送、手机消息
@@ -62,7 +62,7 @@ engine/
 ## 断点衔接
 | 源类型 | 判定 | 缺口时 |
 |---|---|---|
-| 流式（`continuity: "stream"`；rss / json_api / cls_api 默认） | 本批出现上轮最新 50 条之一 → 衔接；否则本批最旧的可信时间 ≤ 上轮最新可信时间 → 按时间衔接；id_walk 源看 id 是否接上 | 按 `paging` 往前翻：`param`（页码）、`cursor`（API 游标）、`id_walk`（按 id 逐条取详情页）、`native`（源脚本自己按时间回翻，如财联社）；仍接不上且 `backfill` 未关闭 → Exa 搜索兜底（每轮最多 3 个源） |
+| 流式（`continuity: "stream"`；rss / json_api / cls_api 默认） | 本批出现上轮最新 50 条之一 → 衔接；否则本批最旧的可信时间 ≤ 上轮最新可信时间 → 按时间衔接；id_walk / before 源看 id 是否接上 | 按 `paging` 往前翻：`param`（页码）、`cursor`（API 游标）、`id_walk`（按 id 逐条取详情页）、`before`（按本页最小消息 id 往前翻，如 Telegram 频道 `?before=`）、`native`（源脚本自己按时间回翻，如财联社）；仍接不上且 `backfill` 未关闭 → Exa 搜索兜底（每轮最多 3 个源） |
 | 快照（`continuity: "snapshot"`；列表页默认） | 首页推荐类，不判断 | — |
 
 每源每轮的回看时长 = 距上次成功 + 15 分钟（1–48 小时），财联社据此决定回翻页数；`cycle` 模式下距上一整轮 ≥6 小时或早 8 点前为隔夜模式，条数与翻页上限 ×4。
@@ -105,7 +105,7 @@ engine/
 | `observations` | **每轮每条**：`rank`、`section`、`views/comments/likes/shares/favorites`、`hot`（JSON 数组，源头原文）、`level`、`signals_raw`。同一条在多轮出现即形成热度时间序列 |
 | `signal_availability` | 每源实际采到过哪些信号、次数、最近时间 |
 | `fetch_attempts` | 每次通道尝试：channel、backend、ok、http_status、items、latency_ms、error_kind、error（已去本机信息）、hint、note |
-| `source_cursors` | 每源断点：last_ok_at、head_keys（最新 50 条去重键）、head_time / tail_time（可信时间范围）、max_id（id_walk） |
+| `source_cursors` | 每源断点：last_ok_at、head_keys（最新 50 条去重键）、head_time / tail_time（可信时间范围）、max_id（id_walk / before） |
 | `continuity` | 每轮每源衔接状态、重叠条数、翻页数、补回条数、缺口区间 |
 | `coverage_gaps` | 缺口与补抓结果（backfilled / partial / open，方式 paging / agent_reach_search） |
 | `article_labels` | 条目标签与地区（label、confidence、origin、rules_version） |
@@ -144,6 +144,8 @@ engine/
 
 ## 站点适配器
 `adapters/<id>.mjs` 导出 `{ id, browseMode: "html", waitFor, parse(html, { url, max }) }`。browse 通道用 `html` 模式取渲染后的整页（等 `waitFor` 选择器出现，最多 15 秒），http 通道把响应体交给同一个 `parse`。
+`telegram` 适配器读 Telegram 公开频道的网页预览 `https://t.me/s/<频道名>`（不用登录）：一帖一条的快讯直接成条（加粗首行为标题，「信源」链接记为原始出处）；`[1/3] [2/3] …` 分帖发的汇总先拼回，再按「━━ 栏目 ━━」和「N、标题」拆成单条。条目链接是消息链接加 `?i=<第几条>`。配源时 `url` 写 `https://t.me/s/<频道名>`，`paging` 写 `{ "mode": "before", "param": "before", "id_pattern": "t\\.me/[A-Za-z0-9_]+/(\\d+)" }`。私有频道（`t.me/+…` 邀请链接）和关了网页预览的频道读不到；国内网络需要能访问 t.me。
+
 新增适配器：写模块 → 在 `adapters/index.mjs` 登记 → 存一份快照 `tests/fixtures/<id>.html.gz` → 在 `tests/unit/adapters.test.mjs` 加断言。
 
 ## 解析规则（模型学会、程序执行）

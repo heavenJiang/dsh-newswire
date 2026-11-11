@@ -145,6 +145,8 @@ The first screen takes 30 seconds: pick sections, things to follow and a push ca
 2. After the first delivery, `/use` or `/watch` that conversation once in Telegram or Feishu. This needs a phone-channel plugin such as dsh-switchboard; this plugin does not depend on it.
 3. For the evening digest, ask the agent to call `newswire_schedule_setup` with `kind: "daily"`.
 
+**Direct push (on automatically with dsh-switchboard 0.5.23 or later)**: when switchboard offers its `phonePush` service, this plugin fetches and writes the edition on the scheduled task's timetable and posts the message itself to switchboard's schedule chats (`scheduleChats`). No model in the scheduled task relays it, so the text is not rewritten or dropped, and no stray markup reaches the phone. Meanwhile the host's scheduled task shows as paused, but it still sets the times: changing the cadence in the panel changes that task. If switchboard is removed, its "Let other plugins post to the phone" setting is turned off, or the panel's delivery is set to "Through the scheduled task", the task is resumed and pushes go through it again. Neither plugin depends on the other.
+
 Too many pushes? Say "push less" or "three times a day is enough" in chat, or adjust it under Follow & push.
 
 **Updates**: Runs → Version checks GitHub for a new version and updates in place with one click.

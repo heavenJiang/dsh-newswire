@@ -14,7 +14,8 @@ import { DEPTHS, depthOf, depthParams, recordCall, usageToday, makeGate } from "
 import { searchNews, answerNews } from "./host/ask.mjs";
 import { analysisMaterials, analyzeStory, saveAnalysis, latestAnalysis, analysisBrief, autoAnalyzeTargets } from "./host/analysis.mjs";
 import { listTrackers, addTracker, removeTracker, unlinkStory, linkAll, trackerDetail, synthesize, suggestions as trackSuggestions, synthTargets } from "./host/tracking.mjs";
-import { CADENCES, LEVELS, TIMINGS, SCOPES, loadPush, savePush, normalizePush, sectionPenalties, rulesFor, applyDailyCap, recentPushes as pushHistory } from "./host/push.mjs";
+import { parseCron, cronMatches, nextCron, minuteKey } from "./host/clock.mjs";
+import { CADENCES, LEVELS, TIMINGS, SCOPES, DELIVERIES, loadPush, savePush, normalizePush, sectionPenalties, rulesFor, applyDailyCap, recentPushes as pushHistory } from "./host/push.mjs";
 import { markKind } from "./engine/pipeline/quality.mjs";
 import os from "node:os";
 import path from "node:path";
@@ -27,7 +28,7 @@ import { readLock } from "./engine/lock.mjs";
 import { createModel, analyzeEvents } from "./host/model.mjs";
 import { cleanExtract, learnRecipe, judgeRecipe } from "./host/recipe.mjs";
 import { readSource, readTargets } from "./host/modelread.mjs";
-import { loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, storyDetail, sinceSeen, editionDiff, reassemble, scrubStory, qualityRows, editionById, editionList, tickerBoard, updateEditionContent, bodiesFor } from "./host/edition.mjs";
+import { loadLayout, ruleEdition, llmEdition, saveEdition, latestEdition, notesFromEdition, editionPicks, recordEditionPushes, composeEditionMessage, storyDetail, sinceSeen, editionDiff, reassemble, scrubStory, qualityRows, editionById, editionList, tickerBoard, updateEditionContent, bodiesFor, inFocus } from "./host/edition.mjs";
 import { buildDaily, saveDaily, latestDaily, dailyDates, composeDailyMessage, todayBj } from "./host/daily.mjs";
 import { recordPushes, DEFAULT_RULES } from "./engine/pipeline/select.mjs";
 import { loadFollows, updateFollows, KINDS as FOLLOW_KINDS } from "./host/follows.mjs";
@@ -510,7 +511,8 @@ function validateOne(s, at, problems) {
   if (s.continuity !== undefined && s.continuity !== null && s.continuity !== "" && ["stream", "snapshot"].indexOf(s.continuity) < 0) problems.push(at + " continuity 只能是 stream（按时间滚动，判断衔接）或 snapshot（首页推荐，不判断）");
   if (s.paging !== undefined && s.paging !== null) {
     const pg = s.paging;
-    if (typeof pg !== "object" || ["param", "cursor", "id_walk", "native"].indexOf(pg.mode) < 0) problems.push(at + " paging.mode 只能是 param/cursor/id_walk/native");
+    if (typeof pg !== "object" || ["param", "cursor", "id_walk", "before", "native"].indexOf(pg.mode) < 0) problems.push(at + " paging.mode 只能是 param/cursor/id_walk/before/native");
+    else if (pg.mode === "before" && (!pg.id_pattern || !regexOk(pg.id_pattern))) problems.push(at + " paging before 需要合法的 id_pattern（从链接里取消息 id）");
     else if (pg.mode === "id_walk" && (typeof pg.template !== "string" || pg.template.indexOf("{id}") < 0 || !regexOk(pg.id_pattern) || !pg.id_pattern)) problems.push(at + " paging id_walk 需要含 {id} 的 template 与合法的 id_pattern");
   }
   if (s.backfill !== undefined && typeof s.backfill !== "boolean") problems.push(at + " backfill 需为布尔");
@@ -519,7 +521,7 @@ function validateOne(s, at, problems) {
   if (s.extract !== undefined && s.extract !== null && !cleanExtract(s.extract)) problems.push(at + " extract 需为 { item, link?, title?, time?, summary?, wait_for? } 形式的 CSS 选择器");
 }
 
-function validateSources(body, opts) {
+export function validateSources(body, opts) {
   const problems = [];
   if (body === null || typeof body !== "object" || Array.isArray(body)) return ["body 必须是对象 { sources: [...] }"];
   if (!Array.isArray(body.sources)) return ["sources 必须是数组"];
@@ -610,7 +612,32 @@ async function upsertSourceInConfig(p, input) {
  * 面板「添加数据源」：只填名称和地址，其余按地址推断——id 取域名，看起来像 feed 的按 RSS、否则按新闻列表页；
  * 新加的源先「试用」（只帮别家印证，不单独上版或推送），攒够数据后在成绩单里决定开不开。
  */
+/** Telegram 公开频道：t.me/<名>、t.me/s/<名>、t.me/<名>/123、telegram.me/<名>、@<名> → 频道名；邀请链接（t.me/+…、joinchat）不是公开频道，返回 null。 */
+export function telegramChannel(raw) {
+  const s = String(raw || "").trim();
+  const at = s.match(/^@([A-Za-z][A-Za-z0-9_]{3,31})$/);
+  if (at) return at[1];
+  const m = s.match(/^(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me)\/(?:s\/)?([A-Za-z][A-Za-z0-9_]{3,31})(?:[/?#]|$)/i);
+  return m && !/^(joinchat|addstickers|share|proxy|socks|iv)$/i.test(m[1]) ? m[1] : null;
+}
+
 export function draftSource(input, existing) {
+  // Telegram 频道：统一成网页预览地址，用 telegram 适配器，按消息 id 往前翻补缺口
+  const tg = telegramChannel(input.url);
+  if (tg) {
+    const ids = new Set((existing || []).map((x) => x.id));
+    const base = ("tg_" + tg.toLowerCase().replace(/[^a-z0-9_]+/g, "_")).slice(0, 37);
+    let id = base;
+    for (let n = 2; ids.has(id); n++) id = base + "_" + n;
+    const pack = input.pack === "study_abroad" ? "study_abroad" : "core";
+    return {
+      id, name: String(input.name || "Telegram·" + tg).trim().slice(0, 80), url: "https://t.me/s/" + tg,
+      type: "html_index", adapter: "telegram",
+      category: String(input.category || (pack === "study_abroad" ? "留学与签证" : "国际宏观")).slice(0, 40),
+      region: "INTL", pack, channels: ["http", "browse"], max_items: 60, enabled: true, trial: true,
+      continuity: "stream", paging: { mode: "before", param: "before", id_pattern: "t\\.me/[A-Za-z0-9_]+/(\\d+)", max_pages: 3 }, body: "list",
+    };
+  }
   // 只填了域名（x.com、www.stcn.com/kx）：补上 https://
   const url0 = String(input.url || "").trim();
   const url = /^https?:\/\//i.test(url0) || !/^[\w-]+(\.[\w-]+)+(\/|$)/.test(url0) ? url0 : "https://" + url0;
@@ -686,7 +713,7 @@ const SOURCE_PROPS = {
   url_include: { type: "string", description: "Keep only links matching this regex." },
   url_exclude: { type: "string", description: "Drop links matching this regex." },
   continuity: { type: "string", enum: ["stream", "snapshot"], description: "stream = a time-ordered feed checked for continuity every run; snapshot = a curated front page, not checked. RSS and APIs default to stream, list pages to snapshot." },
-  paging: { type: "object", description: "How to recover a gap: {mode:param,param,start,max_pages} | {mode:cursor,param,next,max_pages} | {mode:id_walk,template,id_pattern,max_steps} | {mode:native}." },
+  paging: { type: "object", description: "How to recover a gap: {mode:param,param,start,max_pages} | {mode:cursor,param,next,max_pages} | {mode:id_walk,template,id_pattern,max_steps} | {mode:before,param,id_pattern,max_pages} (pages back with ?before=<smallest id on the page>, e.g. Telegram channels) | {mode:native}." },
   body: { type: "string", enum: ["fetch", "list", "none"], description: "Article bodies: fetch = fetch the page for top events (default); list = the list text is already the full body (news flashes); none = never fetch." },
   backfill: { type: "boolean", description: "Fall back to an Exa search when a gap remains; default true." },
   wait_for: { type: "string", description: "CSS selector browse waits for before reading the page (slow pages; up to 15 seconds)." },
@@ -744,6 +771,12 @@ export function apply(ctx, config) {
     ctx.inject(["agentDefaultModel"], (scope) => {
       optional.defaultModel = scope.agentDefaultModel;
       scope.effect(() => () => { delete optional.defaultModel; }, "dsh-newswire: default model");
+    });
+    // 桥接插件（掌上指挥台）提供的直接推送：有就用，没有照旧经定时任务里的模型转发；两边互不依赖
+    ctx.inject(["phonePush"], (scope) => {
+      optional.phonePush = scope.phonePush;
+      optional.phonePushSeen = true;
+      scope.effect(() => () => { delete optional.phonePush; }, "dsh-newswire: phonePush service");
     });
     ctx.inject(["schedule"], (scope) => {
       optional.schedule = scope.schedule;
@@ -993,11 +1026,13 @@ export function apply(ctx, config) {
     const db = openIfExists(p.db);
     if (!db) throw new Error("no_db");
     try {
-      const row = db.prepare("SELECT story_id, title, copy FROM stories WHERE story_id = ?").get(storyId);
+      const row = db.prepare("SELECT story_id, title, copy, section, labels FROM stories WHERE story_id = ?").get(storyId);
       if (!row) throw new Error("not_found");
       let copy = null; try { copy = JSON.parse(row.copy || "null"); } catch { copy = null; }
+      let labels = []; try { labels = JSON.parse(row.labels || "[]"); } catch { labels = []; }
+      const lay = loadLayout(p.layoutFile, p.layoutSeed);
       const mats = analysisMaterials(db, storyId, bodiesFor);
-      const a = await analyzeStory(model, { title: row.title, lead: copy && copy.lead }, mats, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
+      const a = await analyzeStory(model, { title: row.title, lead: copy && copy.lead, focus: inFocus(lay.focus, [row.section].concat(labels)) ? lay.focus.name : "" }, mats, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) });
       return saveAnalysis(db, storyId, a, { model: model.label(), auto });
     } finally { db.close(); }
   }
@@ -1032,7 +1067,7 @@ export function apply(ctx, config) {
     const dp = depthParams(prefs());
     setTimeout(async () => {
       let ids = [];
-      try { ids = dp.autoAnalyze ? withDb(p, (db) => (db ? autoAnalyzeTargets(db, ed, { max: dp.autoAnalyze }) : [])) : []; } catch { ids = []; }
+      try { ids = dp.autoAnalyze ? withDb(p, (db) => (db ? autoAnalyzeTargets(db, ed, { max: dp.autoAnalyze, isFocus: (s) => { const lay = loadLayout(p.layoutFile, p.layoutSeed); return Boolean(s && inFocus(lay.focus, [s.section].concat(s.labels || []))); } }) : [])) : []; } catch { ids = []; }
       for (const id of ids) {
         if (modelState.busy) break;
         modelState.busy = "analyze:" + id;
@@ -1216,7 +1251,130 @@ export function apply(ctx, config) {
       pend.ready_at = new Date().toISOString();
       writePending(pend);
     } finally { composing.delete(pend.pack); }
-    await triggerDelivery(pend.pack);
+    await deliver(pend.pack);
+  }
+
+  // ---------------------------------------------------------------- 直接推送
+  /** 能直接推送吗：桥接插件的 phonePush 服务在、能送到聊天、推送方式不是「经定时任务」。 */
+  function direct() {
+    const svc = optional.phonePush;
+    if (!svc || typeof svc.send !== "function" || typeof svc.available !== "function") return null;
+    if (loadPush(p.pushPrefs).delivery === "task") return null;
+    try { return svc.available() ? svc : null; } catch { return null; }
+  }
+  /** 直接发到手机；对方限流（10 秒一条）时等一下再试一次。发出去返回 true。 */
+  async function sendDirect(text) {
+    if (!String(text || "").trim()) return false;
+    for (let k = 0; k < 2; k++) {
+      const svc = direct();
+      if (!svc) return false;
+      let r = null;
+      try { r = await svc.send(String(text), { source: "dsh-newswire" }); } catch { return false; }
+      if (r && r.delivered > 0) return true;
+      if (!(r && r.reason === "too-soon")) return false;
+      await sleep(11000);
+    }
+    return false;
+  }
+  // ---------------------------------------------------------------- 插件自己的时钟
+  // 直接推送可用时，宿主定时任务里的模型就不必每轮转发（本地模型会改写、漏发、把乱码发到手机）：
+  // 暂停本插件建的定时任务，按它们的 cron 自己到点跑；直接推送断了 3 分钟以上（或改回「经定时任务」）就恢复那些任务。
+  // 任务的时间仍以宿主里的任务为准（面板改节奏照样改那个任务），这里每 5 分钟重读一次。
+  const clockKey = "direct_clock";
+  const clock = { tasks: [], at: 0, offSince: 0, fired: new Set(), startedAt: Date.now() };
+  // 工具区里定义的函数（日报）由那里登记进来
+  const hooks = { dailyRun: null };
+  function readTaken() { try { const r = withDb(p, (db) => (db ? db.prepare("SELECT value FROM kv WHERE key = ?").get(clockKey) : null)); return r ? JSON.parse(r.value) : []; } catch { return []; } }
+  function writeTaken(list) { withDb(p, (db) => { if (db) db.prepare("INSERT INTO kv (key, value, updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").run(clockKey, JSON.stringify(list), new Date().toISOString().replace("T", " ").slice(0, 19)); }); }
+  /** 本插件建的定时任务：各主题包的要闻任务与日报任务（按标题认）。 */
+  function ownTasks(all) {
+    const packs = Object.keys(packSchedule(p, "core").packs);
+    const out = [];
+    for (const pack of new Set(["core"].concat(packs))) {
+      const t = all.find((x) => x.title === packSchedule(p, pack).title);
+      if (t) out.push({ task: t, kind: "cycle", pack });
+      const d = all.find((x) => x.title === "今日回顾" + (pack === "core" ? "" : " · " + pack) + " · dsh-newswire");
+      if (d) out.push({ task: d, kind: "daily", pack: pack === "core" ? "all" : pack });
+    }
+    return out;
+  }
+  async function clockSync(force) {
+    const svc = optional.schedule;
+    if (!svc) return;
+    const taken = readTaken();
+    if (!direct()) {
+      if (!taken.length) { clock.tasks = []; return; }
+      if (!clock.offSince) clock.offSince = Date.now();
+      // 服务还在、只是一时送不到（线路重连等），或刚启动、桥接插件可能还没加载：等 3 分钟再交还；
+      // 服务卸载了或改回「经定时任务」：马上交还
+      const waiting = optional.phonePush || (!optional.phonePushSeen && Date.now() - clock.startedAt < 3 * 60000);
+      if (waiting && loadPush(p.pushPrefs).delivery !== "task" && Date.now() - clock.offSince < 3 * 60000) return;
+      for (const x of taken) { try { await svc.edit({ id: x.id, action: "update", patch: { active: true } }); } catch { /* 下一分钟再试 */ } }
+      writeTaken([]);
+      clock.tasks = [];
+      return;
+    }
+    clock.offSince = 0;
+    if (!force && clock.tasks.length && Date.now() - clock.at < 5 * 60000) return;
+    const all = (await svc.list({ limit: 500 })).items || [];
+    const was = new Set(taken.map((x) => x.id));
+    const next = [];
+    for (const x of ownTasks(all)) {
+      // 只接管五段 cron 的任务；用户在宿主里改成别的时间规则的，留给定时任务
+      if (x.task.kind !== "cron" || !parseCron(x.task.expression)) continue;
+      if (x.task.status === "active") {
+        try { const r = await svc.edit({ id: x.task.id, action: "update", patch: { active: false } }); if (r && r.code) continue; } catch { continue; }
+      } else if (!was.has(x.task.id)) continue; // 用户自己暂停的，不动
+      next.push({ id: x.task.id, kind: x.kind, pack: x.pack, cron: x.task.expression, tz: x.task.timeZone || SCHEDULE_TZ });
+    }
+    writeTaken(next.map((x) => ({ id: x.id, kind: x.kind, pack: x.pack })));
+    clock.tasks = next;
+    clock.at = Date.now();
+  }
+  async function clockTick() {
+    await clockSync(false);
+    if (!clock.tasks.length || !direct()) return;
+    const now = new Date();
+    const mk = minuteKey(now);
+    for (const k of clock.fired) if (Number(k.split("@")[1]) < mk - 5) clock.fired.delete(k);
+    for (const t of clock.tasks) {
+      const k = t.id + "@" + mk;
+      if (clock.fired.has(k) || !cronMatches(t.cron, now, t.tz)) continue;
+      clock.fired.add(k);
+      void background(fireTask(t), "direct " + t.kind);
+    }
+  }
+  /** 到点：要闻按一轮跑（写完再推的由版面写完时直接发），日报写好直接发。 */
+  async function fireTask(t) {
+    if (t.kind === "daily") {
+      const r = hooks.dailyRun ? await hooks.dailyRun({ pack: t.pack }) : null;
+      if (r && r.message) await sendDirect(r.message);
+      return;
+    }
+    const out = await runCycle({ pack: t.pack });
+    if (out && out.message && !(await sendDirect(out.message))) {
+      // 发不出去：交给定时任务转发这条
+      writePending({ source: "cycle", pack: t.pack, ed_pack: t.pack, run_id: out.run_id || newRunId("cycle"), at: new Date().toISOString(), ready: true, ready_at: new Date().toISOString(), message: out.message, parts: partsNow(t.pack), lookback: 6 });
+      await triggerDelivery(t.pack);
+    }
+  }
+  /** 下一次直接推送的时间（面板显示用）。 */
+  function clockNext() {
+    const ts = clock.tasks.filter((t) => t.kind === "cycle").map((t) => nextCron(t.cron, t.tz, Date.now())).filter(Boolean).sort((a, b) => a - b);
+    return ts.length ? ts[0].toISOString() : null;
+  }
+
+  /** 推送写好的这一轮：能直接发就直接发（不经过模型）；发不出去时把拼好的消息留给定时任务转发。 */
+  async function deliver(pack) {
+    if (direct()) {
+      const pend = readPending(pack);
+      if (!pend || !pend.ready) return false;
+      const out = deliverPending(pend);
+      if (!out.message) return true;
+      if (await sendDirect(out.message)) return true;
+      writePending(Object.assign({}, pend, { message: out.message, ready: true, ready_at: new Date().toISOString() }));
+    }
+    return triggerDelivery(pack);
   }
   /** 触发这个主题包的定时任务一次（它调 newswire_cycle，取到写好的版面就推送）。宿主忙时隔一分钟再试。 */
   const triggering = new Set();
@@ -1247,6 +1405,13 @@ export function apply(ctx, config) {
       const pend = readPending(pack);
       if (!pend || composing.has(pack) || triggering.has(pack)) continue;
       const age = Date.now() - Date.parse(pend.at);
+      // 插件重启丢了后台编排（没写完、也没人在写）：接着编一次，已写好的稿按材料复用，不用从头等模型
+      if (!pend.ready && !pend.resumed && age < PENDING_MAX_MS - 10 * 60000 && !modelState.busy) {
+        pend.resumed = true;
+        writePending(pend);
+        void background(composeThenDeliver(pend), "resume push");
+        continue;
+      }
       if (pend.ready ? Date.now() - Date.parse(pend.ready_at || pend.at) > 5 * 60000 : age > PENDING_MAX_MS) {
         if (!pend.ready) {
           const ed = latestContent(pend.ed_pack);
@@ -1254,7 +1419,7 @@ export function apply(ctx, config) {
           writePending(pend);
         }
         if (age > 3 * 3600000) { clearPending(pack); continue; } // 太旧了，交给下一轮
-        await triggerDelivery(pack);
+        await deliver(pack);
       }
     }
   }
@@ -1278,7 +1443,7 @@ export function apply(ctx, config) {
   async function afterManualFetch(runId, edPack) {
     const pack = "core";
     const cur = readPending(pack);
-    if (loadPush(p.pushPrefs).cadence === "daily_only" || (cur && !cur.ready) || !(await pushTask(pack))) { backgroundEdition(runId, edPack); return; }
+    if (loadPush(p.pushPrefs).cadence === "daily_only" || (cur && !cur.ready) || !(direct() || (await pushTask(pack)))) { backgroundEdition(runId, edPack); return; }
     const pend = { source: "manual", pack, ed_pack: edPack, run_id: runId, at: new Date().toISOString(), parts: partsNow(pack), rules: null, lookback: hoursSinceLastPush(), want_llm: llmReady(), ready: false, edition_id: null, quiet_if_empty: true };
     writePending(pend);
     void background(composeThenDeliver(pend), "manual push");
@@ -1286,18 +1451,20 @@ export function apply(ctx, config) {
   /** 面板上点「推送」：按现有的最新版面立即推一条。 */
   async function pushNow() {
     const pack = "core";
-    if (!(await pushTask(pack))) return { ok: false, error: "no_task", note: "还没有定时推送任务：先在「推送」里设置节奏（会创建定时任务），手机端才收得到。" };
+    if (!direct() && !(await pushTask(pack))) return { ok: false, error: "no_task", note: "还没有定时推送任务：先在「推送」里设置节奏（会创建定时任务），手机端才收得到。" };
     const ed = latestContent("all");
     if (!ed) return { ok: false, error: "no_edition", note: "还没有版面，先抓一轮。" };
     const now = new Date().toISOString();
     const cur = readPending(pack);
     writePending({ source: "button", pack, ed_pack: "all", run_id: newRunId("push"), at: now, ready: true, ready_at: now, edition_id: ed.id, parts: partsNow(pack), rules: null, lookback: hoursSinceLastPush(), quiet_if_empty: false });
     // 正在后台写的那一轮写完会自己再存一份、再触发，不受影响
-    void background(triggerDelivery(pack), "push now");
+    void background(deliver(pack), "push now");
     return { ok: true, edition: { id: ed.id, created_at: ed.created_at, mode: ed.mode }, replaced: Boolean(cur && cur.ready), note: "已发起推送（按 " + bjHhmm(ed.created_at) + " 的版面，只推还没推过的），稍后到手机。" };
   }
   function deliverPending(pend) {
     clearPending(pend.pack);
+    // 直接推送没发出去、留给定时任务转发的：消息已经拼好、推送也记过了，原样交出
+    if (typeof pend.message === "string") return { ok: true, run_id: pend.run_id, pack: pend.pack, fetched_at: pend.at, message: pend.message, edition: null };
     const ed = pend.edition_id ? withDb(p, (db) => (db ? edContent(editionById(db, pend.edition_id)) : null)) : null;
     const out = { ok: true, run_id: pend.run_id, pack: pend.pack, fetched_at: pend.at };
     const db = openIfExists(p.db);
@@ -1395,6 +1562,8 @@ export function apply(ctx, config) {
         }
         prewarm.tasksAt = Date.now();
       }
+      // 插件自己按时钟推送时宿主任务是暂停的：提前量按时钟算出的下一次
+      if (clock.tasks.length && direct()) prewarm.tasks = clock.tasks.filter((t) => t.kind === "cycle").map((t) => { const at = nextCron(t.cron, t.tz, Date.now()); return { pack: t.pack, task: { id: t.id, status: "active", scheduledAt: at ? at.toISOString() : null } }; }).filter((x) => x.task.scheduledAt);
       const lead = prewarmLeadMs();
       if (!lead) return;
       for (const [k, at] of prewarm.done) if (at < Date.now() - 3600000) prewarm.done.delete(k);
@@ -1427,8 +1596,12 @@ export function apply(ctx, config) {
     // 宿主只收「无损 JSON」：值里有 undefined、NaN、-0、Date 之类整个结果会被拒（报 value is not lossless JSON，
     // 而这时推送已经记下、消息却回不去）。所有工具的返回统一过一遍 JSON 往返。
     const tool = (def) => disposers.push(ctx.tools.register(Object.assign({}, def, { execute: async (...a) => losslessJson(await def.execute(...a)) })));
+    hooks.dailyRun = dailyRun;
+    disposers.push(() => { hooks.dailyRun = null; });
     // 预编排：每分钟看一眼下一次定时推送还有多久
     { const t = setInterval(() => { void background(prewarmTick(), "prewarm"); void background(checkPending(), "pending push"); }, 60000); disposers.push(() => clearInterval(t)); }
+    // 30 秒看一次时钟（同一分钟只触发一次），保证不漏掉整点
+    { const t = setInterval(() => { void background(clockTick(), "direct clock"); }, 30000); disposers.push(() => clearInterval(t)); }
 
     // ---------------------------------------------------------------- 路由
     route({
@@ -1536,7 +1709,7 @@ export function apply(ctx, config) {
           // 抓到不等于抓对：登录页、导航之类的一两条不算，和学规则用同一个标准
           let res = await testSource(ctx, cfg, p, { source: src, max_items: 8 });
           let verdict = judgeRecipe(res);
-          if (!body.type && !verdict.ok) {
+          if (!body.type && !src.adapter && !verdict.ok) {
             const other = Object.assign({}, src, { type: src.type === "rss" ? "html_index" : "rss" });
             const res2 = await testSource(ctx, cfg, p, { source: other, max_items: 8 });
             const v2 = judgeRecipe(res2);
@@ -1842,10 +2015,13 @@ export function apply(ctx, config) {
 
     // 推送设置：节奏（改定时任务的时间）、门槛档位、每轮与每天上限；推送记录与「有用 / 没用」
     async function pushView() {
+      // 打开推送设置时顺带对一次时钟（接管或交还定时任务），面板显示的就是当前状态
+      try { await clockSync(false); } catch { /* 定时服务一时不可用 */ }
       const prefs = loadPush(p.pushPrefs);
       let task = null;
       try { const r = await scheduleSetup({ action: "status" }); task = r && r.task; } catch { /* 没有定时服务 */ }
-      return { prefs, cadences: Object.fromEntries(Object.entries(CADENCES).map(([k, v]) => [k, v.label])), levels: Object.keys(LEVELS), task, schedule_available: Boolean(optional.schedule),
+      const dp = { service: Boolean(optional.phonePush), on: Boolean(direct()), clock: clock.tasks.length > 0, next: clockNext() };
+      return { prefs, direct: dp, cadences: Object.fromEntries(Object.entries(CADENCES).map(([k, v]) => [k, v.label])), levels: Object.keys(LEVELS), task, schedule_available: Boolean(optional.schedule),
         penalties: withDb(p, (db) => (db ? sectionPenalties(db) : {})), pushes: withDb(p, (db) => (db ? pushHistory(db, 40) : [])) };
     }
     async function applyPush(next) {
@@ -2228,6 +2404,12 @@ export function apply(ctx, config) {
         render: (_a, v) => [{ type: "text", text: String(v.message || "") }],
       },
       async execute(args) {
+        return await dailyRun(args);
+      },
+    });
+
+    /** 今日回顾（工具与插件自己的时钟共用）。 */
+    async function dailyRun(args) {
         const a = args || {};
         const pack = strOrNull(a.pack) || "all";
         const date = /^\d{4}-\d{2}-\d{2}$/.test(String(a.date || "")) ? String(a.date) : todayBj();
@@ -2240,8 +2422,7 @@ export function apply(ctx, config) {
         } else d = withDb(p, (db) => (db ? latestDaily(db, pack, date) : null));
         if (!d) return { ok: false, message: date + " 还没有日报", daily: null };
         return { ok: true, message: composeDailyMessage(d, taxonomyNames()), daily: d };
-      },
-    });
+    }
 
     tool({
       name: "newswire_story",
@@ -2336,9 +2517,12 @@ export function apply(ctx, config) {
         if (action !== "create" && !mine) return { ok: false, task: null, note: "找不到标题为「" + title + "」的任务" };
         if (action === "remove") { await svc.edit({ id: mine.id, action: "delete" }, actor); return { ok: true, task: null, note: "已删除定时任务「" + title + "」" }; }
         if (action === "pause" || action === "resume") {
+          // 插件自己按时钟推送时，宿主任务本来就是暂停的：暂停 = 时钟不再跑它；恢复 = 时钟重新接管
+          if (action === "pause") { writeTaken(readTaken().filter((x) => x.id !== mine.id)); clock.tasks = clock.tasks.filter((x) => x.id !== mine.id); }
           const r = await svc.edit({ id: mine.id, action: "update", patch: { active: action === "resume" } }, actor);
           if (r && r.code) return { ok: false, task: view(mine), note: "操作失败：" + r.code };
-          return { ok: true, task: view(r), note: action === "pause" ? "已暂停" : "已恢复" };
+          if (action === "resume") void background(clockSync(true), "direct clock");
+          return { ok: true, task: view(r), note: action === "pause" ? "已暂停" : "已恢复" + (direct() ? "（由插件按时直接推送到手机）" : "") };
         }
         const timing = { kind: "cron", cron: { expression: (a.cron || (daily ? DAILY_CRON : defaults.cron)).trim(), time_zone: a.time_zone || defaults.tz } };
         const prompt = daily ? dailyPrompt(pack === "core" ? "all" : pack) : schedulePrompt(pack);
@@ -2346,12 +2530,14 @@ export function apply(ctx, config) {
           if (mine) {
             const r = await svc.edit({ id: mine.id, action: "update", patch: { prompt, timing, active: true } }, actor);
             if (r && r.code) return { ok: false, task: view(mine), note: "更新失败：" + r.code };
+            void background(clockSync(true), "direct clock");
             return { ok: true, task: view(r), note: "已更新定时任务（" + timing.cron.expression + " " + timing.cron.time_zone + "）。" };
           }
           const create = {};
           if (a.cwd) create.cwd = a.cwd;
           if (a.agent_preset) create.agentPreset = a.agent_preset;
           const t = await svc.create({ title, prompt, timing, target: { kind: "new_once", create } }, actor);
+          void background(clockSync(true), "direct clock");
           return { ok: true, task: view(t), note: "已创建定时任务（" + timing.cron.expression + " " + timing.cron.time_zone + "），投递到一个固定复用的会话。第一次投递后，在 Telegram/飞书里对该会话 /use 或 /watch 一次，之后每轮消息会推到手机。" };
         } catch (e) {
           return { ok: false, task: view(mine), note: "宿主拒绝了这个定时任务：" + String(e && e.message ? e.message : e) };
@@ -2405,10 +2591,10 @@ export function apply(ctx, config) {
 
     tool({
       name: "newswire_push_prefs",
-      description: "Read or change how often and how much news is pushed to the phone. cadence: every2h (07–21) / every4h (8, 12, 16, 20) / thrice (8, 12, 18) / daily_only (no rounds, only the evening recap) — changing it updates the scheduled task if one exists. level: fewer (higher bar) / normal / more. per_round: max stories per push (1–15). daily_max: max stories per day (1–100). timing: on_time (push at the scheduled time; if the model has not finished, push the latest written edition) / when_ready (fetch at the scheduled time, push once this round's edition is written, usually 10–20 minutes later). scope: picked (stories over the bar, within the limits) / full (every new story and every story with new reports this round, ignoring the bar and limits). With no arguments, returns the current settings, recent pushes and per-section adjustments learned from the reader's feedback.",
+      description: "Read or change how often and how much news is pushed to the phone. cadence: every2h (07–21) / every4h (8, 12, 16, 20) / thrice (8, 12, 18) / daily_only (no rounds, only the evening recap) — changing it updates the scheduled task if one exists. level: fewer (higher bar) / normal / more. per_round: max stories per push (1–15). daily_max: max stories per day (1–100). timing: on_time (push at the scheduled time; if the model has not finished, push the latest written edition) / when_ready (fetch at the scheduled time, push once this round's edition is written, usually 10–20 minutes later). scope: picked (stories over the bar, within the limits) / full (every new story and every story with new reports this round, ignoring the bar and limits). delivery: auto (when the chat bridge plugin offers its phonePush service, the plugin posts to the phone itself on the task's schedule and pauses the scheduled task, so no model relays the text; otherwise through the scheduled task) / task (always through the scheduled task). With no arguments, returns the current settings, recent pushes and per-section adjustments learned from the reader's feedback.",
       parameters: { type: "object", additionalProperties: false, properties: {
         cadence: { type: "string", enum: Object.keys(CADENCES) }, level: { type: "string", enum: Object.keys(LEVELS) },
-        per_round: { type: "number" }, daily_max: { type: "number" }, timing: { type: "string", enum: TIMINGS }, scope: { type: "string", enum: SCOPES } } },
+        per_round: { type: "number" }, daily_max: { type: "number" }, timing: { type: "string", enum: TIMINGS }, scope: { type: "string", enum: SCOPES }, delivery: { type: "string", enum: DELIVERIES } } },
       timeoutMs: 30000,
       output: {
         schema: { type: "object", additionalProperties: true, required: ["prefs"], properties: { prefs: { type: "object" } } },
@@ -2416,7 +2602,7 @@ export function apply(ctx, config) {
       },
       async execute(args) {
         const a = args || {};
-        const changed = ["cadence", "level", "per_round", "daily_max", "timing", "scope"].some((k) => a[k] !== undefined);
+        const changed = ["cadence", "level", "per_round", "daily_max", "timing", "scope", "delivery"].some((k) => a[k] !== undefined);
         if (!changed) { const v = await pushView(); return { prefs: v.prefs, penalties: v.penalties, task: v.task }; }
         const r = await applyPush(a);
         return { prefs: r.prefs, schedule_note: r.schedule ? r.schedule.note : null };

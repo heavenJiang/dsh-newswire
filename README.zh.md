@@ -145,6 +145,8 @@ dsh plugin --profile web add github:heavenJiang/dsh-newswire
 2. 第一次投递后，在 Telegram 或飞书里对这个会话 `/use` 或 `/watch` 一次。这一步需要一个手机通道插件，例如 dsh-switchboard；本插件本身不依赖它。
 3. 想每晚收日报，再让 Agent 调用 `newswire_schedule_setup` 并传 `kind: "daily"`。
 
+**直接推送（装了 dsh-switchboard 0.5.23 及以上时自动启用）**：switchboard 提供 `phonePush` 服务时，本插件按定时任务的时间自己抓取、写版面，写完直接把消息发到 switchboard 里接收定时任务结果的聊天（`scheduleChats`），不经过定时任务里的模型。模型转发长消息时会改写、漏发，甚至把乱码发到手机，直接推送就没有这个问题。这期间宿主里的定时任务显示为"暂停"，时间仍以它为准：在面板里改节奏，照样改的是这个任务。switchboard 卸载、关了"允许其他插件发消息到手机"，或在面板把推送方式改成"经定时任务"，就自动恢复定时任务，回到原来的方式。两个插件互不依赖。
+
 嫌推得多，在对话里说「推少一点」或「一天三次就行」即可，也可以在面板「关注与推送」里调。
 
 **更新**：面板「运行 → 版本」会到 GitHub 检查新版本，点一下就能原地更新。

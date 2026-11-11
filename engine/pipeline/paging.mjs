@@ -3,6 +3,7 @@
  *   param    列表页 URL 加页码：{ mode: "param", param: "page", start: 2, max_pages: 6 }
  *   cursor   JSON API 游标：{ mode: "cursor", param: "cursor", next: "data.next_cursor", max_pages: 6 }
  *   id_walk  快讯 id 连续的站点逐条取详情页：{ mode: "id_walk", template: ".../newsletter/{id}", id_pattern: "/newsletter/(\\d+)", max_steps: 40 }
+ *   before   按消息 id 往前翻（Telegram 频道 ?before=<本页最小 id>）：{ mode: "before", param: "before", id_pattern: "t\\.me/[A-Za-z0-9_]+/(\\d+)", max_pages: 5 }
  *   native   源自身的抓取脚本已按时间回翻（财联社），这里不做事
  * 都走 http 直取（翻页请求多，不占 browse 标签页）；适配器源用同一个 parse。
  */
@@ -10,6 +11,7 @@ import { httpFetch } from "../channels/http.mjs";
 import { getAdapter } from "../adapters/index.mjs";
 import { getPath } from "../parsers/generic.mjs";
 import { parseText } from "./fetch.mjs";
+import { numericId } from "../cursor.mjs";
 
 function withParam(url, key, value) {
   const u = new URL(url);
@@ -52,6 +54,22 @@ export async function* morePages(src, o) {
       if (o.writeRaw) o.writeRaw(src.id + ".c" + (i + 1) + ".json", r.text);
       yield { page: i + 1, url, items };
       if (!items.length) return;
+    }
+  } else if (pg.mode === "before") {
+    const n = Math.min(Number(pg.max_pages || 5) * scale, 30);
+    const minId = (items) => { const ids = items.map((x) => numericId(x.link, pg.id_pattern)).filter((x) => x); return ids.length ? Math.min(...ids) : null; };
+    let r = await httpFetch(src.url, { timeoutMs });
+    let before = r.ok ? minId(parseText(src, adapter, r.text, 1000).items) : null;
+    for (let i = 0; i < n && before; i++) {
+      const url = withParam(src.url, pg.param || "before", before);
+      r = await httpFetch(url, { timeoutMs });
+      if (!r.ok) { yield { page: i + 1, url, items: [], error: r.error }; return; }
+      const items = parseText(src, adapter, r.text, 1000).items;
+      if (o.writeRaw) o.writeRaw(src.id + ".b" + before + ".html", r.text);
+      yield { page: i + 1, url, items };
+      const next = minId(items);
+      if (!next || next >= before) return;
+      before = next;
     }
   } else if (pg.mode === "id_walk") {
     const ids = (o.missingIds || []).slice(0, Math.min(Number(pg.max_steps || 40) * scale, 150));

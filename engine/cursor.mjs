@@ -4,7 +4,7 @@
  * 判定（只对「流式」源：按时间滚动的快讯/feed；首页推荐类「快照」源不判）：
  *   1. 键重叠（主判据）：本批出现了上轮 head_keys 里任意一条 → connected
  *   2. 时间覆盖（辅助）：本批最旧的可信发布时间 ≤ 上轮 head_time → connected_time
- *   3. id 连续（id_walk 源）：本批最小数字 id ≤ 上轮 max_id + 1 → connected
+ *   3. id 连续（id_walk / before 源）：本批最小数字 id ≤ 上轮 max_id + 1 → connected
  *   都不满足 → gap，缺口区间 (上轮 head_time, 本批最旧可信时间)
  * 只有可信时间（feed / page_text）参与时间判断；fetched 是抓取时间近似，不能用来证明衔接。
  */
@@ -26,7 +26,13 @@ export function loadCursor(db, sourceId) {
 
 const trusted = (r) => r.published_at && (r.time_confidence === "feed" || r.time_confidence === "page_text");
 
-/** 从链接里取数字 id（id_walk 源用）。 */
+/** 按 id 翻页的源（id_walk / before）从链接里取 id 用的正则。 */
+export function idPattern(src) {
+  const pg = src.paging;
+  return pg && (pg.mode === "id_walk" || pg.mode === "before") ? pg.id_pattern || null : null;
+}
+
+/** 从链接里取数字 id（id_walk / before 源用）。 */
 export function numericId(url, pattern) {
   if (!pattern) return null;
   const m = String(url).match(new RegExp(pattern));
@@ -52,7 +58,7 @@ export function evaluate(prev, records, src) {
   const keys = new Set(prev.head_keys || []);
   const overlap = records.filter((r) => keys.has(r.id)).length;
   if (overlap > 0) return { status: "connected", overlap, gap_from: null, gap_to: null, oldest, newest };
-  const pattern = src.paging && src.paging.mode === "id_walk" ? src.paging.id_pattern : null;
+  const pattern = idPattern(src);
   if (pattern && prev.max_id) {
     const ids = records.map((r) => numericId(r.url, pattern)).filter((x) => x);
     if (ids.length && Math.min(...ids) <= prev.max_id + 1) return { status: "connected", overlap: 0, gap_from: null, gap_to: null, oldest, newest };
@@ -65,7 +71,7 @@ export function evaluate(prev, records, src) {
 export function nextCursor(prev, records, src, runId, nowIso) {
   const ordered = records.slice().sort((a, b) => (a.page || 0) - (b.page || 0) || (a.signals.rank ?? 0) - (b.signals.rank ?? 0));
   const times = records.filter(trusted).map((r) => r.published_at).sort();
-  const pattern = src.paging && src.paging.mode === "id_walk" ? src.paging.id_pattern : null;
+  const pattern = idPattern(src);
   const ids = pattern ? records.map((r) => numericId(r.url, pattern)).filter((x) => x) : [];
   const headTime = times.length ? times[times.length - 1] : null;
   return {

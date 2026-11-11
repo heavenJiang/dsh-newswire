@@ -1,0 +1,34 @@
+/* 插件自己的时钟：五段 cron 的解析、到点判断与下一次。 */
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { parseCron, cronMatches, nextCron } from "../../host/clock.mjs";
+
+const bj = (s) => new Date(s + "+08:00");
+
+test("解析：常见写法与写错的", () => {
+  assert.ok(parseCron("0 7-21/2 * * *"));
+  assert.ok(parseCron("0 8,12,16,20 * * *"));
+  assert.ok(parseCron("30 21 * * 1-5"));
+  assert.equal(parseCron("0 25 * * *"), null);
+  assert.equal(parseCron("0 8 * *"), null);
+  assert.equal(parseCron("x 8 * * *"), null);
+  assert.deepEqual([...parseCron("0 7-21/2 * * *").hour], [7, 9, 11, 13, 15, 17, 19, 21]);
+});
+
+test("到点：按北京时间的墙上时间", () => {
+  assert.ok(cronMatches("0 7-21/2 * * *", bj("2026-11-11T09:00:00"), "Asia/Shanghai"));
+  assert.ok(!cronMatches("0 7-21/2 * * *", bj("2026-11-11T08:00:00"), "Asia/Shanghai"));
+  assert.ok(!cronMatches("0 7-21/2 * * *", bj("2026-11-11T09:01:00"), "Asia/Shanghai"));
+  assert.ok(cronMatches("0 9 * * *", new Date("2026-11-11T01:00:00Z"), "Asia/Shanghai"), "UTC 01:00 是北京 09:00");
+  // 周：2026-11-11 是周三；0 与 7 都是周日（11-15）
+  assert.ok(cronMatches("0 9 * * 3", bj("2026-11-11T09:00:00"), "Asia/Shanghai"));
+  assert.ok(cronMatches("0 9 * * 7", bj("2026-11-15T09:00:00"), "Asia/Shanghai"));
+  // 日和周都限定时满足其一
+  assert.ok(cronMatches("0 9 1 * 3", bj("2026-11-11T09:00:00"), "Asia/Shanghai"));
+});
+
+test("下一次：不含当前这一分钟，跨天", () => {
+  assert.equal(nextCron("0 8,12,18 * * *", "Asia/Shanghai", bj("2026-11-11T12:00:00")).toISOString(), "2026-11-11T10:00:00.000Z");
+  assert.equal(nextCron("0 8,12,18 * * *", "Asia/Shanghai", bj("2026-11-11T19:30:00")).toISOString(), "2026-11-12T00:00:00.000Z");
+  assert.equal(nextCron("bad", "Asia/Shanghai", Date.now()), null);
+});

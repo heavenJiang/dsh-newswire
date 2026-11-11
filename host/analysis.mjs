@@ -17,6 +17,7 @@ const LEVELS = ["高", "中", "低"];
 
 export function analysisPrompt(story, mats) {
   return "任务：分析一件正在发生的新闻的潜在影响和可能的演变。依据材料与常识推演；具体数字只能用材料里出现过的，不要编造数字；没有把握的写「不确定」或「低」。" +
+    (story.focus ? "\n这是一条" + story.focus + "新闻：着重分析这项技术或产品的影响力——比现有方案新在哪里、会改变谁（竞争对手、开发者与用户、算力与芯片供应链、上下游公司）、多快会落地、可能被谁跟进或反制。" : "") +
     "\n- summary：一句话说这件事意味着什么（不超过60字）" +
     "\n- impacts：最多 4 条，谁会受影响。area 取 " + AREAS.join("/") + "；target 写受影响的对象（公司、资产、行业或地区）；ticker 若是上市公司写股票代码（不确定就留空）；direction 取 " + DIRS.join("/") + "；why 写传导逻辑（不超过60字）；confidence 取 " + LEVELS.join("/") +
     "\n- scenarios：2 到 3 种可能的走向。name 如 基准/升级/缓和；likelihood 取 " + LEVELS.join("/") + "；what 写会怎样发展（不超过60字）；signals 写看到什么说明正往这个方向走（不超过40字）" +
@@ -94,7 +95,11 @@ export function autoAnalyzeTargets(db, ed, o) {
   const min = (o && o.min) ?? 70;
   const max = (o && o.max) ?? 2;
   const st = (ed && ed.stories) || {};
-  const ids = [...(ed.front || [])].concat(...(ed.sections || []).map((s) => s.stories)).filter((id, i, a) => a.indexOf(id) === i && st[id] && st[id].importance >= min);
+  // 重点领域（AI 与新技术）的报道门槛低 10 分并排在前面，新技术的影响优先分析
+  const focal = (id) => Boolean(o && o.isFocus && o.isFocus(st[id]));
+  const ids = [...(ed.front || [])].concat(...(ed.sections || []).map((s) => s.stories))
+    .filter((id, i, a) => a.indexOf(id) === i && st[id] && st[id].importance >= (focal(id) ? min - 10 : min))
+    .sort((a, b) => Number(focal(b)) - Number(focal(a)));
   const out = [];
   for (const id of ids) {
     const a = latestAnalysis(db, id);

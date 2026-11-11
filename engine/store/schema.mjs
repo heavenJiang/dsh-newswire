@@ -17,6 +17,7 @@
  * v11 story_updates（故事线进展）、kv（上次查看时间等状态）。
  * v12 digests（日报）、feedback（读者报错）。
  * v22 article_bodies.list_len（判断列表是否全文）；按新规则清理已入库正文、重算完整度。
+ * v23 write_cache：模型写好的稿按材料指纹存下来，中断或重启后重编时同样的材料不再让模型重写。
  */
 import { completeness } from "../pipeline/quality.mjs";
 import { anchorReader, trimTail, relevant, MIN_SHORT } from "../pipeline/bodytext.mjs";
@@ -238,7 +239,12 @@ const V22 = [
     for (const a of db.prepare("SELECT id, title, summary, content, completeness FROM articles").all()) { const c = completeness(a); if (c !== a.completeness) up.run(c, a.id); }
   },
 ];
-export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22];
+// v23：模型写好的稿按材料指纹存下来（fp = 材料、写法与提示词版本的摘要），中断后重编时复用
+const V23 = [
+  "CREATE TABLE IF NOT EXISTS write_cache (fp TEXT PRIMARY KEY, story_id TEXT, copy TEXT, created_at TEXT)",
+  "CREATE INDEX IF NOT EXISTS idx_write_cache_at ON write_cache(created_at)",
+];
+export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
 export function migrate(db) {

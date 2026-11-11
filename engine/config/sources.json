@@ -575,6 +575,64 @@
       "trial": true
     },
     {
+      "id": "tg_crypto_aggregator",
+      "name": "Telegram·币圈新闻汇总",
+      "category": "市场与交易",
+      "region": "INTL",
+      "lang": "zh",
+      "type": "html_index",
+      "adapter": "telegram",
+      "url": "https://t.me/s/CryptoMarketAggregator",
+      "channels": [
+        "http",
+        "browse"
+      ],
+      "max_items": 120,
+      "weight": 0.45,
+      "tier": "secondary",
+      "group": "tg_crypto_aggregator",
+      "pack": "core",
+      "note": "Telegram 公开频道网页预览；每 8 小时一份 [1/3][2/3][3/3] 分帖汇总，适配器拼回后按栏目与编号拆成单条，保留每条的原始出处（深潮/PANews/Odaily 等）。信号：阅读数、栏目。转述汇总，按次要来源计",
+      "continuity": "stream",
+      "paging": {
+        "mode": "before",
+        "param": "before",
+        "id_pattern": "t\\.me/[A-Za-z0-9_]+/(\\d+)",
+        "max_pages": 3
+      },
+      "body": "list",
+      "trial": true
+    },
+    {
+      "id": "tg_beating_ai",
+      "name": "Telegram·动察 Beating AI",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "zh",
+      "type": "html_index",
+      "adapter": "telegram",
+      "url": "https://t.me/s/OneMillion_AI",
+      "channels": [
+        "http",
+        "browse"
+      ],
+      "max_items": 40,
+      "weight": 0.6,
+      "tier": "secondary",
+      "group": "blockbeats",
+      "pack": "core",
+      "note": "Telegram 公开频道网页预览（律动 BlockBeats 旗下 AI 快讯）；一帖一条，加粗首行为标题，「信源」链接记为原始出处。信号：阅读数、表情回应",
+      "continuity": "stream",
+      "paging": {
+        "mode": "before",
+        "param": "before",
+        "id_pattern": "t\\.me/[A-Za-z0-9_]+/(\\d+)",
+        "max_pages": 3
+      },
+      "body": "list",
+      "trial": true
+    },
+    {
       "id": "cscse_notice",
       "name": "教育部留学服务中心·通知公告",
       "category": "留学与签证",

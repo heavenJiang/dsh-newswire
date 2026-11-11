@@ -32,11 +32,14 @@ function junkTitle(t) {
 }
 
 /**
- * 栏目名、导航链接（「Media & Telecom」「Business」「国际」）不是新闻：英文不足 4 个词、中文不足 6 个汉字。
+ * 栏目名、导航链接（「Media & Telecom」「Business」「国际」）不是新闻：英文不足 4 个词、中文不足 6 个汉字；
+ * 中英混排（「Stripe完成收购OpenRouter」「XXYY宣布停运」）汉字加英文词不足 5 个。
  */
 export function isNavTitle(t) {
   const s = String(t || "").trim();
   const cjk = (s.match(/[一-鿿]/g) || []).length;
+  const words = (s.match(/[A-Za-z][A-Za-z0-9.'’-]*/g) || []).length;
+  if (cjk && words) return cjk + words < 5;
   if (cjk) return cjk < 6;
   return s.split(/\s+/).filter((w) => /[A-Za-z]/.test(w)).length < 4;
 }

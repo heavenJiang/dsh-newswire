@@ -39,10 +39,12 @@ export const DEFAULT_LAYOUT = {
   window_hours: 12,
   min_importance: 25,
   front: { count: 3 },
-  sections: [{ id: "politics", max: 4 }, { id: "macro", max: 3 }, { id: "markets", max: 3 }, { id: "industry", max: 4 }, { id: "tech", max: 3 }, { id: "study", max: 4 }, { id: "society", max: 2 }],
+  sections: [{ id: "politics", max: 4 }, { id: "macro", max: 3 }, { id: "markets", max: 3 }, { id: "industry", max: 4 }, { id: "tech", max: 8 }, { id: "study", max: 4 }, { id: "society", max: 2 }],
   story: { lead_chars: 120, points: 3, point_chars: 40, views: 3, impact_chars: 60 },
   watch: { count: 3 },
   verify: { count: 4, min_importance: 30 },
+  // 重点领域：读者最关心的方向。挑材料时优先、不做规则分诊，模型评重要度时按技术影响力评，头版留位置，影响写技术带来的变化。labels 留空即关闭
+  focus: { name: "AI 与新技术", labels: ["tech", "industry.ai_semis"], boost: 20 },
   style: "客观、准确、简洁；用简体中文写，外文报道译成中文；数字、人名、机构名照录原文；不加评论性形容词；材料里没有的不写；各家说法不一致时如实并列。",
 };
 
@@ -72,8 +74,23 @@ export function normalizeLayout(raw) {
     },
     watch: { count: num(r.watch && r.watch.count, 0, 6, D.watch.count) },
     verify: { count: num(r.verify && r.verify.count, 0, 8, D.verify.count), min_importance: num(r.verify && r.verify.min_importance, 0, 100, D.verify.min_importance) },
+    focus: normalizeFocus(r.focus),
     style: typeof r.style === "string" && r.style.trim() ? r.style.trim().slice(0, 600) : D.style,
   };
+}
+
+function normalizeFocus(f) {
+  const D = DEFAULT_LAYOUT.focus;
+  if (!f || typeof f !== "object") return Object.assign({}, D, { labels: D.labels.slice() });
+  const labels = Array.isArray(f.labels) ? f.labels.filter((x) => typeof x === "string" && /^[a-z_]+(\.[a-z_]+)?$/.test(x.trim())).map((x) => x.trim()).slice(0, 8) : D.labels.slice();
+  return { name: typeof f.name === "string" && f.name.trim() ? f.name.trim().slice(0, 20) : D.name, labels, boost: num(f.boost, 0, 50, D.boost) };
+}
+
+/** 分类标签是否落在重点领域（一级 id 命中其下所有二级）。 */
+export function inFocus(focus, labels) {
+  const fl = (focus && focus.labels) || [];
+  if (!fl.length) return false;
+  return (labels || []).some((l) => fl.some((f) => l === f || String(l).startsWith(f + ".")));
 }
 
 export function loadLayout(file, seedFile) {
@@ -105,12 +122,17 @@ export function gatherItems(db, o) {
   const where = ["a.first_seen_at >= ?", "(a.published_at IS NULL OR a.published_at >= ?)"];
   const args = [o.since, staleBefore(o.since)];
   if (o.pack && o.pack !== "all") { where.push("a.pack = ?"); args.push(o.pack); }
-  const rows = db.prepare(`SELECT a.id, a.title, a.summary, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.pack, a.completeness, a.kind, a.parent_id, COALESCE(s.trial, 0) AS trial,
+  // 重点领域的新闻：按条目自己的分类标签认（没归进事件的也算），排序时加分，免得被条数上限截掉
+  const fl = (o.focus && o.focus.labels) || [];
+  const focusSql = fl.length ? "EXISTS (SELECT 1 FROM article_labels l WHERE l.article_id = a.id AND (" + fl.map(() => "l.label = ? OR l.label LIKE ?").join(" OR ") + "))" : "0";
+  const focusArgs = fl.flatMap((f) => [f, f + ".%"]);
+  const boost = fl.length ? Number(o.focus.boost ?? 20) : 0;
+  const rows = db.prepare(`SELECT ${focusSql} AS focus, a.id, a.title, a.summary, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.pack, a.completeness, a.kind, a.parent_id, COALESCE(s.trial, 0) AS trial,
       s.name AS source_name, COALESCE(s.grp, a.source_id) AS grp, m.event_id, e.importance AS ev_importance, e.credibility AS ev_cred, e.labels AS ev_labels, e.dispute AS ev_dispute
     FROM articles a LEFT JOIN sources s ON s.id = a.source_id LEFT JOIN event_members m ON m.article_id = a.id LEFT JOIN events e ON e.event_id = m.event_id
     WHERE ${where.join(" AND ")} AND a.title IS NOT NULL AND a.title != '' AND COALESCE(a.kind, 'news') NOT IN ('promo', 'digest', 'ticker')
-    ORDER BY COALESCE(e.importance, 0) DESC, m.event_id, a.first_seen_at DESC LIMIT ?`).all(...args, o.limit || 150);
-  return rows.map((r, i) => Object.assign(r, { n: i + 1, labels: parseJ(r.ev_labels, []) }));
+    ORDER BY COALESCE(e.importance, 0) + ${boost} * focus DESC, m.event_id, a.first_seen_at DESC LIMIT ?`).all(...focusArgs, ...args, o.limit || 150);
+  return rows.map((r, i) => Object.assign(r, { n: i + 1, labels: parseJ(r.ev_labels, []), focus: Boolean(r.focus) }));
 }
 
 /** 每条能拿到的最全正文：单独抓到的正文与列表里带的全文取长的；比摘要长出一截才算（否则摘要就够了）。 */
@@ -266,8 +288,13 @@ function assemble(stories, layout, names, extra) {
   // 我的关注：不受上版门槛限制，放在各版块之前；这些报道不再在各版块重复
   const fol = byImp.filter((s) => s.followed && s.followed.length).slice(0, 6).map((s) => s.id);
   if (fol.length) { sections.push({ id: "following", name: "我的关注", stories: fol }); fol.forEach((i) => placed.add(i)); }
+  const focal = (s) => inFocus(layout.focus, [s.section].concat(s.labels || []));
   for (const sec of layout.sections) {
-    const ids = shown.filter((s) => s.section === sec.id && !placed.has(s.id)).slice(0, sec.max).map((s) => s.id);
+    // 版块满了也给重点领域（AI 与新技术）的报道多留 3 个位置，不因条数上限漏掉
+    const cand = shown.filter((s) => s.section === sec.id && !placed.has(s.id));
+    const keep = cand.slice(0, sec.max);
+    for (const s of cand.slice(sec.max)) { if (keep.length >= sec.max + 3) break; if (focal(s)) keep.push(s); }
+    const ids = keep.map((s) => s.id);
     if (ids.length) { sections.push({ id: sec.id, name: sec.name || names[sec.id] || sec.id, stories: ids }); ids.forEach((i) => placed.add(i)); }
   }
   const others = shown.filter((s) => !known.has(s.section) && !placed.has(s.id)).slice(0, 3).map((s) => s.id);
@@ -278,6 +305,11 @@ function assemble(stories, layout, names, extra) {
   // 模型给的头版不够数（合并后重复被去掉等）：按重要度补齐
   for (const x of shown) { if (front.length >= layout.front.count) break; if (!front.includes(x.id)) front.push(x.id); }
   front = front.slice(0, layout.front.count);
+  // 头版至少一篇重点领域的报道：最重要的那篇够分量（≥45）而头版没有时，换掉头版最后一篇（头条不动）
+  const topFocal = layout.front.count >= 2 ? byImp.find((s) => focal(s) && s.importance >= 45) : null;
+  if (topFocal && !front.some((i) => { const s = stories.find((x) => x.id === i); return s && focal(s); })) {
+    if (front.length >= layout.front.count) front[front.length - 1] = topFocal.id; else front.push(topFocal.id);
+  }
   const get = (i) => stories.find((s) => s.id === i);
   const verify = byImp
     .filter((s) => (s.source_count <= 1 && s.importance >= layout.verify.min_importance) || s.credibility === "disputed")
@@ -450,14 +482,24 @@ export function pickCandidates(groups, batch, n) {
 }
 
 /** 提示词的固定部分放前面、材料放后面：生产环境的大模型对相同前缀有缓存，固定部分命中就省 token。 */
-export function groupPrompt(items, tax, cands, adExamples) {
-  const lines = items.map((it) => "[" + it.n + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + clip(it.title, 100) + (it.summary ? "｜" + clip(it.summary, 90) : "") +
+/** 重点领域的评分要求（归并时给模型）。 */
+export function focusRubric(focus) {
+  if (!focus || !(focus.labels || []).length) return "";
+  return "读者最关注「" + focus.name + "」（AI 模型与应用、芯片与算力、前沿技术、科技公司发布的新产品新技术与技术路线、重要开源与研究突破），这类新闻一条都不要漏收，也不要放进 noise。" +
+    "它们的重要度按技术影响力评，不按报道家数：看技术本身有多新（首次、突破、刷新纪录）、发布方分量（头部科技公司、顶尖实验室、主要芯片厂）、会改变什么（行业竞争格局、开发者和用户、成本与算力供需、相关公司），" +
+    "头部公司发布的新模型、新芯片或关键技术 50–70，可能改变行业格局的突破 70 以上，一般产品更新、融资、人事 30–45；只有一家报道不压分。";
+}
+
+export function groupPrompt(items, tax, cands, adExamples, focus) {
+  const fr = focusRubric(focus);
+  const lines = items.map((it) => "[" + it.n + "] " + (fr && it.focus ? "★" : "") + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + clip(it.title, 100) + (it.summary ? "｜" + clip(it.summary, 90) : "") +
     (it._peers && it._peers.length ? "（同一事件另有 " + it._peers.length + " 篇：" + [...new Set(it._peers.map((x) => x.source_name || x.source_id))].slice(0, 4).join("、") + "）" : ""));
   const known = (cands || []).map((g, i) => "[S" + (i + 1) + "] " + g.section + "｜" + clip(g.title, 50));
   return "任务：把讲同一件事的新闻归为一篇报道（中英文报道同一件事也要归在一起）。不是新闻的条目——广告、营销推广、付费栏目的引流预告（隐去公司名、写「这家公司」并给出看好结论的荐股稿）、栏目导航——编号放进 noise，不要收进报道。新闻合集、要闻汇总、日程预告、行情数据都是新闻，不放进 noise。" +
     "新闻讲的是某篇已有报道（编号 S…）的同一件事（含后续进展）时，填 story 为那篇的编号（如 \"S3\"），不必再给标题等；有重大进展时可给出新的 importance。其余的组成新报道，story 留空。" +
     "每篇新报道给出：\n- title：中文标题，概括这件事（不超过30字）\n- section：一级分类 id；labels：最贴切的 1–2 个二级分类 id" +
     "\n- importance：0–100 的重要度，看影响面、权威性、报道家数与时效（常规公告、个股小事 20–40；全国性政策、重大市场波动 50–70；重大国际事件、突发灾难 70 以上）" +
+    (fr ? "\n" + fr + "标 ★ 的是程序按分类认出的这类新闻，没标的也可能是。" : "") +
     "\n- entities：这件事的关键主体（公司、机构、人物、产品或技术名，最多 4 个，用最常见的中文名）" +
     '\n只输出一个 JSON 对象：{"stories":[{"items":[编号],"story":"","title":"","section":"","labels":[""],"importance":0,"entities":[""]}],"noise":[编号]}' +
     "\n\n分类表（一级 id 名称：二级 id 名称……）：\n" + tax.text +
@@ -467,8 +509,10 @@ export function groupPrompt(items, tax, cands, adExamples) {
 }
 
 export function planPrompt(stories, layout) {
-  const lines = stories.map((s, i) => "[" + (i + 1) + "] " + s.section + "｜" + s.importance + "｜" + s.source_count + "家｜" + clip(s.title, 60));
+  const fr = layout.focus && (layout.focus.labels || []).length ? layout.focus : null;
+  const lines = stories.map((s, i) => "[" + (i + 1) + "] " + (fr && inFocus(fr, [s.section].concat(s.labels || [])) ? "★" : "") + s.section + "｜" + s.importance + "｜" + s.source_count + "家｜" + clip(s.title, 60));
   return "任务：给一份新闻版面做统筹。\n1. merge：讲同一件事、应当合并的报道编号组（没有就给空数组）\n2. headline：一句话总括这段时间最重要的事（不超过40字）\n3. front：头版放的 " + layout.front.count + " 篇报道编号，按重要性排序\n4. watch：值得继续关注的 " + Math.max(1, layout.watch.count) + " 件事以内，每件说明原因（不超过50字），附报道编号" +
+    (fr ? "\n读者最关注「" + fr.name + "」（标 ★ 的报道）：头版至少放 1 篇影响最大的 ★ 报道（有的话），值得关注里优先写新技术接下来的进展；评估时看技术的影响力，不只看报道家数。" : "") +
     "\n5. themes：把属于同一条更大的主线、但不是同一件事的报道串起来（如同一场冲突的不同事件、同一家公司接连的动作、同一项技术的多方进展），每条主线给 name（不超过12字）、kind（conflict/company/technology/policy/market/other）和报道编号；没有就给空数组" +
     '\n只输出一个 JSON 对象：{"merge":[[编号]],"headline":"","front":[编号],"watch":[{"text":"","refs":[编号]}],"themes":[{"name":"","kind":"","refs":[编号]}]}' +
     "\n\n这段时间按重要度排列的报道（编号｜版块｜重要度｜报道家数｜标题）：\n" + lines.join("\n");
@@ -483,10 +527,12 @@ export function writePrompt(batch, layout) {
     const fresh = b.mats.map((it, k) => (freshIds.has(it.id) ? "M" + (k + 1) : null)).filter(Boolean);
     const prev = b.prevLead ? "\n上次导语：" + clip(b.prevLead, 160) + (fresh.length ? "\n本次新增材料：" + fresh.join("、") : "") : "";
     const fbk = (b.errors || []).length ? "\n读者指出这些说法有误，不要再写：" + b.errors.map((e) => "『" + clip(e.text, 60) + "』" + (e.note ? "（" + clip(e.note, 40) + "）" : "")).join("；") : "";
-    return "【报道" + (i + 1) + "】" + b.story.title + prev + fbk + "\n材料：\n" + b.mats.map((it, k) => "[M" + (k + 1) + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + materialText(it, b.bodies)).join("\n");
+    const star = layout.focus && inFocus(layout.focus, [b.story.section].concat(b.story.labels || [])) ? "（" + layout.focus.name + "）" : "";
+    return "【报道" + (i + 1) + "】" + star + b.story.title + prev + fbk + "\n材料：\n" + b.mats.map((it, k) => "[M" + (k + 1) + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + materialText(it, b.bodies)).join("\n");
   });
   return "请按版式为以下每篇报道写稿。写作要求：" + layout.style + "每句话只能依据该报道的材料，并在 refs 里标出依据的材料编号；材料里没有的数字、人名、机构名一律不写。" +
-    "\n版式：lead 导语（不超过" + S.lead_chars + "字，说清谁、何时、何事）；points 要点（最多" + S.points + "条，每条不超过" + S.point_chars + "字，写导语之外的关键事实或数字）；views 各方说法（最多" + S.views + "条，{who: 媒体或当事方, says: 说法}，只在各家说法不同或有当事方表态时写，否则给空数组）；impact 影响（不超过" + S.impact_chars + "字，对市场、政策或相关人群的影响，材料不足就给空字符串）。\n\n" +
+    "\n版式：lead 导语（不超过" + S.lead_chars + "字，说清谁、何时、何事）；points 要点（最多" + S.points + "条，每条不超过" + S.point_chars + "字，写导语之外的关键事实或数字）；views 各方说法（最多" + S.views + "条，{who: 媒体或当事方, says: 说法}，只在各家说法不同或有当事方表态时写，否则给空数组）；impact 影响（不超过" + S.impact_chars + "字，对市场、政策或相关人群的影响，材料不足就给空字符串）。" +
+    (layout.focus && (layout.focus.labels || []).length ? "标了（" + layout.focus.name + "）的报道，impact 写这项技术或产品带来的变化：对行业竞争格局、开发者与用户、成本与算力供需或相关公司的影响；points 优先写技术要点（性能、参数、价格、开放方式、上线时间）。" : "") + "\n\n" +
     "update：只对给了「上次导语」的报道写，说清相比上次有什么新进展（不超过40字，依据新增材料；没有实质进展给空字符串）。" +
     '\n只输出一个 JSON 对象：{"stories":[{"ref":1,"lead":"","lead_refs":["M1"],"points":[{"text":"","refs":["M2"]}],"views":[{"who":"","says":"","refs":["M1"]}],"impact":"","update":""}]}' +
     "\n\n" + blocks.join("\n\n");
@@ -499,6 +545,26 @@ export function writePrompt(batch, layout) {
  * @param o { pack, since, hours, layout, names, taxonomy, maxItems, maxStories, batchSize, budgetMs, callTimeoutMs, prev（上一份版面内容）}
  * @returns 版面；材料太少时 { fallback: "too_few_items" }
  */
+/** 模型服务断连一类的错误：值得等一会儿重试。 */
+const CONN_ERR = /connection error|econnreset|econnrefused|fetch failed|socket hang up|network|terminated/i;
+/** 写稿缓存的版本：写稿提示词或写法改了就加一，旧缓存自然失效。 */
+const WRITE_V = 1;
+/** 一篇稿的材料指纹：材料、上次导语、读者报错、写法、重点领域标记与提示词版本都一样，才算同一份稿。 */
+export function writeFingerprint(entry, layout) {
+  const star = layout.focus && inFocus(layout.focus, [entry.story.section].concat(entry.story.labels || [])) ? layout.focus.name : "";
+  return createHash("sha1").update(JSON.stringify({ v: WRITE_V, t: entry.story.title, m: entry.mats.map((it) => it.id), p: entry.prevLead || "", e: (entry.errors || []).map((x) => x.text), s: layout.story, y: layout.style, f: star })).digest("hex");
+}
+const COPY_KEYS = ["lead", "lead_refs", "points", "views", "impact", "update_text", "update_by"];
+function cacheGet(db, fp) {
+  try { const r = db.prepare("SELECT copy FROM write_cache WHERE fp = ? AND created_at >= datetime('now', '-3 days')").get(fp); return r ? JSON.parse(r.copy) : null; } catch { return null; }
+}
+function cachePut(db, fp, story) {
+  try {
+    const copy = Object.fromEntries(COPY_KEYS.filter((k) => story[k] !== undefined).map((k) => [k, story[k]]));
+    db.prepare("INSERT INTO write_cache (fp, story_id, copy, created_at) VALUES (?,?,?,datetime('now')) ON CONFLICT(fp) DO UPDATE SET story_id = excluded.story_id, copy = excluded.copy, created_at = excluded.created_at").run(fp, story.id || null, JSON.stringify(copy));
+  } catch { /* 存不下不影响这一版 */ }
+}
+
 export async function llmEdition(db, model, o) {
   const layout = o.layout;
   const t0 = Date.now();
@@ -513,8 +579,18 @@ export async function llmEdition(db, model, o) {
     const t = Date.now();
     try {
       // 推理模型的推理也占 token：上限留足；解析不了重试一次
+      // 本地模型服务偶尔断连（Connection error）：等一会儿重试一次，不直接退回程序稿
+      const once = async () => {
+        try { return await model.complete(prompt, { step, maxTokens, timeoutMs: Math.min(left(), Math.max(o.callTimeoutMs || 180000, minTimeout || 0)) }); } catch (err) {
+          if (!CONN_ERR.test(String(err && err.message ? err.message : err)) || left() < (o.retryWaitMs ?? 20000) + 30000) throw err;
+          stats.errors.push(step + ": " + String(err.message || err).slice(0, 80) + "（重试）");
+          stats.calls++;
+          await new Promise((r) => setTimeout(r, o.retryWaitMs ?? 20000));
+          return await model.complete(prompt, { step, maxTokens, timeoutMs: Math.min(left(), Math.max(o.callTimeoutMs || 180000, minTimeout || 0)) });
+        }
+      };
       for (let k = 0; k < 2; k++) {
-        const j = parseJsonLoose(await model.complete(prompt, { step, maxTokens, timeoutMs: Math.min(left(), Math.max(o.callTimeoutMs || 180000, minTimeout || 0)) }));
+        const j = parseJsonLoose(await once());
         if (j) return j;
         if (k === 0) stats.calls++;
       }
@@ -528,7 +604,7 @@ export async function llmEdition(db, model, o) {
     }
   };
   const tax = taxonomyIndex(o.taxonomy);
-  const items = gatherItems(db, { pack: o.pack, since: o.since, limit: o.maxItems || 150 });
+  const items = gatherItems(db, { pack: o.pack, since: o.since, limit: o.maxItems || 150, focus: layout.focus });
   if (items.length < 3) return { fallback: "too_few_items" };
   const byN = new Map(items.map((it) => [it.n, it]));
 
@@ -575,7 +651,8 @@ export async function llmEdition(db, model, o) {
   stats.auto_attached = auto;
   // 分诊：规则打分很低、又只有一家报道的新闻几乎不会上版——不交给模型，按规则事件归并；关注命中的照样交给模型
   const followList = (o.follows && o.follows.follow) || [];
-  const lowly = (it) => it.event_id && it.ev_importance != null && it.ev_importance < (o.triageBelow ?? 18) && (!it.ev_cred || it.ev_cred === "single") &&
+  // 重点领域（AI 与新技术）的不分诊，全交给模型看，免得漏掉只有一家报道的新技术
+  const lowly = (it) => !it.focus && it.event_id && it.ev_importance != null && it.ev_importance < (o.triageBelow ?? 18) && (!it.ev_cred || it.ev_cred === "single") &&
     !(followList.length && matchList(followList, { id: "", title: it.title, section: "", labels: it.labels || [], outlets: [{ source_id: it.source_id }] }, [it]).length);
   const triaged = o.triageBelow === 0 ? [] : fresh.filter(lowly);
   if (triaged.length) {
@@ -625,7 +702,7 @@ export async function llmEdition(db, model, o) {
     let got = null;
     try {
       if (Date.now() > groupDeadline) throw new Error("group_budget");
-      const j = await call("group", groupPrompt(batch, tax, cands, adExamples), 2000 + 500 * batch.length, 300000);
+      const j = await call("group", groupPrompt(batch, tax, cands, adExamples, layout.focus), 2000 + 500 * batch.length, 300000);
       if (Array.isArray(j.stories)) got = j.stories;
       // 模型判为非新闻的：标成 promo（读者判过的不动），之后不再进版面
       const nz = (Array.isArray(j.noise) ? j.noise : []).map(Number).filter((n) => inBatch.has(n) && !["corroborated", "confirmed", "disputed"].includes(byN.get(n).ev_cred) && !isDigestTitle(byN.get(n).title) && byN.get(n).kind !== "digest_item" && !(got || []).some((g) => (g.items || []).map(Number).includes(n)));
@@ -773,15 +850,29 @@ export async function llmEdition(db, model, o) {
   // 写稿：一批 3 篇；服务端能并行处理时多批同时写（生产环境的大模型），本地单卡就一批一批写。
   // 并发数：o.concurrency 给了就用；o.probe 为真时先拿前两批并行试一次，比较「两批各自耗时之和 / 实际总耗时」，
   // 接近 2 说明服务端真在并行（之后用 3），接近 1 说明在排队（之后用 1），结果交给 o.onProbe 记住
+  const entryOf = (story) => {
+    const g = story._g;
+    const prevLead = !g.isNew && g.row && g.row.copy && g.row.copy.lead && g.fresh.length ? g.row.copy.lead : "";
+    // 有进展的故事线：新材料优先放进去，模型才看得到新进展
+    let mats = pickMaterials(g.items);
+    if (prevLead) { const nf = pickMaterials(g.fresh, 3); mats = nf.concat(pickMaterials(g.items.filter((it) => !nf.includes(it)), 6 - nf.length)); }
+    return { story, items: g.items, bodies, mats, fresh: g.fresh, prevLead, errors: fb.errors.get(story.id) || [] };
+  };
+  // 断点续写：上一次（中断、重启或超时前）已经写好的同一份材料，直接用写好的稿
+  try { db.prepare("DELETE FROM write_cache WHERE created_at < datetime('now', '-3 days')").run(); } catch { /* 旧库没有这张表 */ }
+  stats.cached = 0;
+  for (let i = toWrite.length - 1; i >= 0; i--) {
+    const s = toWrite[i];
+    const hit = cacheGet(db, writeFingerprint(entryOf(s), layout));
+    if (!hit || !hit.lead) continue;
+    Object.assign(s, hit, { by: "llm" });
+    written.add(s.id);
+    toWrite.splice(i, 1);
+    stats.cached++;
+  }
+  if (stats.cached) progress(bodies);
   const writeBatch = async (group) => {
-      const batch = group.map((story) => {
-        const g = story._g;
-        const prevLead = !g.isNew && g.row && g.row.copy && g.row.copy.lead && g.fresh.length ? g.row.copy.lead : "";
-        // 有进展的故事线：新材料优先放进去，模型才看得到新进展
-        let mats = pickMaterials(g.items);
-        if (prevLead) { const nf = pickMaterials(g.fresh, 3); mats = nf.concat(pickMaterials(g.items.filter((it) => !nf.includes(it)), 6 - nf.length)); }
-        return { story, items: g.items, bodies, mats, fresh: g.fresh, prevLead, errors: fb.errors.get(story.id) || [] };
-      });
+      const batch = group.map(entryOf);
       try {
         // 材料是正文，推理更长：上限按篇数给足（实测 3 篇约 6400 个输出 token），超时放宽到 5 分钟
         const j = await call("write", writePrompt(batch, layout), 4000 + 3000 * batch.length, 300000);
@@ -801,6 +892,7 @@ export async function llmEdition(db, model, o) {
           const up = b.prevLead ? str(w.update, 60) : "";
           if (up && checkText(up, b.mats.map((m) => materialText(m, b.bodies))).ok) Object.assign(b.story, { update_text: up, update_by: "llm" });
           written.add(b.story.id);
+          cachePut(db, writeFingerprint(b, layout), b.story);
         }
       } catch { stats.fallbacks.push("write:" + batch.length); /* 这一批用程序拼的稿 */ }
   };
