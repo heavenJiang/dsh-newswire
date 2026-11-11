@@ -24,8 +24,8 @@ function common(items, host) {
   assert.equal(new Set(items.map((x) => x.link)).size, items.length, "链接不应重复");
 }
 
-test("注册表包含 5 个适配器且都声明了 browse 等待选择器", () => {
-  assert.deepEqual(adapterIds().sort(), ["apnews", "jiemian", "techflow", "telegram", "thepaper"]);
+test("注册表包含 6 个适配器且都声明了 browse 等待选择器", () => {
+  assert.deepEqual(adapterIds().sort(), ["apnews", "hackernews", "jiemian", "techflow", "telegram", "thepaper"]);
   for (const id of adapterIds()) assert.ok(getAdapter(id).waitFor, id + " 缺 waitFor");
 });
 
@@ -119,4 +119,29 @@ test("Telegram 翻页：消息 id 从条目链接里取，按 id 判断衔接", 
 
 test("max 限制生效", () => {
   for (const id of adapterIds()) assert.ok(getAdapter(id).parse(load(id), { max: 3 }).length <= 3, id);
+});
+
+test("Hacker News：首页帖子按分数门槛收，链接是原文，时间是 UTC；讨论页取顶层评论", async () => {
+  const hn = getAdapter("hackernews");
+  const all = hn.parse(load("hackernews"), { max: 30, src: { min_points: 0 } });
+  assert.equal(all.length, 30);
+  const items = hn.parse(load("hackernews"), { max: 30, src: { min_points: 100 } });
+  assert.ok(items.length > 5 && items.length < 30, "门槛之下的不收：" + items.length);
+  assert.ok(items.every((x) => x.signals.likes >= 100));
+  common(items, "");
+  const first = items[0];
+  assert.match(first.link, /^https:\/\/www\.vulncheck\.com\//);
+  assert.match(first.published_at, /^2026-11-10T22:17:56Z$/);
+  assert.match(first.summary, /^Hacker News 讨论：319 分，144 条评论（vulncheck\.com）/);
+  assert.equal(first.signals_raw.discussion, "https://news.ycombinator.com/item?id=50447074");
+  const pages = { "https://news.ycombinator.com/item?id=50447074": readFileSync(path.join(FIX, "hackernews_item.html.gz")) };
+  const fetchHtml = async (u) => (pages[u] ? gunzipSync(pages[u]).toString("utf8") : null);
+  const few = await hn.enrich(items.map((x) => Object.assign({}, x)), { fetchHtml, src: { comment_items: 2 } });
+  assert.equal(few.tried, 2, "只读分数最高的几条");
+  const r = await hn.enrich(items, { fetchHtml, src: { comment_items: 30 } });
+  assert.equal(r.tried, items.length);
+  assert.equal(r.ok, 1);
+  assert.match(first.comments, /^· （15 条回复）I received 9 reports of Fil-C issues/);
+  assert.ok(first.comments.split("\n").length >= 5 && first.comments.split("\n").every((l) => l.length <= 420));
+  assert.equal(first.content, "", "外链帖不拿讨论页当正文");
 });

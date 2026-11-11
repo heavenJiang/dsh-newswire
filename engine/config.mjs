@@ -5,12 +5,14 @@
  * v3 → v4：补齐推送规则 push（按主题包）。
  * v4 → v5：补齐正文抓取方式 body（fetch / list / none）。
  * v5 → v6：留学主题包（新源、packs 增加名称与默认推送时间、push.study_abroad）；packs 与 push 按键合并，用户已有的值优先。
+ * v6 → v7：海外技术源（Hacker News、技术博客）。只加种子里标了 added_in: 7 的源，而且一律关闭，在面板里自己打开；
+ *          种子里其他用户没有的源（比如以前没加的试用频道）不再借升级加进来。
  * 用户自己改过的值一律保留（种子只填缺失字段）。
  */
 import fs from "node:fs";
 
-export const CONFIG_VERSION = 6;
-const SEED_FIELDS = ["region", "weight", "tier", "group", "pack", "adapter", "lang", "wait_for", "continuity", "paging", "backfill", "timeout_ms", "body"];
+export const CONFIG_VERSION = 7;
+const SEED_FIELDS = ["region", "weight", "tier", "group", "pack", "adapter", "lang", "wait_for", "continuity", "paging", "backfill", "timeout_ms", "body", "profile"];
 const KNOWN_CHANNELS = new Set(["browse", "agent_reach", "http", "jina"]);
 
 export function upgradeConfig(doc, seed) {
@@ -29,7 +31,13 @@ export function upgradeConfig(doc, seed) {
     return out;
   });
   const added = [];
-  for (const s of seed.sources || []) if (!have.has(s.id)) { sources.push(s); added.push(s.id); }
+  for (const s of seed.sources || []) {
+    if (have.has(s.id)) continue;
+    const since = Number(s.added_in) || 0;
+    // v6 以前的升级照旧补齐种子里的源；之后只补本次升级新增的源，并且先关着
+    if (version < 6 && since <= 6) { sources.push(s); added.push(s.id); }
+    else if (since > version && since <= CONFIG_VERSION) { sources.push(Object.assign({}, s, { enabled: false })); added.push(s.id); }
+  }
   const categories = Array.from(new Set([].concat(doc.categories || [], seed.categories || [])));
   const defaults = Object.assign({}, doc.defaults || {}, { channels: (seed.defaults && seed.defaults.channels) || ["browse", "agent_reach", "http"] });
   return { doc: Object.assign({}, doc, { version: CONFIG_VERSION, defaults, packs: mergeByKey(seed.packs, doc.packs), push: mergeByKey(seed.push, doc.push), categories, sources }), changed: true, added };

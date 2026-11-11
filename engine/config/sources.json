@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "timezone": "Asia/Shanghai",
   "defaults": {
     "channels": [
@@ -824,6 +824,229 @@
       "note": "国际教育行业媒体，用于交叉印证",
       "body": "fetch",
       "trial": true
+    },
+    {
+      "id": "hn_front",
+      "name": "Hacker News",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "html_index",
+      "adapter": "hackernews",
+      "url": "https://news.ycombinator.com/",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 30,
+      "weight": 0.5,
+      "tier": "community",
+      "group": "hackernews",
+      "pack": "core",
+      "profile": "community",
+      "continuity": "snapshot",
+      "min_points": 100,
+      "comment_items": 8,
+      "note": "Hacker News 首页：100 分以上的帖子，条目链接是帖子指向的原文；分数最高的 8 条再读讨论页取顶层评论。社区讨论，不算独立信源。信号：分数、评论数",
+      "enabled": false,
+      "added_in": 7
+    },
+    {
+      "id": "openai_news",
+      "name": "OpenAI News",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://openai.com/news/rss.xml",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 10,
+      "weight": 0.9,
+      "tier": "primary",
+      "group": "openai",
+      "pack": "core",
+      "note": "OpenAI 官方新闻（RSS）：发布、研究与公司动态",
+      "enabled": false,
+      "added_in": 7
+    },
+    {
+      "id": "simonw",
+      "name": "Simon Willison",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://simonwillison.net/atom/everything/",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 10,
+      "weight": 0.6,
+      "tier": "primary",
+      "group": "simonw",
+      "pack": "core",
+      "profile": "tech-deep",
+      "note": "Simon Willison 的博客：LLM 工具、模型实测与工程实践（短链接帖较多）",
+      "enabled": false,
+      "added_in": 7
+    },
+    {
+      "id": "hf_blog",
+      "name": "Hugging Face Blog",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://huggingface.co/blog/feed.xml",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 10,
+      "weight": 0.6,
+      "tier": "primary",
+      "group": "huggingface",
+      "pack": "core",
+      "profile": "tech-deep",
+      "note": "Hugging Face 博客：开源模型、训练与推理技术",
+      "enabled": false,
+      "added_in": 7
+    },
+    {
+      "id": "nvidia_dev",
+      "name": "NVIDIA Technical Blog",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://developer.nvidia.com/blog/feed",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 10,
+      "weight": 0.6,
+      "tier": "primary",
+      "group": "nvidia",
+      "pack": "core",
+      "profile": "tech-deep",
+      "note": "NVIDIA 开发者技术博客：GPU、CUDA、推理与训练优化",
+      "enabled": false,
+      "added_in": 7
+    },
+    {
+      "id": "vllm_blog",
+      "name": "vLLM Blog",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://vllm.ai/blog/rss.xml",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 10,
+      "weight": 0.6,
+      "tier": "primary",
+      "group": "vllm",
+      "pack": "core",
+      "profile": "tech-deep",
+      "note": "vLLM 博客：大模型推理引擎",
+      "enabled": false,
+      "added_in": 7
+    },
+    {
+      "id": "lilianweng",
+      "name": "Lil'Log (Lilian Weng)",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://lilianweng.github.io/index.xml",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 10,
+      "weight": 0.6,
+      "tier": "primary",
+      "group": "lilianweng",
+      "pack": "core",
+      "profile": "tech-deep",
+      "note": "Lilian Weng 的长文：模型与对齐综述（更新少，篇幅长）",
+      "enabled": false,
+      "added_in": 7
+    },
+    {
+      "id": "raschka",
+      "name": "Ahead of AI (Sebastian Raschka)",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://magazine.sebastianraschka.com/feed",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 10,
+      "weight": 0.6,
+      "tier": "primary",
+      "group": "raschka",
+      "pack": "core",
+      "profile": "tech-deep",
+      "note": "Sebastian Raschka：LLM 研究解读与实现",
+      "enabled": false,
+      "added_in": 7
+    },
+    {
+      "id": "interconnects",
+      "name": "Interconnects (Nathan Lambert)",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://www.interconnects.ai/feed",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 10,
+      "weight": 0.6,
+      "tier": "primary",
+      "group": "interconnects",
+      "pack": "core",
+      "profile": "tech-deep",
+      "note": "Nathan Lambert：开放模型、后训练与行业分析",
+      "enabled": false,
+      "added_in": 7
+    },
+    {
+      "id": "github_blog",
+      "name": "The GitHub Blog",
+      "category": "科技与AI",
+      "region": "INTL",
+      "lang": "en",
+      "type": "rss",
+      "url": "https://github.blog/feed/",
+      "channels": [
+        "browse",
+        "http"
+      ],
+      "max_items": 10,
+      "weight": 0.6,
+      "tier": "primary",
+      "group": "github",
+      "pack": "core",
+      "profile": "tech-deep",
+      "note": "GitHub 官方博客：开发者工具与工程实践",
+      "enabled": false,
+      "added_in": 7
     }
   ]
 }

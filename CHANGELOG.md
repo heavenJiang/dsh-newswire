@@ -2,6 +2,17 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.17 (2026-11-11)
+
+- **Overseas tech sources**: Hacker News and nine tech blogs (OpenAI News, Simon Willison, Hugging Face, NVIDIA Technical Blog, vLLM, Lil'Log, Ahead of AI, Interconnects, GitHub Blog). After upgrading they appear in the Sources tab, **off by default**; turn them on yourself. All are read through browse; no paid API is used.
+  - Hacker News uses a new `hackernews` adapter on the front page: only posts with 100 points or more, linked to the article they point to, so other outlets' reports of the same piece group with it. The 8 highest-scoring posts also have their discussion page read for top-level comments, which the Community discussion profile writes up as Community views.
+  - Tech blogs use the Long-form tech profile; OpenAI News is official news and goes through "AI and new technology" by category.
+  - Items from sources that declare a profile skip rule triage and rank higher when material is picked, so the model scores them with that profile's guidance. Before, such single-source posts scored too low by the rules to reach the model.
+- **Community discussion is not an independent outlet.** New source tier `tier: "community"`: no source points, no "corroborated", and listed after the byline as "Discussed on Hacker News"; stories with only community discussion stay out of To verify.
+- **The browser's auto-translate no longer pollutes English pages.** With auto-translate on, browse read the translated page: Chinese translations were inserted after English titles and the comment markup was scrambled. Adapters can declare `rawHtml` to read the server's original HTML from inside the page instead (Hacker News does).
+- **Exa backfill is off by default.** Exa is a paid API; gaps are closed by paging back. To use it, set `"backfill": true` on a source.
+- Source config upgrades to v7: only the sources added in this release are added, and they start off; trial channels you never added are not slipped in by the upgrade. Sources you edited are left as they are.
+
 ## 1.1.16 (2026-11-11)
 
 - **Profiles can write their own parts.** Besides lead, points, views and impact, a profile can add a paragraph (`text`) or a few short lines (`list`), such as Background, Takeaways or Community views. Every part is checked sentence by sentence and failing sentences are removed. The panel shows them under More, and readers can flag these sentences too.

@@ -479,7 +479,7 @@ function strOrNull(v) {
 }
 
 const TYPES = ["rss", "html_index", "cls_api", "json_api"];
-const TIERS = ["primary", "secondary"];
+const TIERS = ["primary", "secondary", "community"];
 const ID_RE = /^[a-z0-9][a-z0-9_-]{1,39}$/;
 
 function regexOk(pattern) {
@@ -505,7 +505,7 @@ function validateOne(s, at, problems) {
   if (s.max_items !== undefined && clampNum(s.max_items, 1, 300, 0) === 0) problems.push(at + " max_items 需为 1-300");
   if (s.timeout_ms !== undefined && clampNum(s.timeout_ms, 5000, 180000, 0) === 0) problems.push(at + " timeout_ms 需为 5000-180000");
   if (s.weight !== undefined && s.weight !== null && !(Number(s.weight) >= 0 && Number(s.weight) <= 1)) problems.push(at + " weight 需为 0-1");
-  if (s.tier !== undefined && s.tier !== null && s.tier !== "" && TIERS.indexOf(s.tier) < 0) problems.push(at + " tier 只能是 primary/secondary");
+  if (s.tier !== undefined && s.tier !== null && s.tier !== "" && TIERS.indexOf(s.tier) < 0) problems.push(at + " tier 只能是 primary/secondary/community");
   for (const k of ["group", "pack", "profile"]) if (s[k] !== undefined && s[k] !== null && s[k] !== "" && (typeof s[k] !== "string" || !ID_RE.test(s[k]))) problems.push(at + " " + k + " 需为 [a-z0-9_-] 标识");
   if (s.region !== undefined && s.region !== null && (typeof s.region !== "string" || s.region.length > 8)) problems.push(at + " region 需为不超过 8 字符的地区码（如 CN/US/UK/INTL）");
   if (!regexOk(s.url_include) || !regexOk(s.url_exclude)) problems.push(at + " url_include/url_exclude 不是合法正则");
@@ -553,7 +553,9 @@ function normalizeSource(s) {
   if (s.signals !== undefined && s.signals !== null && typeof s.signals === "object") out.signals = s.signals;
   if (s.paging !== undefined && s.paging !== null && typeof s.paging === "object") out.paging = s.paging;
   if (s.continuity === "stream" || s.continuity === "snapshot") out.continuity = s.continuity;
-  if (s.backfill === false) out.backfill = false;
+  if (s.backfill === false || s.backfill === true) out.backfill = s.backfill;
+  if (s.min_points !== undefined) out.min_points = clampNum(s.min_points, 0, 5000, 100);
+  if (s.comment_items !== undefined) out.comment_items = clampNum(s.comment_items, 0, 30, 8);
   if (s.body === "list" || s.body === "none") out.body = s.body;
   out.enabled = s.enabled !== false;
   if (s.max_items !== undefined) out.max_items = clampNum(s.max_items, 1, 300, 20);
@@ -703,7 +705,10 @@ const SOURCE_PROPS = {
   region: { type: "string", description: "Region code: CN / US / UK / HK / INTL and so on." },
   lang: { type: "string", description: "zh / en。" },
   weight: { type: "number", description: "Credibility weight 0–1, used by cross-validation." },
-  tier: { type: "string", enum: TIERS, description: "primary (first-hand, wire, official) or secondary (reposts, aggregators)." },
+  tier: { type: "string", enum: TIERS, description: "primary (first-hand, wire, official), secondary (reposts, aggregators), or community (discussion sites such as Hacker News; never counts as an independent outlet)." },
+  profile: { type: "string", description: "Profile for this source's stories: wire, tech-frontier, tech-deep (tech blogs), community (discussion sites), or one defined under dataDir/profiles." },
+  min_points: { type: "number", description: "Hacker News adapter: skip posts below this score (default 100)." },
+  comment_items: { type: "number", description: "Hacker News adapter: read the discussion page of this many top posts for comments (default 8, 0 = none)." },
   group: { type: "string", description: "Media group; channels of one group share it and count as one outlet in cross-validation." },
   pack: { type: "string", description: "Topic pack; default core." },
   max_items: { type: "number", description: "Items to take on a source's first round (1–300). After that, a source with a continuity cursor fetches everything newer than the last round (up to 300 per round; Cailian pages back until it reaches the last round), so this is not a per-round limit." },
@@ -716,7 +721,7 @@ const SOURCE_PROPS = {
   continuity: { type: "string", enum: ["stream", "snapshot"], description: "stream = a time-ordered feed checked for continuity every run; snapshot = a curated front page, not checked. RSS and APIs default to stream, list pages to snapshot." },
   paging: { type: "object", description: "How to recover a gap: {mode:param,param,start,max_pages} | {mode:cursor,param,next,max_pages} | {mode:id_walk,template,id_pattern,max_steps} | {mode:before,param,id_pattern,max_pages} (pages back with ?before=<smallest id on the page>, e.g. Telegram channels) | {mode:native}." },
   body: { type: "string", enum: ["fetch", "list", "none"], description: "Article bodies: fetch = fetch the page for top events (default); list = the list text is already the full body (news flashes); none = never fetch." },
-  backfill: { type: "boolean", description: "Fall back to an Exa search when a gap remains; default true." },
+  backfill: { type: "boolean", description: "Fall back to an Exa search (a paid API) when paging cannot close a gap; off unless set to true." },
   wait_for: { type: "string", description: "CSS selector browse waits for before reading the page (slow pages; up to 15 seconds)." },
   json: { type: "object", description: "json_api field mapping: list/title/link/time/summary/signals{views,comments,likes,shares,level,…}." },
 };

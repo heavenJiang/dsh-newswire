@@ -176,6 +176,9 @@ The panel follows the harness's light and dark themes and works at phone width.
 | core | International | Reuters, AP World / Business, BBC, New York Times, The Guardian, FT, Dow Jones, Al Jazeera, DW Chinese, South China Morning Post |
 | study_abroad | China | CSCSE (notices, news), Ministry of Education, China Scholarship Council |
 | study_abroad | International | UK Visas and Immigration, IRCC Canada, USCIS, The PIE News, ICEF Monitor |
+| core | Overseas tech (off by default) | Hacker News, OpenAI News, Simon Willison, Hugging Face, NVIDIA Technical Blog, vLLM, Lil'Log, Ahead of AI, Interconnects, GitHub Blog |
+
+**Overseas tech sources** start off; turn them on in the Sources tab. Hacker News uses the Community discussion profile: only posts with 100 points or more, linked to the article they point to; the 8 highest-scoring posts also have their discussion page read for top-level comments, written up as Community views. It is discussion, not reporting, so it never counts as an independent outlet and never enters To verify. Tech blogs use the Long-form tech profile: technical points, background and takeaways. All of them are read through browse; English pages are read as the server's original HTML, so the browser's auto-translate doesn't get in.
 
 **Want another source?** On the Sources tab, click "+ Add a source", enter a name and an RSS feed or news list page URL, test-fetch to see what comes back, then add it. Type (RSS or list page), region and id are worked out for you, and new sources start on trial.
 
@@ -208,13 +211,14 @@ The panel follows the harness's light and dark themes and works at phone width.
 - **What it does here**: parses RSS (it ships with feedparser) and reads pages through whichever web-reading backend it currently has. AP, CSCSE and some other sources use it.
 - **Safety**: it lives in its own `~/.agent-reach-venv`, separate from the system Python, and the setup script installs only the CLI; it never logs you in anywhere. Install it from GitHub; the PyPI package of the same name is a different project. When its web backend is Jina Reader, page URLs are sent to Jina's service.
 
-### MCPorter and Exa: getting back what was missed
+### MCPorter and Exa: getting back what was missed (off by default)
 
 [![GitHub stars](https://img.shields.io/github/stars/openclaw/mcporter?style=social)](https://github.com/openclaw/mcporter) [![GitHub stars](https://img.shields.io/github/stars/exa-labs/exa-mcp-server?style=social)](https://github.com/exa-labs/exa-mcp-server)
 
 - **MCPorter**: from the team behind the open-source personal AI assistant [OpenClaw](https://openclaw.ai). It discovers and calls MCP servers from the command line and from scripts ([docs](https://mcporter.sh)). 见微知著 uses it to call Exa.
 - **Exa**: [Exa Labs](https://exa.ai), "the search engine for AI". Its official hosted MCP server (`https://mcp.exa.ai/mcp`) works anonymously with rate limits; for higher limits, get an API key from Exa.
-- **What it does here**: when a source can't connect to the last round and paging back doesn't close the gap, it searches for the missing items by source name, domain and time range. It's a fallback and rarely runs. Exa receives only that search query, nothing about you.
+- **What it does here**: when a source can't connect to the last round and paging back doesn't close the gap, it searches for the missing items by source name, domain and time range. Exa receives only that search query, nothing about you.
+- **Off by default** (since 1.1.17): Exa is a paid API, and gaps are closed by paging back. To use it, set `"backfill": true` on that source.
 
 ---
 

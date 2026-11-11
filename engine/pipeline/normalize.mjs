@@ -103,6 +103,8 @@ export function toRecord(it, src, o) {
     title_norm: normTitle(title),
     summary,
     content: body,
+    // 社区评论（Hacker News 讨论页的顶层评论）：单独存，不混进正文
+    comments: it.comments ? String(it.comments).slice(0, 4000) : null,
     published_at,
     time_confidence,
     source_id: src.id,

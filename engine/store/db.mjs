@@ -34,13 +34,14 @@ const RANK = (x) => "(CASE " + x + " WHEN 'feed' THEN 3 WHEN 'page_text' THEN 2 
 const CRANK = (x) => `CASE ${x} WHEN 'full' THEN 2 WHEN 'truncated' THEN 1 ELSE 0 END`;
 
 export function upsertArticle(db, r, ctx) {
-  db.prepare(`INSERT INTO articles (id,url,canonical_url,title,title_norm,summary,content,published_at,time_confidence,fetched_at,first_seen_at,last_seen_at,source_id,category,region,lang,pack,channel,paywalled,metrics,content_hash,raw_path,text_len,training_ready,parser_version,kind,kind_by,kind_note,parent_id,completeness)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  db.prepare(`INSERT INTO articles (id,url,canonical_url,title,title_norm,summary,content,published_at,time_confidence,fetched_at,first_seen_at,last_seen_at,source_id,category,region,lang,pack,channel,paywalled,metrics,content_hash,raw_path,text_len,training_ready,parser_version,kind,kind_by,kind_note,parent_id,completeness,comments)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(id) DO UPDATE SET
       last_seen_at = excluded.last_seen_at,
       url = excluded.url,
       summary = CASE WHEN LENGTH(excluded.summary) > LENGTH(COALESCE(articles.summary, '')) THEN excluded.summary ELSE articles.summary END,
       content = CASE WHEN LENGTH(excluded.content) > LENGTH(COALESCE(articles.content, '')) THEN excluded.content ELSE articles.content END,
+      comments = CASE WHEN LENGTH(COALESCE(excluded.comments, '')) > LENGTH(COALESCE(articles.comments, '')) THEN excluded.comments ELSE articles.comments END,
       published_at = CASE WHEN ${RANK("excluded.time_confidence")} > ${RANK("COALESCE(articles.time_confidence, 'fetched')")} THEN excluded.published_at ELSE articles.published_at END,
       time_confidence = CASE WHEN ${RANK("excluded.time_confidence")} > ${RANK("COALESCE(articles.time_confidence, 'fetched')")} THEN excluded.time_confidence ELSE articles.time_confidence END,
       paywalled = excluded.paywalled,
@@ -53,7 +54,7 @@ export function upsertArticle(db, r, ctx) {
       kind_note = CASE WHEN articles.kind_by IN ('reader', 'llm') THEN articles.kind_note ELSE excluded.kind_note END,
       parent_id = COALESCE(articles.parent_id, excluded.parent_id),
       completeness = CASE WHEN ${CRANK("excluded.completeness")} > ${CRANK("COALESCE(articles.completeness, 'title_only')")} THEN excluded.completeness ELSE articles.completeness END`)
-    .run(r.id, r.url, r.canonical_url, r.title, r.title_norm, r.summary || "", r.content || "", r.published_at, r.time_confidence, ctx.nowIso, ctx.nowIso, ctx.nowIso, r.source_id, r.category, r.region, r.lang, r.pack, ctx.channel || "none", r.paywalled ? 1 : 0, JSON.stringify(r.metrics || {}), r.content_hash, ctx.rawPath || null, r.text_len, r.training_ready ? 1 : 0, r.parser_version, r.kind || "news", r.kind_by || null, r.kind_note || null, r.parent_id || null, r.completeness || null);
+    .run(r.id, r.url, r.canonical_url, r.title, r.title_norm, r.summary || "", r.content || "", r.published_at, r.time_confidence, ctx.nowIso, ctx.nowIso, ctx.nowIso, r.source_id, r.category, r.region, r.lang, r.pack, ctx.channel || "none", r.paywalled ? 1 : 0, JSON.stringify(r.metrics || {}), r.content_hash, ctx.rawPath || null, r.text_len, r.training_ready ? 1 : 0, r.parser_version, r.kind || "news", r.kind_by || null, r.kind_note || null, r.parent_id || null, r.completeness || null, r.comments || null);
 }
 
 /** 同一轮同一源里重复出现的条目只记第一次（排名更靠前的那次）。 */

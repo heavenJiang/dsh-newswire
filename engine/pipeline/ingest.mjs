@@ -88,7 +88,8 @@ export async function processSource(src0, env) {
     }
     if (src.paging.mode === "id_walk" && ids.length) cont = evaluate(prev, Array.from(byId.values()), src);
   }
-  if (cont.status === "gap" && src.backfill !== false && env.backfillBudget && env.backfillBudget.left > 0) {
+  // Exa 搜索补抓是收费接口：默认不用，只有源里明确写了 backfill: true 才用（缺口主要靠翻页补）
+  if (cont.status === "gap" && src.backfill === true && env.backfillBudget && env.backfillBudget.left > 0) {
     env.backfillBudget.left--;
     method = method ? method + "+agent_reach_search" : "agent_reach_search";
     const bf = await exaBackfill(src, { gapFrom: cont.gap_from, gapTo: cont.gap_to, max: 10 });

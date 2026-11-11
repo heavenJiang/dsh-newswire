@@ -29,7 +29,7 @@ function jsonSpec(src) {
 /** 正文类文本 → 条目：有适配器用适配器，否则按源类型通用解析。 */
 export function parseText(src, adapter, text, max) {
   if (adapter) {
-    const items = adapter.parse(text, { url: src.url, max });
+    const items = adapter.parse(text, { url: src.url, max, src });
     if (items.length) return { items, parsed_by: "adapter:" + adapter.id };
   }
   const type = src.type === "adapter" ? "html_index" : src.type;
@@ -84,12 +84,12 @@ export async function fetchSource(src, env) {
           record({ channel: ch, ok: false, error: reason, error_kind: "browser_unavailable", hint: reason === "browse_not_found" ? "未找到 browse：运行 curl -fsSL https://raw.githubusercontent.com/heavenJiang/dsh-newswire/main/scripts/setup.sh | bash 一键安装，或在插件设置里填 browseBin" : "browse 扩展没连上：在终端运行 browse install 完成配对，或在 Chrome 工具栏点 browse 按钮重连", latency_ms: 0 });
           break;
         }
-        const res = await browseFetch(browseModeOf(src, adapter), src.url, max, { timeoutMs, sinceHours: src.since_hours || env.windowHours || 24, until: src.until || null, pages: Number(src.pages || Math.ceil(max / 20) + 2), category: src.category_src || "", waitFor: (adapter && adapter.waitFor) || src.wait_for || "", extract: src.extract || null, known: src.known_links || [] });
+        const res = await browseFetch(browseModeOf(src, adapter), src.url, max, { timeoutMs, sinceHours: src.since_hours || env.windowHours || 24, until: src.until || null, pages: Number(src.pages || Math.ceil(max / 20) + 2), category: src.category_src || "", waitFor: (adapter && adapter.waitFor) || src.wait_for || "", raw: Boolean(adapter && adapter.rawHtml), extract: src.extract || null, known: src.known_links || [] });
         if (res.ok) {
           const v = res.value || {};
           const payload = res.data || {};
           if (adapter && typeof payload.html === "string") {
-            items = adapter.parse(payload.html, { url: src.url, max });
+            items = adapter.parse(payload.html, { url: src.url, max, src });
             parsedBy = "adapter:" + adapter.id;
             rawPath = env.writeRaw(src.id + ".browse.html", payload.html);
           } else {
@@ -160,5 +160,27 @@ export async function fetchSource(src, env) {
       await new Promise((rr) => setTimeout(rr, Number(env.backoffMs || 800)));
     }
   }
-  return { items: won ? items : [], won, parsed_by: parsedBy, raw_path: rawPath, attempts };
+  let enrich = null;
+  // 适配器要补读详情页的（如 Hacker News 的讨论页取评论）：先用 browse，不行再直取；有时间上限
+  if (won && items.length && adapter && typeof adapter.enrich === "function") {
+    const t0 = Date.now();
+    const useBrowse = env.browse && env.browse.ok && chain.includes("browse");
+    const fetchHtml = async (url) => {
+      if (useBrowse) {
+        const r = await browseFetch("html", url, 1, { timeoutMs: Math.min(timeoutMs, 30000), waitFor: "", pages: 1, raw: Boolean(adapter.rawHtml) });
+        if (r.ok && r.data && typeof r.data.html === "string" && r.data.html.length > 500) return r.data.html;
+      }
+      if (!chain.includes("http")) return null;
+      const h = await httpFetch(url, { timeoutMs: Math.min(timeoutMs, 20000) });
+      return h.ok ? h.text : null;
+    };
+    let note = "";
+    try {
+      const r = await adapter.enrich(items, { fetchHtml, src, deadline: t0 + Number(src.enrich_ms || 120000) });
+      note = "enrich tried=" + (r && r.tried) + " ok=" + (r && r.ok);
+    } catch (e) { note = "enrich failed: " + String((e && e.message) || e).slice(0, 120); }
+    // 不记成一次抓取尝试（不影响源的健康度统计），只附在结果里
+    enrich = { ms: Date.now() - t0, note };
+  }
+  return { items: won ? items : [], won, parsed_by: parsedBy, raw_path: rawPath, attempts, enrich };
 }

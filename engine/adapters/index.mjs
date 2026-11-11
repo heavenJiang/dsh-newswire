@@ -7,8 +7,9 @@ import jiemian from "./jiemian.mjs";
 import thepaper from "./thepaper.mjs";
 import apnews from "./apnews.mjs";
 import telegram from "./telegram.mjs";
+import hackernews from "./hackernews.mjs";
 
-const REGISTRY = new Map([techflow, jiemian, thepaper, apnews, telegram].map((a) => [a.id, a]));
+const REGISTRY = new Map([techflow, jiemian, thepaper, apnews, telegram, hackernews].map((a) => [a.id, a]));
 
 export function getAdapter(id) { return id ? REGISTRY.get(id) || null : null; }
 export function adapterIds() { return Array.from(REGISTRY.keys()); }

@@ -147,6 +147,9 @@ export function taxonomyIndex(labels) {
 const topOf = (label) => String(label || "").split(".")[0];
 
 // ------------------------------------------------------------------ 材料
+/** 源声明了读法（非默认）的新闻挑材料时加的分：规则给它们的分很低（单一来源、社区讨论不算媒体），不加会被条数上限截掉。 */
+const DECLARED_BOOST = 20;
+
 /** 时段内首次出现的新闻，附规则事件（同一事件的排在一起）。 */
 export function gatherItems(db, o) {
   // 新源首轮会抓到列表里的旧闻：发布时间早于时段一天以上的不算本时段的新闻（与推送的旧闻规则一致）
@@ -158,11 +161,11 @@ export function gatherItems(db, o) {
   const focusSql = fl.length ? "EXISTS (SELECT 1 FROM article_labels l WHERE l.article_id = a.id AND (" + fl.map(() => "l.label = ? OR l.label LIKE ?").join(" OR ") + "))" : "0";
   const focusArgs = fl.flatMap((f) => [f, f + ".%"]);
   const boost = fl.length ? Number(o.focus.boost ?? 20) : 0;
-  const rows = db.prepare(`SELECT ${focusSql} AS focus, a.id, a.title, a.summary, a.comments, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.pack, a.completeness, a.kind, a.parent_id, COALESCE(s.trial, 0) AS trial,
+  const rows = db.prepare(`SELECT ${focusSql} AS focus, a.id, a.title, a.summary, a.comments, s.tier AS src_tier, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.pack, a.completeness, a.kind, a.parent_id, COALESCE(s.trial, 0) AS trial,
       s.name AS source_name, s.profile AS src_profile, COALESCE(s.grp, a.source_id) AS grp, m.event_id, e.importance AS ev_importance, e.credibility AS ev_cred, e.labels AS ev_labels, e.dispute AS ev_dispute
     FROM articles a LEFT JOIN sources s ON s.id = a.source_id LEFT JOIN event_members m ON m.article_id = a.id LEFT JOIN events e ON e.event_id = m.event_id
     WHERE ${where.join(" AND ")} AND a.title IS NOT NULL AND a.title != '' AND COALESCE(a.kind, 'news') NOT IN ('promo', 'digest', 'ticker')
-    ORDER BY COALESCE(e.importance, 0) + ${boost} * focus DESC, m.event_id, a.first_seen_at DESC LIMIT ?`).all(...focusArgs, ...args, o.limit || 150);
+    ORDER BY COALESCE(e.importance, 0) + ${boost} * focus + ${DECLARED_BOOST} * (COALESCE(s.profile, '') NOT IN ('', 'wire')) DESC, m.event_id, a.first_seen_at DESC LIMIT ?`).all(...focusArgs, ...args, o.limit || 150);
   return rows.map((r, i) => Object.assign(r, { n: i + 1, labels: parseJ(r.ev_labels, []), focus: Boolean(r.focus) }));
 }
 
@@ -195,8 +198,13 @@ function storyFacts(items) {
   markReposts(view);
   const outlets = [];
   const reposts = [];
+  // 社区讨论（Hacker News 等）：不算独立媒体，单独列出
+  const community = [];
   const seen = new Set();
-  for (const v of view.slice().sort((a, b) => a.t - b.t)) if (!v.repost_of && !seen.has(v.grp)) { seen.add(v.grp); outlets.push({ source_id: v.it.source_id, name: v.it.source_name || v.it.source_id }); }
+  for (const v of view.slice().sort((a, b) => a.t - b.t)) {
+    if (v.it.src_tier === "community") { if (!seen.has(v.grp)) { seen.add(v.grp); community.push({ source_id: v.it.source_id, name: v.it.source_name || v.it.source_id }); } continue; }
+    if (!v.repost_of && !seen.has(v.grp)) { seen.add(v.grp); outlets.push({ source_id: v.it.source_id, name: v.it.source_name || v.it.source_id }); }
+  }
   for (const v of view) if (v.repost_of && !seen.has(v.grp)) { seen.add(v.grp); reposts.push({ source_id: v.it.source_id, name: v.it.source_name || v.it.source_id }); }
   const evCount = new Map();
   for (const it of items) if (it.event_id) evCount.set(it.event_id, (evCount.get(it.event_id) || 0) + 1);
@@ -210,7 +218,7 @@ function storyFacts(items) {
   const times = items.map((it) => it.first_seen_at).filter(Boolean).sort();
   const pubs = items.map((it) => it.published_at).filter(Boolean).sort();
   return {
-    outlets, reposts, source_count: outlets.length, credibility, event_ids: eventIds, lead_event_id: leadEvent ? leadEvent[0] : null,
+    outlets, reposts, ...(community.length ? { community } : {}), source_count: outlets.length, credibility, event_ids: eventIds, lead_event_id: leadEvent ? leadEvent[0] : null,
     article_ids: items.map((it) => it.id), lead_article_id: lead.id, url: lead.url, first_seen_at: times[0] || null, published_at: pubs[0] || null,
     dispute: items.map((it) => parseJ(it.ev_dispute, null)).find(Boolean) || null,
   };
@@ -368,8 +376,9 @@ function assemble(stories, layout, names, extra) {
     if (front.length >= layout.front.count) front[front.length - 1] = topFocal.id; else front.push(topFocal.id);
   }
   const get = (i) => stories.find((s) => s.id === i);
+  // 只有社区讨论、没有媒体报道的（Hacker News 帖子）不是待核实的新闻
   const verify = byImp
-    .filter((s) => (s.source_count <= 1 && s.importance >= layout.verify.min_importance) || s.credibility === "disputed")
+    .filter((s) => (s.source_count === 1 || (s.source_count === 0 && !(s.community || []).length)) && s.importance >= layout.verify.min_importance || s.credibility === "disputed")
     .slice(0, layout.verify.count)
     .map((s) => ({ text: s.title + (s.credibility === "disputed" ? "：各家" + ((s.dispute && s.dispute.kind) || "说法") + "不一" : "：仅 " + ((s.outlets[0] || {}).name || "一家") + " 报道"), stories: [s.id] }));
   const watch = (extra.watch || []).filter((w) => w.text).slice(0, layout.watch.count);
@@ -423,7 +432,7 @@ export function ruleEdition(db, o) {
   const args = [o.since, Math.min(layout.min_importance, layout.verify.min_importance), staleBefore(o.since)];
   if (o.pack && o.pack !== "all") { where.push("e.pack = ?"); args.push(o.pack); }
   const events = db.prepare("SELECT e.* FROM events e WHERE " + where.join(" AND ") + " ORDER BY e.importance DESC LIMIT 80").all(...args);
-  const memQ = db.prepare(`SELECT a.id, a.title, a.summary, a.comments, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.completeness, COALESCE(s.trial, 0) AS trial, s.name AS source_name, s.profile AS src_profile, COALESCE(m.grp, a.source_id) AS grp, m.event_id
+  const memQ = db.prepare(`SELECT a.id, a.title, a.summary, a.comments, s.tier AS src_tier, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.completeness, COALESCE(s.trial, 0) AS trial, s.name AS source_name, s.profile AS src_profile, COALESCE(m.grp, a.source_id) AS grp, m.event_id
     FROM event_members m JOIN articles a ON a.id = m.article_id LEFT JOIN sources s ON s.id = a.source_id WHERE m.event_id = ? ORDER BY COALESCE(a.published_at, a.first_seen_at) LIMIT 10`);
   // 每个规则事件对应一条故事线：成员已归入的沿用那条（模型模式下起的标题、写的稿都能接着用），否则新起
   const byId = new Map();
@@ -797,7 +806,8 @@ export async function llmEdition(db, model, o) {
   // 分诊：规则打分很低、又只有一家报道的新闻几乎不会上版——不交给模型，按规则事件归并；关注命中的照样交给模型
   const followList = (o.follows && o.follows.follow) || [];
   // 重点领域（AI 与新技术）的不分诊，全交给模型看，免得漏掉只有一家报道的新技术
-  const lowly = (it) => !it.focus && it.event_id && it.ev_importance != null && it.ev_importance < (o.triageBelow ?? 18) && (!it.ev_cred || it.ev_cred === "single") &&
+  // 源声明了读法的（技术博客、Hacker News）也不分诊：它们多半只有一家、规则打分低，重要度交给模型按读法的评分要求判断
+  const lowly = (it) => !it.focus && !(it.src_profile && it.src_profile !== DEFAULT_PROFILE) && it.event_id && it.ev_importance != null && it.ev_importance < (o.triageBelow ?? 18) && (!it.ev_cred || it.ev_cred === "single") &&
     !(followList.length && matchList(followList, { id: "", title: it.title, section: "", labels: it.labels || [], outlets: [{ source_id: it.source_id }] }, [it]).length);
   const triaged = o.triageBelow === 0 ? [] : fresh.filter(lowly);
   if (triaged.length) {

@@ -255,6 +255,14 @@ const HTML_BODY = [
   "if (WAITFOR) { try { await page.waitForSelector(WAITFOR, { state: 'attached', timeout: 15000 }); } catch (e) {} } else { await new Promise((r) => setTimeout(r, 1200)); }",
   "const payload = { items: [], html: await page.content() };",
 ];
+// 原始 HTML：在页面里用浏览器自己的 fetch 再取一次（同源、带登录态），拿到的是服务器给的原文。
+// 浏览器开着自动翻译时，page.content() 读到的是翻译后的 DOM（英文标题后面被插进中文译文、评论的标签结构也变了）；
+// 解析服务器 HTML 的适配器（rawHtml: true，如 Hacker News）用这个。取不到时退回渲染后的 DOM。
+const RAW_HTML_BODY = [
+  "let raw = '';",
+  "try { raw = await page.evaluate(async () => { const r = await fetch(location.href, { credentials: 'include' }); return r.ok ? await r.text() : ''; }); } catch (e) { raw = ''; }",
+  "const payload = { items: [], html: raw && raw.length > 500 ? raw : await page.content(), raw: Boolean(raw && raw.length > 500) };",
+];
 
 const CLS_BODY = [
   "await page.goto('https://www.cls.cn/telegraph', { waitUntil: 'domcontentloaded', timeout: 35000 });",
@@ -286,7 +294,7 @@ const CLS_BODY = [
 export function renderJob(mode, url, max, opts) {
   const m = opts || {};
   const token = m.token || "x";
-  let body = mode === "rss" ? RSS_BODY : mode === "cls_api" ? CLS_BODY : mode === "article" ? ARTICLE_BODY : mode === "html" ? HTML_BODY : mode === "select" ? SELECT_BODY : mode === "outline" ? OUTLINE_BODY : mode === "read" ? READ_BODY : INDEX_BODY;
+  let body = mode === "rss" ? RSS_BODY : mode === "cls_api" ? CLS_BODY : mode === "article" ? ARTICLE_BODY : mode === "html" ? (m.raw ? RAW_HTML_BODY : HTML_BODY) : mode === "select" ? SELECT_BODY : mode === "outline" ? OUTLINE_BODY : mode === "read" ? READ_BODY : INDEX_BODY;
   const pre = mode === "cls_api" ? [] : head(url);
   const fill = (l) => l.replaceAll("WAITFOR", JSON.stringify(m.waitFor || ""));
   if (mode === "select") body = body.map((l) => l.replaceAll("EXTRACT", JSON.stringify(m.extract || {})));

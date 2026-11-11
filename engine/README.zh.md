@@ -62,7 +62,7 @@ engine/
 ## 断点衔接
 | 源类型 | 判定 | 缺口时 |
 |---|---|---|
-| 流式（`continuity: "stream"`；rss / json_api / cls_api 默认） | 本批出现上轮最新 50 条之一 → 衔接；否则本批最旧的可信时间 ≤ 上轮最新可信时间 → 按时间衔接；id_walk / before 源看 id 是否接上 | 按 `paging` 往前翻：`param`（页码）、`cursor`（API 游标）、`id_walk`（按 id 逐条取详情页）、`before`（按本页最小消息 id 往前翻，如 Telegram 频道 `?before=`）、`native`（源脚本自己按时间回翻，如财联社）；仍接不上且 `backfill` 未关闭 → Exa 搜索兜底（每轮最多 3 个源） |
+| 流式（`continuity: "stream"`；rss / json_api / cls_api 默认） | 本批出现上轮最新 50 条之一 → 衔接；否则本批最旧的可信时间 ≤ 上轮最新可信时间 → 按时间衔接；id_walk / before 源看 id 是否接上 | 按 `paging` 往前翻：`param`（页码）、`cursor`（API 游标）、`id_walk`（按 id 逐条取详情页）、`before`（按本页最小消息 id 往前翻，如 Telegram 频道 `?before=`）、`native`（源脚本自己按时间回翻，如财联社）；仍接不上且源里写了 `backfill: true` → Exa 搜索兜底（收费接口，默认不用；每轮最多 3 个源） |
 | 快照（`continuity: "snapshot"`；列表页默认） | 首页推荐类，不判断 | — |
 
 每源每轮的回看时长 = 距上次成功 + 15 分钟（1–48 小时），财联社据此决定回翻页数；`cycle` 模式下距上一整轮 ≥6 小时或早 8 点前为隔夜模式，条数与翻页上限 ×4。
@@ -172,7 +172,8 @@ engine/
 | 其它 RSS / 列表页 | 只有 rank |
 
 ## 站点适配器
-`adapters/<id>.mjs` 导出 `{ id, browseMode: "html", waitFor, parse(html, { url, max }) }`。browse 通道用 `html` 模式取渲染后的整页（等 `waitFor` 选择器出现，最多 15 秒），http 通道把响应体交给同一个 `parse`。
+`adapters/<id>.mjs` 导出 `{ id, browseMode: "html", waitFor, parse(html, { url, max, src }) }`，可选 `rawHtml: true` 与 `enrich(items, { fetchHtml, src, deadline })`。browse 通道用 `html` 模式取渲染后的整页（等 `waitFor` 选择器出现，最多 15 秒）；`rawHtml` 时改为在页面里用浏览器自己的 fetch 取服务器给的原始 HTML，浏览器自动翻译改不到它。http 通道把响应体交给同一个 `parse`。`enrich` 在抓取成功后补读详情页（先 browse 后 http，`src.enrich_ms` 默认 120 秒）。
+`hackernews` 适配器读 Hacker News 首页：只收 `min_points`（默认 100）分以上的帖子，链接是帖子指向的原文（没有外链的 Ask/Show HN 用讨论页），分数和评论数记为热度。`enrich` 读分数最高的 `comment_items`（默认 8）条的讨论页，顶层评论存进 `articles.comments`，Ask HN 的正文作摘要。`tier: "community"` 的源不算独立媒体：事件里单独列出（`outlets` 里标 `community: true`），不加来源分、不参与印证。
 `telegram` 适配器读 Telegram 公开频道的网页预览 `https://t.me/s/<频道名>`（不用登录）：一帖一条的快讯直接成条（加粗首行为标题，「信源」链接记为原始出处）；`[1/3] [2/3] …` 分帖发的汇总先拼回，再按「━━ 栏目 ━━」和「N、标题」拆成单条。条目链接是消息链接加 `?i=<第几条>`。配源时 `url` 写 `https://t.me/s/<频道名>`，`paging` 写 `{ "mode": "before", "param": "before", "id_pattern": "t\\.me/[A-Za-z0-9_]+/(\\d+)" }`。私有频道（`t.me/+…` 邀请链接）和关了网页预览的频道读不到；国内网络需要能访问 t.me。
 
 新增适配器：写模块 → 在 `adapters/index.mjs` 登记 → 存一份快照 `tests/fixtures/<id>.html.gz` → 在 `tests/unit/adapters.test.mjs` 加断言。

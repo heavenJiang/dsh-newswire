@@ -193,9 +193,12 @@ export function scoreEvent(db, eid, o) {
   const reposters = new Map();
   for (const m of members) if (m.repost_of && !reposters.has(m.grp)) reposters.set(m.grp, { grp: m.grp, source_id: m.source_id, name: (sources.get(m.source_id) || {}).name || m.source_id, of: m.repost_of });
   const outlets = new Map();
+  // 社区讨论（tier=community，如 Hacker News）：是讨论，不是报道——不算独立媒体、不参与印证，单独列出
+  const community = new Map();
   for (const m of members) {
     if (m.repost_of) continue;
     const src = sources.get(m.source_id) || {};
+    if (src.tier === "community") { if (!community.has(m.grp)) community.set(m.grp, { grp: m.grp, source_id: m.source_id, name: src.name || m.source_id, community: true }); continue; }
     const cur = outlets.get(m.grp);
     if (!cur || (m.t || Infinity) < cur.t) outlets.set(m.grp, { grp: m.grp, source_id: m.source_id, name: src.name || m.source_id, t: m.t, weight: Number(src.weight || 0.7), region: src.region || "", authority: isAuthority(src), secondary: src.tier === "secondary" });
   }
@@ -222,7 +225,7 @@ export function scoreEvent(db, eid, o) {
   const dispute = n >= 2 ? detectDispute(members) : null;
   const credibility = dispute ? "disputed" : n >= 2 ? (authority ? "confirmed" : "corroborated") : "single";
   // 主链接取源头热度最高、其次最早的成员；显示标题：有中文成员时取最短的中文标题（≥8 字，快讯转载最干净），否则用主条目标题
-  const primary = (m) => ((sources.get(m.source_id) || {}).tier === "secondary" ? 0 : 1);
+  const primary = (m) => (["secondary", "community"].includes((sources.get(m.source_id) || {}).tier) ? 0 : 1);
   const lead = members.slice().sort((a, b) => primary(b) - primary(a) || b.heat - a.heat || (a.t || 0) - (b.t || 0))[0];
   // 外文报道有中文译名的也算中文标题，事件标题不再是英文
   const zhTitles = members.map((m) => (isZh(m.title) ? m.title : m.title_zh || "")).filter((t) => isZh(t) && t.length >= 8);
@@ -235,7 +238,7 @@ export function scoreEvent(db, eid, o) {
   const lastSeen = members.map((m) => m.last_seen_at).sort().pop();
   db.prepare(`UPDATE events SET title=?, lead_article_id=?, first_seen_at=?, last_seen_at=?, member_count=?, source_count=?, outlets=?, region_mix=?, importance=?, credibility=?, labels=?, regions=?, entities=?, factors=?, dispute=?, version=version+1, updated_run=?, updated_at=? WHERE event_id=?`)
     .run(title, lead.article_id, Number.isFinite(first) ? new Date(first).toISOString().replace("T", " ").slice(0, 19) : null, lastSeen, members.length, n,
-      JSON.stringify(outs.map((x) => ({ grp: x.grp, source_id: x.source_id, name: x.name, t: x.t ? new Date(x.t).toISOString().replace("T", " ").slice(0, 19) : null })).concat([...reposters.values()].filter((r) => !outlets.has(r.grp)).map((r) => ({ grp: r.grp, source_id: r.source_id, name: r.name, repost_of: r.of })))),
+      JSON.stringify(outs.map((x) => ({ grp: x.grp, source_id: x.source_id, name: x.name, t: x.t ? new Date(x.t).toISOString().replace("T", " ").slice(0, 19) : null })).concat([...reposters.values()].filter((r) => !outlets.has(r.grp)).map((r) => ({ grp: r.grp, source_id: r.source_id, name: r.name, repost_of: r.of })), [...community.values()])),
       cn && intl ? "cn+intl" : intl ? "intl" : "cn", importance, credibility, JSON.stringify(labels), JSON.stringify(regions), JSON.stringify(c.strong), JSON.stringify(f), dispute ? JSON.stringify(dispute) : null, runId, nowIso, eid);
   db.prepare("INSERT OR REPLACE INTO event_scores (event_id, run_id, importance, source_count, credibility, factors, scored_at) VALUES (?,?,?,?,?,?,?)").run(eid, runId, importance, n, credibility, JSON.stringify(f), nowIso);
   return { event_id: eid, importance, credibility, source_count: n };

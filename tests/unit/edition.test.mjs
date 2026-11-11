@@ -330,3 +330,15 @@ test("读法：社区讨论的报道按它的块写稿——社区观点逐条�
   assert.equal(s2.extra[0].items[0].text, "有评论认为提醒很及时");
   db.close();
 });
+
+test("读法：源声明了读法的新闻不做规则分诊，交给模型按读法评分", async () => {
+  const db = tmpDb();
+  const run = async () => { const { m } = fakeModel({}); return (await llmEdition(db, m, base({ triageBelow: 50 }))).stats.triaged; };
+  const before = await run();
+  const db2 = tmpDb();
+  db2.prepare("UPDATE sources SET profile = 'tech-deep' WHERE id = 'moe'").run();
+  const { m } = fakeModel({});
+  const after = (await llmEdition(db2, m, base({ triageBelow: 50 }))).stats.triaged;
+  assert.equal(after, before - 1, "教育部那条（单源、45 分）声明了读法，不再被分诊");
+  db.close(); db2.close();
+});
