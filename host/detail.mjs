@@ -4,7 +4,7 @@
  *
  * 和版面上的稿件一样逐句核对：每句话里的数字、外文专名、引号里的词都要在材料里找得到，
  * 核对不过的句子删掉（段落按句删，不整段撤下）；出处改标到含这些成分的材料上。
- * 不联网、不用以前的报道。存 story_details（每次一行）；故事线有了新报道可以重写。
+ * 不联网、不用以前的报道。存 story_details（每次一行）；故事线有了新报道可以重写，重写时标出比上一篇多了哪些条目。
  */
 import { parseJsonLoose } from "./model.mjs";
 import { checkText } from "./factcheck.mjs";
@@ -125,8 +125,28 @@ export async function writeDetail(model, story, mats, o) {
   return d;
 }
 
+/**
+ * 和上一篇详细报道比：经过、关键数字、各方说法、待确认里上一篇没有的条目标 new（按字面相似度认，不调用模型），
+ * 并记下新增了几条、上一篇是什么时候写的。长期追的事件重写时，读者一眼看得出这次多了什么。
+ */
+export function markNew(d, prev) {
+  if (!prev) return d;
+  const keyOf = (x) => bigrams((x.time || "") + (x.who || "") + (x.text || x.says || ""));
+  const old = ["timeline", "numbers", "views", "open"].flatMap((k) => (prev[k] || []).map(keyOf));
+  let added = 0;
+  for (const k of ["timeline", "numbers", "views", "open"]) {
+    for (const x of d[k] || []) {
+      const b = keyOf(x);
+      if (!old.some((o) => similarity(o, b) >= 0.6)) { x.new = true; added++; }
+    }
+  }
+  d.since = { at: prev.created_at || null, added, items: Math.max(0, (d.materials || []).length - ((prev.materials || []).length || 0)) };
+  return d;
+}
+
 export function saveDetail(db, storyId, d, meta) {
   const now = nowSql();
+  try { markNew(d, latestDetail(db, storyId)); } catch { /* 比不了就不标 */ }
   const n = db.prepare("SELECT COUNT(*) n FROM story_items WHERE story_id = ?").get(storyId).n;
   db.prepare("INSERT INTO story_details (story_id, created_at, model, items, content) VALUES (?,?,?,?,?)").run(storyId, now, (meta && meta.model) || null, n, JSON.stringify(d));
   return Object.assign({ created_at: now, model: (meta && meta.model) || null, items: n, newer: 0 }, d);

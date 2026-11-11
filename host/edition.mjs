@@ -534,7 +534,10 @@ export function ruleEdition(db, o) {
   const rb = bodiesFor(db, stories.filter((s) => s.by === "llm").flatMap((s) => s._g.items.map((it) => it.id)));
   for (const s of stories) { verifyStory(db, s, s._g.items, rb, profilesOf(layout).get(s.profile).content, profilesOf(layout).get(s.profile).blocks); scrubStory(s, fb.errors.get(s.id)); }
   const watch = events.filter((e) => { const f = parseJ(e.factors, {}); return (f.persistence > 0 || f.speed > 0) && e.importance >= 40; })
-    .slice(0, layout.watch.count).map((e) => { const s = stories.find((x) => x.event_ids.includes(e.event_id)); return s ? { text: s.title + "：" + s.source_count + " 家跟进，仍在发展", stories: [s.id] } : null; }).filter(Boolean);
+    .map((e) => stories.find((x) => x.event_ids.includes(e.event_id))).filter(Boolean)
+    // 几个规则事件归在同一条故事线里时只列一次
+    .filter((st, i, arr) => arr.findIndex((x) => x.id === st.id) === i)
+    .slice(0, layout.watch.count).map((s) => ({ text: s.title + "：" + s.source_count + " 家跟进，仍在发展", stories: [s.id] }));
   const parts = assemble(stories, layout, o.names || {}, { watch });
   const out = finish(o, stories.map(strip), parts, { mode: "rules", items_read: stories.reduce((n, s) => n + s.article_ids.length, 0), stats: { reused, fresh_items: groups.reduce((n, g) => n + g.fresh.length, 0), check: sumChecks(stories) } });
   // 规则模式只登记新故事线与新归入的新闻，不改已有故事线的标题、版块和模型写的稿

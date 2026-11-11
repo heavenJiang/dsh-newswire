@@ -98,3 +98,22 @@ test("详细报道核对：段落按句删、短句整条删，出处改到含�
   await assert.rejects(writeDetail(model, { title: "x" }, [], {}), /no_materials/);
   db.close();
 });
+
+test("重写详细报道：比上一篇多出来的条目标 new，记下新增几条；第一篇不标", async () => {
+  const { markNew } = await import("../../host/detail.mjs");
+  const db = tmpDb();
+  const mats = detailMaterials(db, "st-1", bodiesFor);
+  const first = { overview: { text: "伊朗官方媒体称霍尔木兹海峡有3艘油轮起火。", refs: [1] }, timeline: [{ time: "11月10日 08:05", text: "伊朗海军派出救援船只。", refs: [1] }], numbers: [], views: [], background: { text: "", refs: [] }, open: [{ text: "起火原因不明。", refs: [1] }] };
+  const a = saveDetail(db, "st-1", verifyDetail(first, mats, { title: "霍尔木兹海峡油轮起火" }), { model: "m" });
+  assert.equal(a.since, undefined, "第一篇没有可比的");
+  assert.ok(!a.timeline[0].new);
+  const second = Object.assign({}, first, { timeline: first.timeline.concat([{ time: "11月10日 10:00", text: "布伦特原油报每桶86.5美元。", refs: [2] }]), views: [{ who: "美国国务院", says: "正在密切关注局势，呼吁各方保持克制。", refs: [3] }] });
+  const b = saveDetail(db, "st-1", verifyDetail(second, mats, { title: "霍尔木兹海峡油轮起火" }), { model: "m" });
+  assert.deepEqual(b.timeline.map((x) => Boolean(x.new)), [false, true]);
+  assert.equal(b.views[0].new, true);
+  assert.ok(!b.open[0].new, "上一篇就有的不标");
+  assert.equal(b.since.added, 2);
+  assert.equal(latestDetail(db, "st-1").since.added, 2, "存下来了");
+  assert.equal(markNew({ timeline: [] }, null).since, undefined);
+  db.close();
+});

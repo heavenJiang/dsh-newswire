@@ -11,6 +11,7 @@
  */
 import { parseJsonLoose } from "./model.mjs";
 import { checkText } from "./factcheck.mjs";
+import { bigrams, similarity } from "../engine/pipeline/select.mjs";
 
 const clip = (s, n) => { const t = String(s || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 const str = (v, n) => (typeof v === "string" && v.trim() ? clip(v, n) : "");
@@ -39,12 +40,18 @@ export function aliasesFor(name, extra, entities) {
   return out.slice(0, 12);
 }
 
+/**
+ * 一条故事线「最近有动静」的时间：最后一篇报道加入的时间。不用 stories.updated_at——每份版面都会把版上的故事线刷一遍，
+ * 用它算「新动态」的话几乎每条都是新的（综述因此每轮都重写、首页的最新动态也不对）。老数据没记加入时间的按故事线建立的时间算。
+ */
+const LAST_AT = "(SELECT MAX(si.joined_at) FROM story_items si WHERE si.story_id = s.story_id)";
+
 export function listTrackers(db) {
   const rows = db.prepare("SELECT * FROM trackers WHERE status = 'active' ORDER BY created_at DESC").all();
   const cnt = db.prepare("SELECT COUNT(*) n, MAX(linked_at) last FROM tracker_stories WHERE tracker_id = ? AND how != 'banned'");
-  const recent = db.prepare("SELECT COUNT(*) n FROM tracker_stories ts JOIN stories s ON s.story_id = ts.story_id WHERE ts.tracker_id = ? AND ts.how != 'banned' AND s.updated_at >= ?");
+  const recent = db.prepare(`SELECT COUNT(*) n FROM tracker_stories ts JOIN stories s ON s.story_id = ts.story_id WHERE ts.tracker_id = ? AND ts.how != 'banned' AND COALESCE(${LAST_AT}, s.created_at) >= ?`);
   const syn = db.prepare("SELECT at, content FROM tracker_syntheses WHERE tracker_id = ? ORDER BY id DESC LIMIT 1");
-  const top = db.prepare(`SELECT s.story_id, s.title, s.updated_at FROM tracker_stories ts JOIN stories s ON s.story_id = ts.story_id WHERE ts.tracker_id = ? AND ts.how != 'banned' ORDER BY s.updated_at DESC LIMIT 1`);
+  const top = db.prepare(`SELECT s.story_id, s.title, COALESCE(${LAST_AT}, s.created_at) AS updated_at FROM tracker_stories ts JOIN stories s ON s.story_id = ts.story_id WHERE ts.tracker_id = ? AND ts.how != 'banned' AND s.status = 'active' ORDER BY 3 DESC, s.importance DESC LIMIT 1`);
   return rows.map((r) => {
     const c = cnt.get(r.id);
     const sy = syn.get(r.id);
@@ -53,7 +60,7 @@ export function listTrackers(db) {
     return { id: r.id, name: r.name, kind: r.kind, ticker: r.ticker, aliases: parseJ(r.aliases, []), origin: r.origin, created_at: r.created_at,
       stories: c.n, week: recent.get(r.id, daysAgo(7)).n, latest: latest ? { id: latest.story_id, title: latest.title, at: latest.updated_at } : null,
       synthesis: sc ? { at: sy.at, state: sc.state || "", trend: sc.trend || "", changed: sc.changed || "" } : null,
-      fresh: sy ? db.prepare("SELECT COUNT(*) n FROM tracker_stories ts JOIN stories s ON s.story_id = ts.story_id WHERE ts.tracker_id = ? AND ts.how != 'banned' AND s.updated_at > ?").get(r.id, sy.at).n : c.n,
+      fresh: sy ? db.prepare(`SELECT COUNT(*) n FROM tracker_stories ts JOIN stories s ON s.story_id = ts.story_id WHERE ts.tracker_id = ? AND ts.how != 'banned' AND (COALESCE(${LAST_AT}, s.created_at) > ? OR ts.linked_at > ?)`).get(r.id, sy.at, sy.at).n : c.n,
       spark: daily(db, r.id, 30) };
   });
 }
@@ -115,12 +122,44 @@ export function linkStories(db, id, o) {
   }
   if (t.kind === "theme" && o && Array.isArray(o.themes)) {
     const mine = new Set(db.prepare("SELECT story_id FROM tracker_stories WHERE tracker_id = ? AND how != 'banned'").all(id).map((r) => r.story_id));
-    for (const th of o.themes) if (th.name === t.name || (th.stories || []).some((s) => mine.has(s))) for (const s of th.stories || []) if (!found.has(s)) found.set(s, "theme");
+    // 版面里的主线：同名的整条认；不同名的要有一半以上（且至少两篇）已经挂在这个对象上才认——
+    // 原来只要有一篇重叠就把整条主线挂过来，几轮下来不相干的报道越挂越多
+    const nameBg = bigrams(t.name);
+    for (const th of o.themes) {
+      const ss = th.stories || [];
+      const overlap = ss.filter((s) => mine.has(s)).length;
+      // 版面每次给主线起的名字不完全一样（「AI与数据中心」/「AI数据中心建设」）：名字相近也算同一条
+      const sameName = th.name === t.name || (th.name && similarity(nameBg, bigrams(th.name)) >= 0.5);
+      if (sameName || (overlap >= 2 && overlap * 2 >= ss.length)) for (const s of ss) if (!found.has(s)) found.set(s, "theme");
+    }
+  }
+  // 主线的核心主体：已挂的故事线里一半以上（且至少两条）都有的关键主体（如「英伟达风波」里的英伟达），带这个主体的新故事线也挂上
+  if (t.kind === "theme") {
+    const total = db.prepare("SELECT COUNT(*) n FROM tracker_stories WHERE tracker_id = ? AND how != 'banned'").get(id).n;
+    const core = db.prepare(`SELECT lower(e.name) name, COUNT(DISTINCT e.story_id) n FROM tracker_stories ts JOIN story_entities e ON e.story_id = ts.story_id
+      WHERE ts.tracker_id = ? AND ts.how != 'banned' GROUP BY lower(e.name) HAVING n >= 2`).all(id).filter((r) => r.n * 2 >= total && usable(r.name)).map((r) => r.name);
+    for (const name of core.slice(0, 3)) {
+      for (const r of db.prepare("SELECT DISTINCT e.story_id FROM story_entities e JOIN stories s ON s.story_id = e.story_id WHERE lower(e.name) = ? AND s.updated_at >= ? AND s.status = 'active'").all(name, since)) if (!found.has(r.story_id)) found.set(r.story_id, "entity");
+    }
   }
   const ins = db.prepare("INSERT OR IGNORE INTO tracker_stories (tracker_id, story_id, linked_at, how) VALUES (?,?,?,?)");
   const added = [];
   for (const [sid, how] of found) if (Number(ins.run(id, sid, nowSql(), how).changes)) added.push(sid);
   return added;
+}
+
+/**
+ * 一次性修复（1.1.24）：以前主线只要和版面里的某条主线重叠一篇，就把那条主线的报道全挂过来，
+ * 几天下来每个主线对象都挂了一百多条、互相几乎一样。这里把这样挂上的（how = 'theme'、不是建立时带进来的）摘掉；
+ * 建立对象时带的那几篇、按别名和关键主体认的、读者摘掉的记录都不动。之后按新的规则（同名或过半重叠）重新挂。
+ * @returns 摘掉的条数
+ */
+export function repairThemeLinks(db) {
+  let removed = 0;
+  for (const t of db.prepare("SELECT id, created_at FROM trackers WHERE kind = 'theme'").all()) {
+    removed += Number(db.prepare("DELETE FROM tracker_stories WHERE tracker_id = ? AND how = 'theme' AND linked_at > datetime(?, '+1 minute')").run(t.id, t.created_at).changes) || 0;
+  }
+  return removed;
 }
 
 /** 每份版面出来后：所有追踪对象各自挂新的故事线。@returns { [trackerId]: [新挂上的故事线] } */
@@ -135,7 +174,7 @@ export function linkAll(db, themes) {
 
 /** 追踪对象的时间轴：挂上的故事线按时间（首报），附最新进展。 */
 export function timeline(db, id, limit) {
-  return db.prepare(`SELECT s.story_id, s.title, s.section, s.importance, s.updated_at, s.copy, ts.linked_at,
+  return db.prepare(`SELECT s.story_id, s.title, s.section, s.importance, COALESCE(${LAST_AT}, s.created_at) AS updated_at, s.copy, ts.linked_at,
       (SELECT MIN(COALESCE(a.published_at, a.first_seen_at)) FROM story_items si JOIN articles a ON a.id = si.article_id WHERE si.story_id = s.story_id) first_at,
       (SELECT COUNT(*) FROM story_items si WHERE si.story_id = s.story_id) n,
       (SELECT text FROM story_updates u WHERE u.story_id = s.story_id ORDER BY u.at DESC LIMIT 1) update_text

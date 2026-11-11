@@ -110,3 +110,33 @@ export function setSourceState(doc, id, state) {
   else { s.enabled = true; delete s.removed_at; if (state === "trial") s.trial = true; else delete s.trial; }
   return s;
 }
+
+/**
+ * 各版块的来源覆盖：近 24 小时有更新的故事线里，多少条只有一家媒体在报。
+ * 一个版块几乎全是单一来源时，「多家印证」「各方说法不一」这些都用不上——提示读者给这个版块补一两个来源。
+ * @returns [{ section, stories, single, share（单一来源占比，0–100）, top（这个版块报道最多的来源名） }]，只列故事线 ≥ 5 条且单一来源 ≥ 85% 的
+ */
+export function thinCoverage(db, o) {
+  const hours = Math.max(1, Number(o && o.hours) || 24);
+  const since = new Date(Date.now() - hours * 3600000).toISOString().replace("T", " ").slice(0, 19);
+  const rows = db.prepare(`SELECT s.story_id, s.section, COALESCE(src.grp, a.source_id) grp, COALESCE(src.name, a.source_id) name
+    FROM stories s JOIN story_items i ON i.story_id = s.story_id JOIN articles a ON a.id = i.article_id LEFT JOIN sources src ON src.id = a.source_id
+    WHERE s.updated_at >= ? AND s.status = 'active'`).all(since);
+  const by = new Map();
+  for (const r of rows) {
+    if (!r.section) continue;
+    if (!by.has(r.section)) by.set(r.section, { stories: new Map(), names: new Map() });
+    const sec = by.get(r.section);
+    if (!sec.stories.has(r.story_id)) sec.stories.set(r.story_id, new Set());
+    sec.stories.get(r.story_id).add(r.grp);
+    sec.names.set(r.name, (sec.names.get(r.name) || 0) + 1);
+  }
+  const out = [];
+  for (const [section, sec] of by) {
+    const n = sec.stories.size;
+    const single = [...sec.stories.values()].filter((g) => g.size < 2).length;
+    const share = n ? Math.round((100 * single) / n) : 0;
+    if (n >= 5 && share >= 85) out.push({ section, stories: n, single, share, top: [...sec.names].sort((a, b) => b[1] - a[1])[0][0] });
+  }
+  return out.sort((a, b) => b.stories - a.stories);
+}

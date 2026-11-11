@@ -8,13 +8,13 @@
 
 import { makeDeepRead, modelSplitDigests } from "./host/deepread.mjs";
 import { contentHealth, filteredItems } from "./host/health.mjs";
-import { sourceScores, setSourceState } from "./host/sources.mjs";
+import { sourceScores, setSourceState, thinCoverage } from "./host/sources.mjs";
 import { translateTitles } from "./host/translate.mjs";
 import { DEPTHS, depthOf, depthParams, recordCall, usageToday, makeGate } from "./host/runtime.mjs";
 import { searchNews, answerNews } from "./host/ask.mjs";
 import { detailMaterials, writeDetail, saveDetail, latestDetail } from "./host/detail.mjs";
 import { analysisMaterials, analyzeStory, saveAnalysis, latestAnalysis, analysisBrief, autoAnalyzeTargets, webMaterials, searchQuery } from "./host/analysis.mjs";
-import { listTrackers, addTracker, removeTracker, unlinkStory, linkAll, trackerDetail, synthesize, suggestions as trackSuggestions, synthTargets } from "./host/tracking.mjs";
+import { listTrackers, addTracker, removeTracker, unlinkStory, linkAll, trackerDetail, synthesize, suggestions as trackSuggestions, synthTargets, repairThemeLinks } from "./host/tracking.mjs";
 import { createQueue, PRIORITY } from "./host/queue.mjs";
 import { prune } from "./host/retention.mjs";
 import { parseCron, cronMatches, nextCron, minuteKey } from "./host/clock.mjs";
@@ -1458,6 +1458,10 @@ export function apply(ctx, config) {
   /** 每天清理一次只增不减的表（版面、账本、抓取记录等），模型和抓取都闲着时做。 */
   function maintenanceTick() {
     if (modelState.busy || busyWith()) return;
+    // 一次性修复：摘掉以前按过宽的规则挂到主线对象上的故事线（见 repairThemeLinks）
+    if (!kvGet("tracker_links_v2")) {
+      try { const n = withDb(p, (db) => (db ? repairThemeLinks(db) : null)); if (n != null) kvSet("tracker_links_v2", { at: new Date().toISOString(), removed: n }); } catch { /* 下一分钟再试 */ }
+    }
     const last = kvGet("maintenance");
     if (last && Date.now() - Date.parse(last.at) < 24 * 3600000) return;
     const db = openIfExists(p.db);
@@ -2196,7 +2200,7 @@ export function apply(ctx, config) {
       methods: ["GET", "HEAD"],
       fetch: async (request) => {
         const days = Number(new URL(request.url, "http://x").searchParams.get("days")) || 7;
-        return jsonResponse({ sources: withDb(p, (db) => (db ? sourceScores(db, { days }) : [])) }, 200);
+        return jsonResponse({ sources: withDb(p, (db) => (db ? sourceScores(db, { days }) : [])), thin: withDb(p, (db) => (db ? thinCoverage(db) : [])) }, 200);
       },
     });
     route({

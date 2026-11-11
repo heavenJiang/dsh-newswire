@@ -42,6 +42,8 @@ The edition has top stories, your follows, sections, things to watch and items a
 
 ### 🔭 Tracking, the flagship feature
 
+Today's edition opens with tracking: trackers that got new reports in the last 24 hours come first, and pushes name the trackers with movement before anything else.
+
 News arrives one item at a time, but what you care about is usually a thread: what a company keeps shipping, who is pushing a technology forward, where a conflict is going.
 
 - Add something to track (companies can carry a ticker). Related storylines attach automatically; detach a wrong one in one click.

@@ -2,6 +2,16 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.24 (2026-11-11)
+
+What you track comes first, and two tracking bugs that made the data drift are fixed:
+- **Tracking at the top of the front page.** Today's edition starts with the trackers that got new reports in the last 24 hours (up to 4): name, how many new, the time and headline of the latest, and the current-state line from the summary. Click to open that storyline.
+- **"New" in tracking means a new report arrived.** It used to follow the storyline's update time, which every edition refreshes for every storyline on the board, so nearly everything counted as new. That was the root cause of summaries being rewritten every round. It now follows the time the last report joined.
+- **Themes no longer snowball.** A theme tracker used to take over a whole edition theme if a single story overlapped; after a few days each theme had over a hundred near-identical stories (SpaceX reports under an Nvidia theme). Now the edition theme must have the same or a similar name, or at least half of its stories (and at least two) must already belong to the tracker. Core entities also link stories: an entity present in at least half of the tracker's storylines (Nvidia in an Nvidia theme) brings in new storylines that carry it. **A one-time cleanup runs after upgrading**: links made by the old rule are removed (stories added when the tracker was created, links by alias or entity, and your own removals are untouched). On real data it removed 805 links, leaving each theme with its original 3–7 stories to grow again under the new rule.
+- **Rewritten detailed reports mark what is new.** Timeline entries, key numbers, views and open questions that were not in the previous report are marked "new", with a count at the top; the phone version marks them with 🆕. Matching is by text similarity, with no model call.
+- **A hint for single-outlet sections.** The Sources page says so when 85% or more of a section's storylines in the last 24 hours (at least 5) have one outlet, since corroboration and differing views cannot work there.
+- Fixed: the program-made preview listed the same storyline twice under "Worth watching"; the "upgraded" push reason was untranslated.
+
 ## 1.1.23 (2026-11-11)
 
 Pushes were too long and feedback too rare (3 votes on 265 pushes). Both change together:

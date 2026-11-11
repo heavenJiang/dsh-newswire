@@ -75,3 +75,18 @@ test("试用源只能印证：只有试用源报道的事不上版；与正常�
   assert.ok(ed.stories[storyIdFor("both1")], "有正常源同报的上版");
   db.close();
 });
+
+test("来源覆盖：一个版块近 24 小时的故事线几乎都只有一家在报时提示；有多家的版块不提", async () => {
+  const { thinCoverage } = await import("../../host/sources.mjs");
+  const { openDb } = await import("../../engine/store/schema.mjs");
+  const fs = await import("node:fs"); const os = await import("node:os"); const path = await import("node:path");
+  const db = openDb(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "nw-thin-")), "n.sqlite"));
+  db.prepare("INSERT INTO sources (id, name, grp) VALUES ('cls','财联社电报','cls'), ('wsj','华尔街见闻','wsj')").run();
+  const story = db.prepare("INSERT INTO stories (story_id, pack, title, section, labels, importance, status, created_at, updated_at) VALUES (?,?,?,?,'[]',50,'active',datetime('now'),datetime('now'))");
+  const art = db.prepare("INSERT INTO articles (id, url, title, source_id) VALUES (?,?,?,?)");
+  const link = db.prepare("INSERT INTO story_items (article_id, story_id) VALUES (?,?)");
+  for (let i = 0; i < 6; i++) { story.run("m" + i, "all", "宏观" + i, "macro"); art.run("ma" + i, "https://x/ma" + i, "t", "cls"); link.run("ma" + i, "m" + i); }
+  for (let i = 0; i < 6; i++) { story.run("t" + i, "all", "科技" + i, "tech"); art.run("ta" + i, "https://x/ta" + i, "t", "cls"); link.run("ta" + i, "t" + i); if (i < 3) { art.run("tb" + i, "https://x/tb" + i, "t", "wsj"); link.run("tb" + i, "t" + i); } }
+  assert.deepEqual(thinCoverage(db), [{ section: "macro", stories: 6, single: 6, share: 100, top: "财联社电报" }]);
+  db.close();
+});

@@ -90,12 +90,14 @@ export function composeExpand(n, d) {
 /** 详细报道发到手机的样子。@param dt latestDetail() 的结果 */
 export function composeDetail(n, title, dt) {
   const L = ["📰 **" + (n ? n + ". " : "") + md(title) + "** · 详细报道"];
+  const nw = (x) => (x.new ? "🆕 " : "");
+  if (dt.since && dt.since.added) L.push("比上一篇新增 " + dt.since.added + " 条（标 🆕）");
   if (dt.overview && dt.overview.text) L.push("", md(dt.overview.text));
-  if ((dt.timeline || []).length) { L.push("", "**经过**"); for (const x of dt.timeline) L.push("· " + (x.time ? md(x.time) + " " : "") + md(x.text)); }
-  if ((dt.numbers || []).length) { L.push("", "**关键数字**"); for (const x of dt.numbers) L.push("· " + md(x.text)); }
-  if ((dt.views || []).length) { L.push("", "**各方说法**"); for (const x of dt.views) L.push("· " + md(x.who) + "：" + md(x.says)); }
+  if ((dt.timeline || []).length) { L.push("", "**经过**"); for (const x of dt.timeline) L.push("· " + nw(x) + (x.time ? md(x.time) + " " : "") + md(x.text)); }
+  if ((dt.numbers || []).length) { L.push("", "**关键数字**"); for (const x of dt.numbers) L.push("· " + nw(x) + md(x.text)); }
+  if ((dt.views || []).length) { L.push("", "**各方说法**"); for (const x of dt.views) L.push("· " + nw(x) + md(x.who) + "：" + md(x.says)); }
   if (dt.background && dt.background.text) L.push("", "**背景**", md(dt.background.text));
-  if ((dt.open || []).length) { L.push("", "**说法不一或待确认**"); for (const x of dt.open) L.push("· " + md(x.text)); }
+  if ((dt.open || []).length) { L.push("", "**说法不一或待确认**"); for (const x of dt.open) L.push("· " + nw(x) + md(x.text)); }
   const ck = dt.check || {};
   L.push("", "由 " + (dt.model || "模型") + " 读 " + ((dt.materials || []).length || dt.items || 0) + " 篇报道写成，逐句与原文核对" + (ck.dropped ? "（" + ck.dropped + " 句核对不上已删去）" : "") + "，可能有误，以原文为准。");
   return L.join("\n");

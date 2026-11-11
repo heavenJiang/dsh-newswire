@@ -103,3 +103,52 @@ test("综述：首次给全部近况；之后增量——只给上次综述与�
   assert.equal(d.synthesis.state, "英伟达新品与合作并进");
   db.close();
 });
+
+test("新动态按「有新报道加入」算，不按版面刷新的时间；主线只有一篇重叠时不整条挂过来", async () => {
+  const db = db0();
+  story(db, "s1", "英伟达发布Rubin平台", { ents: ["英伟达"], msAgo: 5 * 86400000 });
+  const id = addTracker(db, { name: "英伟达", kind: "company", entities: ENT });
+  db.prepare("INSERT INTO tracker_syntheses (tracker_id, at, content) VALUES (?, datetime('now', '-1 hour'), '{}')").run(id);
+  // 版面把故事线刷了一遍（updated_at = 现在），但没有新报道
+  db.prepare("UPDATE stories SET updated_at = datetime('now')").run();
+  db.prepare("UPDATE tracker_stories SET linked_at = datetime('now', '-2 days')").run();
+  assert.equal(listTrackers(db).find((x) => x.id === id).fresh, 0, "只是被版面刷新：不算新动态");
+  assert.equal(needsSynthesis(db, id, { now: Date.now() + 9 * 3600000 }), 0);
+  // 真有新报道加入
+  db.prepare("INSERT INTO articles (id, url, title, source_id) VALUES ('n1','https://x/n1','英伟达新报道','cls')").run();
+  db.prepare("INSERT INTO story_items (article_id, story_id, joined_at) VALUES ('n1','s1', datetime('now'))").run();
+  assert.equal(listTrackers(db).find((x) => x.id === id).fresh, 1);
+
+  // 主线：版面里的另一条主线只和它重叠一篇 → 不认；重叠过半（且 ≥2 篇）→ 认
+  const th = addTracker(db, { name: "AI 算力", kind: "theme", entities: ENT });
+  for (const k of ["a", "b", "c", "d"]) story(db, "t" + k, "无关报道" + k, { msAgo: 3600000 });
+  db.prepare("INSERT INTO tracker_stories (tracker_id, story_id, linked_at, how) VALUES (?, 'ta', datetime('now'), 'manual')").run(th);
+  assert.deepEqual(linkStories(db, th, { days: 1, themes: [{ name: "别的主线", stories: ["ta", "tb", "tc", "td"] }] }), [], "只重叠一篇：不挂");
+  db.prepare("INSERT INTO tracker_stories (tracker_id, story_id, linked_at, how) VALUES (?, 'tb', datetime('now'), 'manual')").run(th);
+  assert.deepEqual(linkStories(db, th, { days: 1, themes: [{ name: "别的主线", stories: ["ta", "tb", "tc", "td"] }] }).sort(), ["tc", "td"], "重叠一半：整条挂上");
+  // 名字相近也算同一条主线；核心主体（一半以上已挂的故事线都有）带来新故事线
+  story(db, "te", "又一篇", { msAgo: 3600000 });
+  assert.deepEqual(linkStories(db, th, { days: 1, themes: [{ name: "AI 算力扩张", stories: ["te"] }] }), ["te"], "名字相近");
+  const nv = addTracker(db, { name: "英伟达风波", kind: "theme", entities: {}, stories: [] });
+  story(db, "n1", "黄仁勋被调查", { ents: ["英伟达", "黄仁勋"], msAgo: 3600000 });
+  story(db, "n2", "英伟达股价大跌", { ents: ["英伟达"], msAgo: 3600000 });
+  story(db, "n3", "英伟达回应质疑", { ents: ["英伟达"], msAgo: 1800000 });
+  story(db, "n4", "苹果发布新机", { ents: ["苹果"], msAgo: 1800000 });
+  const seed = db.prepare("INSERT OR IGNORE INTO tracker_stories (tracker_id, story_id, linked_at, how) VALUES (?,?, datetime('now'), 'theme')");
+  seed.run(nv, "n1"); seed.run(nv, "n2");
+  assert.deepEqual(linkStories(db, nv, { days: 1, themes: [] }).filter((x) => x !== "s1").sort(), ["n3"], "带核心主体「英伟达」的挂上，不相干的不挂");
+  db.close();
+});
+
+test("一次性修复：摘掉按旧规则挂到主线上的故事线；建立时带的、按别名认的、读者摘掉的不动", async () => {
+  const { repairThemeLinks } = await import("../../host/tracking.mjs");
+  const db = db0();
+  for (const k of ["a", "b", "c", "d"]) story(db, "r" + k, "报道" + k, { msAgo: 3600000 });
+  const id = addTracker(db, { name: "某主线", kind: "theme", entities: ENT, stories: ["ra"] });
+  const ins = db.prepare("INSERT OR REPLACE INTO tracker_stories (tracker_id, story_id, linked_at, how) VALUES (?,?, datetime('now', '+1 hour'), ?)");
+  ins.run(id, "rb", "theme"); ins.run(id, "rc", "alias"); ins.run(id, "rd", "banned");
+  assert.equal(repairThemeLinks(db), 1);
+  assert.deepEqual(db.prepare("SELECT story_id, how FROM tracker_stories WHERE tracker_id = ? ORDER BY story_id").all(id).map((x) => x.story_id + ":" + x.how), ["ra:theme", "rc:alias", "rd:banned"]);
+  assert.equal(repairThemeLinks(db), 0);
+  db.close();
+});
