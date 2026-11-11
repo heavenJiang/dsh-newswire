@@ -2,6 +2,12 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.25 (2026-11-11)
+
+Housekeeping, no behaviour change:
+- **The entry file is split.** `index.js` goes from 3186 lines to 1245: module-level helpers (settings and paths, source config I/O, the engine subprocess, source validation) move to `host/core.mjs`, the 37 panel routes to `host/routes.mjs`, and the 23 model tools plus the system prompt section to `host/tools.mjs`. The entry keeps the config schema and one run's state and flow (model queue, editions, pushes and the clock), handed to routes and tools through one `app` object. The split was mechanical: text cut by statement, each file's references computed by scope analysis, no logic changed; afterwards every route and tool was called once on a copy of real data with no reference errors.
+- Fixed: the first-run endpoint (`/api/newswire/onboard`) referenced a variable that did not exist after saving preferences, so it returned an error (the preferences were saved). The scope analysis for the split found it.
+
 ## 1.1.24 (2026-11-11)
 
 What you track comes first, and two tracking bugs that made the data drift are fixed:
