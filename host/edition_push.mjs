@@ -19,7 +19,9 @@ export function editionPicks(db, ed, rules, o) {
   for (const s of Object.values(ed.stories || {}).sort((a, b) => b.importance - a.importance)) {
     const followed = Boolean(s.followed && s.followed.length);
     // 读者对某版块的推送多次说「没用」：这个版块门槛提高（关注的不受影响）
-    const min = followed ? (rules.min_follow ?? 20) : (s.source_count >= 2 ? rules.min_corroborated : rules.min_single) + ((o.penalties && o.penalties[s.section]) || 0);
+    // 重点领域（AI 与新技术）不看家数：一家报道、有一手原文就够，取两档门槛里低的那个
+    const base = s.focal ? Math.min(rules.min_single ?? 36, rules.min_corroborated ?? 50) : s.source_count >= 2 ? rules.min_corroborated : rules.min_single;
+    const min = followed ? (rules.min_follow ?? 20) : base + ((o.penalties && o.penalties[s.section]) || 0);
     if (!full && s.importance < min) continue;
     if (req && !followed && !req.some((p) => s.section === p || (s.labels || []).some((l) => l === p || l.startsWith(p + ".")))) continue;
     if (s.published_at && s.published_at < staleBefore) continue;
@@ -43,13 +45,16 @@ export function editionPicks(db, ed, rules, o) {
 /** 各家媒体的原文链接（每家取这条故事线里最早的一篇）：推送里媒体名就是链接。 */
 function linksOf(db, s) {
   const ids = (s.article_ids || []).slice(0, 60);
-  if (!ids.length) return [];
+  // 原文（一手信息：官网、论文、官方账号）排在最前面
+  const origin = s.origin && s.origin.url ? [{ name: "原文（" + s.origin.site + "）", url: s.origin.url, origin: true }] : [];
+  if (!ids.length) return origin;
   const rows = db.prepare("SELECT source_id, url FROM articles WHERE id IN (" + ids.map(() => "?").join(",") + ") AND url IS NOT NULL ORDER BY first_seen_at").all(...ids);
   const first = new Map();
   for (const r of rows) if (!first.has(r.source_id)) first.set(r.source_id, r.url);
   const lead = (s.outlets || []).map((o) => ({ name: o.name || o.source_id, url: first.get(o.source_id) || null }));
   if (lead.length && s.url) lead[0].url = s.url;
   // 聚合站转的是同一篇原文：同一个链接只列一次
+  lead.unshift(...origin);
   const seen = new Set();
   return lead.filter((x) => !x.url || (!seen.has(x.url) && seen.add(x.url)));
 }
@@ -216,7 +221,8 @@ export function composeEditionMessage(parts, picks, ed, names) {
     const links = (s.links && s.links.length ? s.links : [{ name: (s.outlets[0] || {}).name || (s.outlets[0] || {}).source_id, url: s.url }]).filter((x) => x && x.name);
     const shown = links.slice(0, brief ? 1 : 3).map((x) => { const n = mdText(String(x.name).replace(/·.*$/, "")); return x.url ? "[" + n + "](" + x.url + ")" : n; });
     const h = s.heat || {};
-    L.push([shown.join("、") + (s.outlets.length > shown.length ? " 等 " + s.outlets.length + " 家" : ""), tz(s.published_at || s.first_seen_at).slice(-5),
+    const shownMedia = links.slice(0, brief ? 1 : 3).filter((x) => !x.origin).length;
+    L.push([shown.join("、") + (s.outlets.length > shownMedia && s.outlets.length > 1 ? " 等 " + s.outlets.length + " 家" : ""), tz(s.published_at || s.first_seen_at).slice(-5),
       s.credibility === "confirmed" ? "权威确认" : s.credibility === "disputed" ? "说法有分歧" : "", !brief && h.views != null ? "阅读 " + fmtN(h.views) : ""].filter(Boolean).join(" · "));
     if (/^markets|^macro/.test(s.section || "")) markets = true;
   };

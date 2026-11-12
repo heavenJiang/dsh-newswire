@@ -25,13 +25,14 @@ export const DETAIL_LIMITS = { items: 20, chars: 12000, per: 1500 };
  */
 export function detailMaterials(db, storyId, bodiesFor, o) {
   const L = Object.assign({}, DETAIL_LIMITS, o || {});
-  const rows = db.prepare(`SELECT a.id, a.title, a.title_zh, a.summary, a.url, a.published_at, a.first_seen_at, s.name AS source_name, a.source_id
+  const rows = db.prepare(`SELECT a.id, a.title, a.title_zh, a.summary, a.url, a.published_at, a.first_seen_at, s.name AS source_name, a.source_id, a.origin_site, a.origin_text
     FROM story_items i JOIN articles a ON a.id = i.article_id LEFT JOIN sources s ON s.id = a.source_id
     WHERE i.story_id = ? ORDER BY COALESCE(a.published_at, a.first_seen_at)`).all(storyId);
   const bodies = bodiesFor ? bodiesFor(db, rows.map((x) => x.id)) : new Map();
   const all = rows.map((it) => {
     const title = it.title_zh || it.title || "";
-    const text = String(bodies.get(it.id) || it.summary || "").replace(/\s+/g, " ").trim();
+    // 原文（一手信息）附在转述后面
+    const text = (String(bodies.get(it.id) || it.summary || "") + (it.origin_text ? " 【原文（" + (it.origin_site || "") + "）】" + it.origin_text : "")).replace(/\s+/g, " ").trim();
     return { id: it.id, title, source: it.source_name || it.source_id, t: it.published_at || it.first_seen_at, url: it.url, text: text === title ? "" : text, bg: bigrams(title + text.slice(0, 200)) };
   });
   // 去重：和已留下的某篇几乎一样，留长的那篇

@@ -40,6 +40,7 @@ import { selectEvents, recordPushes, composeMessage, messageParts, failingSource
 import { processEvents, reprocess } from "./pipeline/events.mjs";
 import { compileTaxonomy } from "./taxonomy.mjs";
 import { bodyCandidates, fetchBodies, bodyProfiles, fillCandidates, fillBodies } from "./pipeline/bodies.mjs";
+import { originCandidates, findOrigins } from "./pipeline/origin.mjs";
 import { exportDataset } from "./export.mjs";
 import { applyRetention } from "./retention.mjs";
 import { coolingMap } from "./pipeline/cooling.mjs";
@@ -76,6 +77,15 @@ configureBrowse({ bin: findBin("browse", str(A["browse-bin"])) || "", session: s
 configureAgentReach({ bin: findBin("agent-reach", str(A["agent-reach-bin"])) || "", mcporter: findBin("mcporter", str(A["mcporter-bin"])) || "" });
 
 const cfg = loadConfig(CFG_PATH, SEED);
+/** 重点领域的分类（版式 layout.json 的 focus.labels，和配置放在一起；没有版式文件时用默认的 AI 与新技术；设为 [] 即关闭找原文）。 */
+function focusLabels() {
+  try {
+    const f = path.join(path.dirname(CFG_PATH), "layout.json");
+    const lay = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : null;
+    if (lay && lay.focus && Array.isArray(lay.focus.labels)) return lay.focus.labels.filter((x) => typeof x === "string");
+  } catch { /* 坏的版式文件按默认 */ }
+  return ["tech", "industry.ai_semis"];
+}
 const TAX_SEED = path.join(ROOT, "config/taxonomy.json");
 const TAX_PATH = path.resolve(str(A.taxonomy) || (fs.existsSync(path.join(path.dirname(CFG_PATH), "taxonomy.json")) ? path.join(path.dirname(CFG_PATH), "taxonomy.json") : TAX_SEED));
 /** 分类体系：数据目录那份按种子版本自动合并升级后编译。 */
@@ -362,6 +372,21 @@ if (bodyBudget > 0 && ev.touched.length) {
     }
   } catch (e) {
     console.log("[bodies] 失败：" + e.message);
+  }
+}
+
+// 找原文：AI 与新技术这类新闻要一手信息——聚合站条目页上的「打开原文」「信源」指向官网、论文、官方账号，读回原文正文（每轮预算 --origin-budget，最长 75 秒）
+const originBudget = Number(A["origin-budget"] ?? 16);
+if (originBudget > 0) {
+  try {
+    const list = originCandidates(db, { runId, labels: focusLabels(), budget: originBudget });
+    if (list.length) {
+      progress({ stage: "bodies", detail: "给 " + list.length + " 条 AI 与新技术新闻找原文（官网、论文、官方账号）" });
+      const r = await findOrigins(db, list, { browse: pre.ok, concurrency: 4, maxMs: 75000 });
+      console.log("[origin] 找原文 " + r.tried + " 条，找到出处 " + r.found + "（一手 " + r.first_hand + "），读回原文 " + r.read + "（" + Math.round(r.ms / 1000) + "s）");
+    }
+  } catch (e) {
+    console.log("[origin] 失败：" + e.message);
   }
 }
 

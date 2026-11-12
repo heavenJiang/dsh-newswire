@@ -6,6 +6,7 @@ import { bigrams, markReposts, similarity } from "../engine/pipeline/select.mjs"
 import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { verifyCopy } from "./factcheck.mjs";
+import { isFirstHand, siteOf } from "../engine/pipeline/origin.mjs";
 import { applyFollows } from "./follows.mjs";
 import { historyText } from "./history.mjs";
 import { BUILTIN_PROFILES_DIR, builtinProfiles, focusOf, loadProfiles, profileFor, withFocus } from "./profiles.mjs";
@@ -160,7 +161,7 @@ export function gatherItems(db, o) {
   const focusSql = fl.length ? "EXISTS (SELECT 1 FROM article_labels l WHERE l.article_id = a.id AND (" + fl.map(() => "l.label = ? OR l.label LIKE ?").join(" OR ") + "))" : "0";
   const focusArgs = fl.flatMap((f) => [f, f + ".%"]);
   const boost = fl.length ? Number(o.focus.boost ?? 20) : 0;
-  const rows = db.prepare(`SELECT ${focusSql} AS focus, a.id, a.title, a.summary, a.comments, s.tier AS src_tier, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.pack, a.completeness, a.kind, a.parent_id, COALESCE(s.trial, 0) AS trial,
+  const rows = db.prepare(`SELECT ${focusSql} AS focus, a.id, a.title, a.summary, a.comments, a.origin_url, a.origin_site, a.origin_text, s.tier AS src_tier, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.pack, a.completeness, a.kind, a.parent_id, COALESCE(s.trial, 0) AS trial,
       s.name AS source_name, s.profile AS src_profile, COALESCE(s.grp, a.source_id) AS grp, m.event_id, e.importance AS ev_importance, e.credibility AS ev_cred, e.labels AS ev_labels, e.dispute AS ev_dispute
     FROM articles a LEFT JOIN sources s ON s.id = a.source_id LEFT JOIN event_members m ON m.article_id = a.id LEFT JOIN events e ON e.event_id = m.event_id
     WHERE ${where.join(" AND ")} AND a.title IS NOT NULL AND a.title != '' AND COALESCE(a.kind, 'news') NOT IN ('promo', 'digest', 'ticker')
@@ -216,11 +217,27 @@ export function storyFacts(items) {
   const lead = items.slice().sort((a, b) => String(a.published_at || a.first_seen_at).localeCompare(String(b.published_at || b.first_seen_at)))[0];
   const times = items.map((it) => it.first_seen_at).filter(Boolean).sort();
   const pubs = items.map((it) => it.published_at).filter(Boolean).sort();
+  const origin = originOf(items);
   return {
-    outlets, reposts, ...(community.length ? { community } : {}), source_count: outlets.length, credibility, event_ids: eventIds, lead_event_id: leadEvent ? leadEvent[0] : null,
+    outlets, reposts, ...(community.length ? { community } : {}), ...(origin ? { origin } : {}), source_count: outlets.length, credibility, event_ids: eventIds, lead_event_id: leadEvent ? leadEvent[0] : null,
     article_ids: items.map((it) => it.id), lead_article_id: lead.id, url: lead.url, first_seen_at: times[0] || null, published_at: pubs[0] || null,
     dispute: items.map((it) => parseJ(it.ev_dispute, null)).find(Boolean) || null,
   };
+}
+
+/**
+ * 一篇报道的原文（一手信息）：聚合站条目页上找到的出处（engine/pipeline/origin.mjs），或报道本身就发在一手站点上（官方博客源）。
+ * 一手站点（官网、论文、官方账号、代码仓库）优先，其次最早的。@returns { url, site, first_hand } 或 null
+ */
+export function originOf(items) {
+  const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+  const cands = [];
+  for (const it of items) {
+    if (it.origin_url) cands.push({ url: it.origin_url, site: it.origin_site || host(it.origin_url), first_hand: isFirstHand(it.origin_url, it.title) });
+    else if (it.url && isFirstHand(it.url, it.title) && it.src_tier !== "community") cands.push({ url: it.url, site: siteOf(it.url), first_hand: true });
+  }
+  if (!cands.length) return null;
+  return cands.find((c) => c.first_hand) || cands[0];
 }
 
 /** 去掉快讯开头的套话：【标题】、「财联社11月9日电，」「新华社北京11月8日电」之类。 */
@@ -306,11 +323,14 @@ export const materialText = (it, bodies, content) => {
   const c = content || {};
   const body = bodies && bodies.get(it.id);
   // 有正文时给正文（摘要多半是正文开头，不重复给）；没有就给摘要
-  const main = [it.title, body ? sample(body, c.body_chars || 900, c.sampling) : it.summary ? clip(it.summary, c.summary_chars || 240) : ""].filter(Boolean).join("｜");
+  const main = [it.title, body ? sample(body, c.body_chars || 900, c.sampling) : it.summary ? clip(it.summary, c.summary_chars || 240) : "",
+    // 原文（一手信息）：聚合站转述后面附上它标出的出处原文，写稿以原文为准，核对也认它
+    it.origin_text ? ORIGIN_MARK + (it.origin_site || "") + "）】" + sample(it.origin_text, c.body_chars || 900, c.sampling) : ""].filter(Boolean).join("｜");
   // 社区评论（Hacker News 等）：读法要看评论（content.comments > 0）时附在后面，标明是评论，不是报道原文
   return c.comments > 0 && it.comments ? main + "｜" + COMMENTS_MARK + clip(it.comments, c.comments) : main;
 };
 export const COMMENTS_MARK = "【社区评论】";
+export const ORIGIN_MARK = "【原文（";
 
 /** 材料够「多」：报道篇数到了 rich_items，多读几篇后的材料合起来也够长（一两句的快讯凑不出细节）。 */
 const RICH_MIN_CHARS = 800;
@@ -343,7 +363,7 @@ const matView = (it) => ({ id: it.id, name: it.source_name || it.source_id, url:
 
 function loadArticles(db, ids) {
   if (!ids.length) return [];
-  return db.prepare(`SELECT a.id, a.title, a.summary, a.comments, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, s.name AS source_name, COALESCE(s.grp, a.source_id) AS grp
+  return db.prepare(`SELECT a.id, a.title, a.summary, a.comments, a.origin_url, a.origin_site, a.origin_text, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, s.name AS source_name, COALESCE(s.grp, a.source_id) AS grp
     FROM articles a LEFT JOIN sources s ON s.id = a.source_id WHERE a.id IN (` + ids.map(() => "?").join(",") + ")").all(...ids);
 }
 
@@ -401,6 +421,8 @@ export function assemble(stories, layout, names, extra) {
   const fol = byImp.filter((s) => s.followed && s.followed.length).slice(0, 6).map((s) => s.id);
   if (fol.length) { sections.push({ id: "following", name: "我的关注", stories: fol }); fol.forEach((i) => placed.add(i)); }
   const focal = (s) => inFocus(layout.focus, [s.section].concat(s.labels || []));
+  // 重点领域（AI 与新技术）的报道记下来：推送不按家数设门槛，待核实不列它们（这类新闻要的是一手原文，不是多家印证）
+  for (const s of stories) { if (focal(s)) s.focal = true; else delete s.focal; }
   for (const sec of layout.sections) {
     // 版块满了也给重点领域（AI 与新技术）的报道多留 3 个位置，不因条数上限漏掉
     const cand = shown.filter((s) => s.section === sec.id && !placed.has(s.id));
@@ -425,7 +447,7 @@ export function assemble(stories, layout, names, extra) {
   const get = (i) => stories.find((s) => s.id === i);
   // 只有社区讨论、没有媒体报道的（Hacker News 帖子）不是待核实的新闻
   const verify = byImp
-    .filter((s) => (s.source_count === 1 || (s.source_count === 0 && !(s.community || []).length)) && s.importance >= layout.verify.min_importance || s.credibility === "disputed")
+    .filter((s) => !s.focal && (s.source_count === 1 || (s.source_count === 0 && !(s.community || []).length)) && s.importance >= layout.verify.min_importance || s.credibility === "disputed")
     .slice(0, layout.verify.count)
     .map((s) => ({ text: s.title + (s.credibility === "disputed" ? "：各家" + ((s.dispute && s.dispute.kind) || "说法") + "不一" : "：仅 " + ((s.outlets[0] || {}).name || "一家") + " 报道"), stories: [s.id] }));
   const watch = (extra.watch || []).filter((w) => w.text).slice(0, layout.watch.count);
@@ -476,7 +498,7 @@ export function deferRewrite(row, s, S) {
   if (!row || !row.copy || row.copy.by !== "llm" || !row.copy.lead || !(S && S.rewrite_min > 0)) return false;
   const had = Number(row.copy.items) || 0;
   const pending = s._total - had;
-  if (pending <= 0 || s.importance >= 60) return false;
+  if (pending <= 0 || s.importance >= 60 || newOrigin(row, originCount(s._g && s._g.items))) return false;
   return pending < S.rewrite_min || pending < Math.ceil(had * S.rewrite_ratio);
 }
 /**
@@ -492,7 +514,11 @@ export function isBriefWire(g, s, S, profile) {
   return Math.max(text.length, String(it.title || "").length) <= S.brief_chars;
 }
 /** 稿件可以沿用：模型写的，且写稿后没有新报道加入。 */
-export const copyFresh = (row, total) => Boolean(row && row.copy && row.copy.by === "llm" && row.copy.items >= total);
+export const copyFresh = (row, total, origins) => Boolean(row && row.copy && row.copy.by === "llm" && row.copy.items >= total && !newOrigin(row, origins));
+/** 这条故事线的新闻里读回原文（一手信息）的篇数。 */
+export const originCount = (items) => (items || []).filter((it) => it && it.origin_text).length;
+/** 写稿之后又找到了原文：旧稿是照着转述写的，要按原文重写（不沿用、不延后）。 */
+export const newOrigin = (row, origins) => Number(origins || 0) > Number((row && row.copy && row.copy.origins) || 0);
 export const copyOf = (c) => Object.assign({ lead: c.lead || "", lead_refs: c.lead_refs || [], points: c.points || [], views: c.views || [], impact: c.impact || "" }, Array.isArray(c.extra) && c.extra.length ? { extra: c.extra } : {}, Array.isArray(c.history) && c.history.length ? { history: c.history } : {});
 
 // ------------------------------------------------------------------ 节省 token：程序编排
@@ -502,7 +528,7 @@ export function ruleEdition(db, o) {
   const args = [o.since, Math.min(layout.min_importance, layout.verify.min_importance), staleBefore(o.since)];
   if (o.pack && o.pack !== "all") { where.push("e.pack = ?"); args.push(o.pack); }
   const events = db.prepare("SELECT e.* FROM events e WHERE " + where.join(" AND ") + " ORDER BY e.importance DESC LIMIT 80").all(...args);
-  const memQ = db.prepare(`SELECT a.id, a.title, a.summary, a.comments, s.tier AS src_tier, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.completeness, COALESCE(s.trial, 0) AS trial, s.name AS source_name, s.profile AS src_profile, COALESCE(m.grp, a.source_id) AS grp, m.event_id
+  const memQ = db.prepare(`SELECT a.id, a.title, a.summary, a.comments, a.origin_url, a.origin_site, a.origin_text, s.tier AS src_tier, a.url, ${PUB} AS published_at, a.first_seen_at, a.source_id, a.completeness, COALESCE(s.trial, 0) AS trial, s.name AS source_name, s.profile AS src_profile, COALESCE(m.grp, a.source_id) AS grp, m.event_id
     FROM event_members m JOIN articles a ON a.id = m.article_id LEFT JOIN sources s ON s.id = a.source_id WHERE m.event_id = ? ORDER BY COALESCE(a.published_at, a.first_seen_at) LIMIT 10`);
   // 每个规则事件对应一条故事线：成员已归入的沿用那条（模型模式下起的标题、写的稿都能接着用），否则新起
   const byId = new Map();
@@ -534,7 +560,7 @@ export function ruleEdition(db, o) {
     facts.credibility = e.credibility || facts.credibility;
     const total = (row ? row.total : 0) + g.fresh.length;
     let copy;
-    if (copyFresh(row, total)) { copy = Object.assign(copyOf(row.copy), { by: "llm", reused: true }); reused++; }
+    if (copyFresh(row, total, originCount(g.items))) { copy = Object.assign(copyOf(row.copy), { by: "llm", reused: true }); reused++; }
     else copy = ruleCopy(g.items, facts, layout, parseJ(e.factors, {}), gb);
     const section = row ? row.section : topOf(labels[0]) || "other";
     const prof = storyProfile(layout, { section, labels: row ? row.labels : labels }, g.items);

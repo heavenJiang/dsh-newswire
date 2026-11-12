@@ -32,6 +32,7 @@ engine/
     paging.mjs          Paging backfill: param / cursor / id_walk / before
     events.mjs          Classify → cluster events → cross-validate and score; reprocess
     bodies.mjs          Body fetching and extraction for top events
+    origin.mjs          Find the original: for AI and new-tech items, take the source link from aggregator pages and read the first-hand text
     select.mjs          Source heat, event selection for push, the phone message
     normalize.mjs       Raw item → stored record (dedup key, time confidence, titles for untitled flashes, navigation-label filter)
     signals.mjs         Heat signal normalization
@@ -85,6 +86,8 @@ Events touched this round whose first report is within the look-back window: mul
 
 ## Bodies
 Events with importance ≥50 this round, up to 2 members per event (primary sources first), `--body-budget` per round (default 12). Paywalled sources, `body: "list"` sources (news flashes whose list text is the full text, training-ready from 60 characters), `body: "none"` sources, and sources whose body fetches failed 3+ times in 7 days without success are skipped.
+
+**Finding the original**: for this round's focus-area items (layout `focus.labels`, AI and new tech by default) from non-first-hand sites, the item page is opened, a source link such as "打开原文", "信源" or "Source" is taken, and the original is read back into `articles.origin_url / origin_site / origin_text` (an empty `origin_url` means checked, no source on the page). `--origin-budget` items per round (default 16, 0 turns it off), at most 75 seconds.
 Extraction: plain request → JSON-LD `articleBody` → the longest body field in Next.js `__NEXT_DATA__` → page paragraphs (inside `<article>` when present, without navigation and boilerplate); when the request is refused (401/403) and browse is available, the real browser reads the article; the reader (Jina) last. Verification pages are never taken as bodies or bypassed; they are recorded as `bot_blocked`. Results go to `article_bodies`, and fill `articles.content` and `training_ready` when longer than what was there.
 
 ## Dataset export

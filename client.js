@@ -134,7 +134,7 @@ window.__ModuleLoader__.load({
         'head.health': '健康度', 'head.factors': '打分因子', 'head.members': '各源报道', 'head.trend': '重要度轨迹', 'head.heat': '热度曲线',
         'head.pushes': '推送记录', 'head.dispute': '分歧', 'head.schedule': '定时推送', 'head.continuity': '本轮衔接', 'head.gaps': '最近缺口',
         'head.attempts': '抓取尝试', 'head.digest': '汇总正文', 'head.failed': '失败与降级', 'head.recentPushes': '最近推送',
-        'cred.single': '单源', 'cred.corroborated': '已印证', 'cred.confirmed': '权威确认', 'cred.disputed': '存在分歧',
+        'rd.origin1': '一手 · {w}', 'rd.origin': '原文 · {w}', 'rd.originHint1': '发布方自己的原文（官网、论文或官方账号），不必等多家印证', 'rd.originHint': '这条报道引用的原文', 'cred.single': '单源', 'cred.corroborated': '已印证', 'cred.confirmed': '权威确认', 'cred.disputed': '存在分歧',
         'cred.any': '全部', 'cred.multi': '多源', 'cred.auth': '权威确认',
         'factor.sources': '独立媒体', 'factor.weight': '源权重', 'factor.cross_region': '国内外同报', 'factor.authority': '权威源', 'factor.native': '源头热度',
         'factor.speed': '跟进速度', 'factor.persistence': '持续', 'factor.watch': '关注词',
@@ -256,7 +256,7 @@ window.__ModuleLoader__.load({
         'head.health': 'Health', 'head.factors': 'Score factors', 'head.members': 'Coverage', 'head.trend': 'Importance trend', 'head.heat': 'Heat curve',
         'head.pushes': 'Pushes', 'head.dispute': 'Dispute', 'head.schedule': 'Scheduled push', 'head.continuity': 'Continuity', 'head.gaps': 'Recent gaps',
         'head.attempts': 'Fetch attempts', 'head.digest': 'Digest', 'head.failed': 'Failures', 'head.recentPushes': 'Recent pushes',
-        'cred.single': 'single', 'cred.corroborated': 'corroborated', 'cred.confirmed': 'confirmed', 'cred.disputed': 'disputed',
+        'rd.origin1': 'first-hand · {w}', 'rd.origin': 'original · {w}', 'rd.originHint1': 'The publisher\'s own release (site, paper or official account); no need to wait for other outlets', 'rd.originHint': 'The original this report cites', 'cred.single': 'single', 'cred.corroborated': 'corroborated', 'cred.confirmed': 'confirmed', 'cred.disputed': 'disputed',
         'cred.any': 'all', 'cred.multi': 'multi-source', 'cred.auth': 'confirmed',
         'factor.sources': 'outlets', 'factor.weight': 'weight', 'factor.cross_region': 'cross-region', 'factor.authority': 'authority', 'factor.native': 'native heat',
         'factor.speed': 'speed', 'factor.persistence': 'persistence', 'factor.watch': 'watch words',
@@ -623,7 +623,9 @@ window.__ModuleLoader__.load({
       return h('span', { className: 'nw-byline', title: (s.reposts || []).length ? t('rd.repostsHint', { w: s.reposts.map(function (x) { return shortName(x) }).join('、') }) : undefined }, parts.join(' · '),
         s.credibility === 'confirmed' ? h('span', { className: 'nw-pill nw-pill-ok' }, t('cred.confirmed')) : null,
         s.credibility === 'corroborated' && n > 1 ? h('span', { className: 'nw-pill nw-pill-info' }, t('cred.corroborated')) : null,
-        s.credibility === 'disputed' ? h('span', { className: 'nw-pill nw-pill-warn' }, t('cred.disputed')) : null)
+        s.credibility === 'disputed' ? h('span', { className: 'nw-pill nw-pill-warn' }, t('cred.disputed')) : null,
+        // 原文（一手信息：官网、论文、官方账号）：点了直接去看原文
+        s.origin && s.origin.url ? h('a', { className: 'nw-pill nw-origin ' + (s.origin.first_hand ? 'nw-pill-ok' : 'nw-pill-info'), href: s.origin.url, target: '_blank', rel: 'noopener noreferrer', title: t(s.origin.first_hand ? 'rd.originHint1' : 'rd.originHint'), onClick: function (e) { e.stopPropagation() } }, t(s.origin.first_hand ? 'rd.origin1' : 'rd.origin', { w: s.origin.site })) : null)
     }
 
     // ------------------------------------------------------------------ 追踪
@@ -3002,7 +3004,7 @@ window.__ModuleLoader__.load({
       '.nw-v-lead .nw-rs-title{font-size:clamp(22px,3.8cqi,30px)}',
       
       '.nw-pill{display:inline-block;margin-left:8px;padding:0 7px;border-radius:999px;font-size:11px;line-height:18px;font-weight:600;vertical-align:1px}',
-      '.nw-pill-ok{color:' + C.ok + ';background:' + C.okBg + '} .nw-pill-warn{color:' + C.warn + ';background:' + C.warnBg + '} .nw-pill-info{color:' + C.accent + ';background:' + C.accentBg + '}',
+      '.nw-origin{text-decoration:none;cursor:pointer} .nw-origin:hover{text-decoration:underline} .nw-pill-ok{color:' + C.ok + ';background:' + C.okBg + '} .nw-pill-warn{color:' + C.warn + ';background:' + C.warnBg + '} .nw-pill-info{color:' + C.accent + ';background:' + C.accentBg + '}',
       '.nw-rail-box h4{display:flex;align-items:center;gap:7px;font-size:12px;letter-spacing:.06em;padding-bottom:8px;border-bottom:1px solid ' + C.line1 + '}',
       '.nw-rail-box h4::before{content:"";flex:none;width:3px;height:12px;border-radius:2px;background:' + C.accent + '} .nw-rail-warn h4{border-bottom-color:' + C.line1 + '} .nw-rail-warn h4::before{background:' + C.warn + '}',
       '.nw-ticks ul{gap:0!important} .nw-tick{padding:6px 0;border-bottom:1px dashed ' + C.line1 + '} .nw-ticks li:last-child .nw-tick{border-bottom:0}',

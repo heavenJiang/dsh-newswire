@@ -10,7 +10,7 @@ import { checkText } from "./factcheck.mjs";
 import { applyFollows, matchList } from "./follows.mjs";
 import { historyText, relatedStories } from "./history.mjs";
 import { DEFAULT_BLOCKS, DEFAULT_PROFILE, builtinProfiles, profileFor, promptOf, withFocus } from "./profiles.mjs";
-import { assemble, assignments, bodiesFor, clip, copyFresh, copyOf, deferRewrite, feedbackState, finish, gatherItems, inFocus, isBriefWire, materialText, notTrialOnly, pickMaterials, profilesOf, programUpdate, richSpec, ruleCopy, scrubStory, sourceOnly, storyFacts, storyIdFor, storyProfile, storyRows, str, strip, sumChecks, taxonomyIndex, topOf, tz, verifyStory } from "./edition_base.mjs";
+import { assemble, assignments, bodiesFor, clip, copyFresh, originCount, copyOf, deferRewrite, feedbackState, finish, gatherItems, inFocus, isBriefWire, materialText, notTrialOnly, pickMaterials, profilesOf, programUpdate, richSpec, ruleCopy, scrubStory, sourceOnly, storyFacts, storyIdFor, storyProfile, storyRows, str, strip, sumChecks, taxonomyIndex, topOf, tz, verifyStory } from "./edition_base.mjs";
 
 // ------------------------------------------------------------------ 模型：提示词
 /**
@@ -250,7 +250,7 @@ export function writeFingerprint(entry, layout) {
   // 读法的写法（名称、版本、写稿要求、材料设置、输出块）改了，旧稿就不能沿用
   const f = p.id === DEFAULT_PROFILE && !promptOf(p, "write") ? "" : [p.id, p.version, p.name, promptOf(p, "write"), JSON.stringify(p.content), JSON.stringify(p.blocks)].join("|");
   const h = (entry.history || []).map((x) => x.story_id);
-  return createHash("sha1").update(JSON.stringify(Object.assign({ v: WRITE_V, t: entry.story.title, m: entry.mats.map((it) => it.id), p: entry.prevLead || "", r: entry.rich || null, e: (entry.errors || []).map((x) => x.text), s: layout.story, y: layout.style, f }, h.length ? { h } : {}))).digest("hex");
+  return createHash("sha1").update(JSON.stringify(Object.assign({ v: WRITE_V, t: entry.story.title, m: entry.mats.map((it) => it.id), o: entry.mats.filter((it) => it.origin_text).map((it) => it.id), p: entry.prevLead || "", r: entry.rich || null, e: (entry.errors || []).map((x) => x.text), s: layout.story, y: layout.style, f }, h.length ? { h } : {}))).digest("hex");
 }
 const COPY_KEYS = ["lead", "lead_refs", "points", "views", "impact", "extra", "history", "update_text", "update_by", "title", "retitled"];
 function cacheGet(db, fp) {
@@ -546,7 +546,7 @@ export async function llmEdition(db, model, o) {
   for (const s of stories) {
     const g = s._g;
     // 有读者报错未处理的，重写
-    if (!g.absorbed && copyFresh(g.row, s._total) && !fb.errors.has(s.id)) { Object.assign(s, copyOf(g.row.copy), { by: "llm", reused: true }); reused++; }
+    if (!g.absorbed && copyFresh(g.row, s._total, originCount(g.items)) && !fb.errors.has(s.id)) { Object.assign(s, copyOf(g.row.copy), { by: "llm", reused: true }); reused++; }
     else if (!placed.has(s.id)) continue;
     // 小进展：已有模型稿、不在头版、不算重要、新报道还少——先沿用旧稿（「进展」一行由程序标出新增了什么），攒够了再重写
     else if (!g.absorbed && !fb.errors.has(s.id) && !frontSet.has(s.id) && deferRewrite(g.row, s, SW)) { Object.assign(s, copyOf(g.row.copy), { by: "llm", reused: true, deferred: s._total - g.row.copy.items }); reused++; stats.deferred++; }
@@ -703,7 +703,7 @@ export async function llmEdition(db, model, o) {
   // 模型失败时按规则临时归并出的新故事线不登记：下一轮这些新闻再交给模型
   out._persist = allStories.filter((s) => !(s._g.isNew && s._g.by === "rules")).map((s) => ({
     id: s.id, isNew: s.is_new, title: s.title, section: s.section, labels: s.labels, importance: s.importance, profile: s.profile, absorbed: s._g.absorbed || [], entities: s._g.entities || [],
-    copy: written.has(s.id) ? Object.assign({ lead: s.lead, lead_refs: s.lead_refs, points: s.points, views: s.views, impact: s.impact, by: "llm", model: model.label(), at, items: s._total }, s.extra && s.extra.length ? { extra: s.extra } : {}, s.history && s.history.length ? { history: s.history } : {}) : null,
+    copy: written.has(s.id) ? Object.assign({ lead: s.lead, lead_refs: s.lead_refs, points: s.points, views: s.views, impact: s.impact, by: "llm", model: model.label(), at, items: s._total, origins: originCount(s._g.items) }, s.extra && s.extra.length ? { extra: s.extra } : {}, s.history && s.history.length ? { history: s.history } : {}) : null,
     update: s.updated && s.update_text ? { text: s.update_text, by: s.update_by, items: s._g.fresh.length } : null,
     resolve: written.has(s.id) && fb.errors.has(s.id),
     items: s._g.fresh.map((it) => ({ article_id: it.id, event_id: it.event_id || null })),

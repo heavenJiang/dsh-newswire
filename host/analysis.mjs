@@ -54,11 +54,11 @@ export function searchQuery(title) {
 
 /** 一条故事线的分析材料：最新的几篇报道，正文优先。 */
 export function analysisMaterials(db, storyId, bodiesFor) {
-  const items = db.prepare(`SELECT a.id, a.title, a.title_zh, a.summary, a.url, a.published_at, a.first_seen_at, s.name AS source_name, a.source_id
+  const items = db.prepare(`SELECT a.id, a.title, a.title_zh, a.summary, a.url, a.published_at, a.first_seen_at, s.name AS source_name, a.source_id, a.origin_site, a.origin_text
     FROM story_items i JOIN articles a ON a.id = i.article_id LEFT JOIN sources s ON s.id = a.source_id
     WHERE i.story_id = ? ORDER BY COALESCE(a.published_at, a.first_seen_at) DESC LIMIT 8`).all(storyId);
   const bodies = bodiesFor ? bodiesFor(db, items.map((x) => x.id)) : new Map();
-  return items.map((it) => ({ id: it.id, title: it.title_zh || it.title, source: it.source_name || it.source_id, t: it.published_at || it.first_seen_at, url: it.url, text: bodies.get(it.id) || it.summary || it.title }));
+  return items.map((it) => ({ id: it.id, title: it.title_zh || it.title, source: it.source_name || it.source_id, t: it.published_at || it.first_seen_at, url: it.url, text: (bodies.get(it.id) || it.summary || it.title) + (it.origin_text ? " 【原文（" + (it.origin_site || "") + "）】" + String(it.origin_text).slice(0, 3000) : "") }));
 }
 
 /** 跑一次分析并核对。@returns 分析内容（已核对），或抛错 */

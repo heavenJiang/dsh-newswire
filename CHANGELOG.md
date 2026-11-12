@@ -2,6 +2,16 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.37 (2026-11-12)
+
+Reader request: for new tech, especially AI and large models (company news, new papers, newly released models), skip multi-source corroboration and get first-hand information.
+- **Find the original.** After each fetch, for AI and new-tech items (the layout's focus area), the aggregator's item page is opened, its source link ("打开原文", "信源", "原文链接", "view on X") taken and the original read back. On the last day's 45 items: 15 from the AI hot list had a source, 11 of them the publisher's own (Google DeepMind's blog; DeepMind, Tencent Hunyuan and MiniMax on X; Databricks' blog). Cailian and ChainCatcher flash pages carry no source link, so nothing is found there. X posts keep only the post, not the replies below it.
+- **Copy follows the original.** The original is part of the material (tagged 【原文（site）】) and the fact check accepts it; the AI and new-tech writing rules now say facts, figures and names follow the original, the lead says who published it where, and no "only one outlet" or "unconfirmed". Detailed reports and impact analysis get the original too. A story already written is rewritten once its original is found (before, with no new reports the old copy was reused as is and the original never used).
+- **No outlet counting.** AI and new-tech stories with one outlet no longer go to "To verify"; their push bar is the lower of the two, never raised for having one outlet.
+- **The original is visible.** Each story's byline ends with "first-hand · deepmind.google" or "first-hand · X @GoogleDeepMind" (green, the publisher's own) or "original · the-decoder.com" (blue, an earlier report), linking to it; pushes list the original first.
+- **Fix: the recap never wrote itself.** The 1.1.35 "program recap after each edition" and "model recap at 21:30" called a function that was never imported and failed every time with `latestDaily is not defined`, so neither ever ran. The import is added.
+- Database migration v29: articles gains origin_url / origin_site / origin_text / origin_at. The engine takes `--origin-budget` (items per round, default 16, 0 turns it off).
+
 ## 1.1.36 (2026-11-12)
 
 A review of the model's copy (156 stories over two days): accuracy is good (97–99% of sentences pass the fact check, no fabrication found); the problems are information density and material choice. This release changes both:

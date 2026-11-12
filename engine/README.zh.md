@@ -32,6 +32,7 @@ engine/
     paging.mjs          翻页补抓：param / cursor / id_walk / before
     events.mjs          分类 → 事件聚类 → 交叉验证打分；重算
     bodies.mjs          重点事件的正文抓取与抽取
+    origin.mjs          找原文：AI 与新技术新闻从聚合站条目页取出处链接，读回一手原文
     select.mjs          源头热度、按事件选推送、手机消息
     normalize.mjs       原始条目 → 入库记录（去重键、时间可信度、无标题快讯取首句、栏目名过滤）
     signals.mjs         热度信号归一化
@@ -85,6 +86,8 @@ engine/
 
 ## 正文
 本轮重要度 ≥50 的事件，每个事件最多 2 家成员（一手源优先），每轮 `--body-budget` 篇（默认 12）。跳过付费墙源、`body: "list"`（快讯：列表里就是全文，60 字以上即可用于训练）与 `body: "none"` 的源，以及近 7 天抓正文失败 ≥3 次且从未成功的源。
+
+**找原文**：本轮出现的重点领域新闻（版式 `focus.labels`，默认 AI 与新技术）里，来自非一手站点的，打开条目页找「打开原文」「信源」「原文链接」这类出处链接，读回原文正文，存进 `articles.origin_url / origin_site / origin_text`（`origin_url` 为空串表示找过、页面上没有出处）。每轮 `--origin-budget` 条（默认 16，0 关闭），最长 75 秒。
 抽取顺序：http 取页 → JSON-LD `articleBody` → Next.js `__NEXT_DATA__` 里最长的正文字段 → 页面段落（优先 `<article>` 内，去掉导航与样板句）；请求被拒（401/403）且 browse 可用时用真实浏览器读正文；最后用阅读器（Jina）。验证页一律不当正文、不绕过，记为 `bot_blocked`。结果写 `article_bodies`，比原内容长时回填 `articles.content` 与 `training_ready`。
 
 ## 数据集导出

@@ -112,6 +112,7 @@ A round is a flow chart: fetch (each source's result) → edition (which groupin
 
 - Every event gets an importance score from 0 to 100, based on independent outlets, source weight, domestic and foreign coverage, source-side heat and follow-up speed.
 - Every event gets a credibility label: **single source**, **corroborated**, **confirmed by an authority**, or **disputed** (outlets give conflicting figures).
+- **AI and new tech get first-hand sources, not corroboration**: for models, papers and company launches, the "original" or "source" link on aggregator pages (AI hot lists, Telegram channels) is opened and the publisher's own text (site, paper, official account, repository) is read back for the model to write from; facts follow the original. The edition marks it "first-hand · openai.com" or "first-hand · X @GoogleDeepMind", linking straight to it, and pushes list it first. These stories never land in "To verify" for having one outlet, and pushes don't raise their bar by outlet count.
 - Readers can flag any sentence. It is withdrawn at once and avoided on the next rewrite.
 
 ### 🗂 Your data stays yours

@@ -31,7 +31,7 @@ import { learnRecipe } from "./host/recipe.mjs";
 import { readSource, readTargets } from "./host/modelread.mjs";
 import { bodiesFor, composeEditionMessage, editionById, editionPicks, inFocus, latestEdition, llmEdition, loadLayout, notesFromEdition, orderPicks, restGroups, tierPicks, profilesOf, reassemble, recordEditionPushes, ruleEdition, saveEdition, scrubStory, storyDetail, storyProfile, tickerBoard, updateEditionContent } from "./host/edition.mjs";
 import { promptOf } from "./host/profiles.mjs";
-import { buildDaily, saveDaily, todayBj } from "./host/daily.mjs";
+import { buildDaily, saveDaily, latestDaily, todayBj } from "./host/daily.mjs";
 import { DEFAULT_RULES, recordPushes } from "./engine/pipeline/select.mjs";
 import { loadFollows, updateFollows } from "./host/follows.mjs";
 import { UpdateChecker, githubToken } from "./host/update.mjs";
