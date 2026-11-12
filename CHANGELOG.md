@@ -2,6 +2,17 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.36 (2026-11-12)
+
+A review of the model's copy (156 stories over two days): accuracy is good (97–99% of sentences pass the fact check, no fabrication found); the problems are information density and material choice. This release changes both:
+- **Material covers the origin and the latest.** Big storylines used to give the model only the earliest reports: in an 18-report story about a Houthi attack on Riyadh, the lead stopped at the first "explosions heard in Riyadh" and missed that the Houthis had claimed four rounds of strikes. Writing now keeps the earliest report for context and fills the rest with the newest; near-duplicates (reposts, updated flashes) keep only the longest; if one outlet dominates, another outlet's newest report is swapped in. Material is still shown to the model in time order.
+- **Leads give the current state, without a date opener.** The lead must say where things stand now, with the background in passing, and must not open with "11月12日，" (77% did; the edition and pushes already show times). The program strips such an opener too.
+- **Points, views and impact may not restate the lead.** Before, 49 of 447 points reworded the lead; of 233 views, 85 repeated it and 44 named the reporting outlet as the speaker; impact often restated the fact. The writing rules now spell out "only information not in the lead", "who is the person or body taking a position; an outlet only when outlets' figures disagree", "impact is a consequence, not the fact", and "'did not respond to requests for comment' is not a view". The program filters again: points and views that nearly repeat the lead, impact that restates it, and link-only or "details at…" points are dropped. A view carrying a number not in the lead is always kept, since disagreeing figures are what readers need.
+- **One-line flashes get a lead only.** When every report is at most 120 characters and all together under 200, the model is told to write only the lead. Before, 39 of 49 such flashes got filler points such as "reported by X".
+- **Misgrouped material is ignored.** The model is told to skip material that is not about the same event; in testing, an Altman podcast no longer leaks into a story about a maths proof.
+- Measured on a local model, old vs new on the same six storylines and the same sources: five clearly better, one (a single 286-character report) worse at first because the one-liner threshold of 300 characters was too high; with the threshold above it got its points back.
+- The writing cache version is bumped: storylines with new material are rewritten under the new rules, untouched ones keep their copy.
+
 ## 1.1.35 (2026-11-12)
 
 Nine problems a reader pointed out, each fixed:

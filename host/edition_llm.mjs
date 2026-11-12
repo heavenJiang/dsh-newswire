@@ -89,10 +89,10 @@ export function blockSpec(blocks, S, comments) {
   const json = ['"ref":1'];
   const wide = (b) => (comments && (b.materials || []).includes("community") ? "，可以依据【社区评论】" : "");
   for (const b of blocks) {
-    if (b.kind === "lead") { desc.push("lead 导语（不超过" + (b.chars || S.lead_chars) + "字，" + (b.ask || "说清谁、何时、何事") + "）"); json.push('"lead":""', '"lead_refs":["M1"]'); }
-    else if (b.kind === "points") { desc.push("points 要点（最多" + (b.max || S.points) + "条，每条不超过" + (b.chars || S.point_chars) + "字，" + (b.ask || "写导语之外的关键事实或数字") + wide(b) + "）"); json.push('"points":[{"text":"","refs":["M2"]}]'); }
-    else if (b.kind === "views") { desc.push("views " + (b.name || "各方说法") + "（最多" + (b.max || S.views) + "条，{who: " + (wide(b) ? "媒体、当事方或评论者" : "媒体或当事方") + ", says: 说法}，" + (b.ask || "只在各家说法不同或有当事方表态时写，否则给空数组") + wide(b) + "）"); json.push('"views":[{"who":"","says":"","refs":["M1"]}]'); }
-    else if (b.kind === "impact") { desc.push("impact 影响（不超过" + (b.chars || S.impact_chars) + "字，" + (b.ask || "对市场、政策或相关人群的影响，材料不足就给空字符串") + "）"); json.push('"impact":""'); }
+    if (b.kind === "lead") { desc.push("lead 导语（不超过" + (b.chars || S.lead_chars) + "字，" + (b.ask || "写这件事到现在的最新状态：谁、何事、结果；材料有先后时以最新的为准，前因一笔带过。不要用「11月12日，」这类日期开头，时间要紧时写进句子里") + "）"); json.push('"lead":""', '"lead_refs":["M1"]'); }
+    else if (b.kind === "points") { desc.push("points 要点（最多" + (b.max || S.points) + "条，每条不超过" + (b.chars || S.point_chars) + "字，" + (b.ask || "每条都必须是导语里没有的新信息（关键数字、经过、各方动作）；把导语换个说法再写一遍的不要写；没有新信息就少写或给空数组") + wide(b) + "）"); json.push('"points":[{"text":"","refs":["M2"]}]'); }
+    else if (b.kind === "views") { desc.push("views " + (b.name || "各方说法") + "（最多" + (b.max || S.views) + "条，{who: " + (wide(b) ? "当事方、官员、机构、分析人士或评论者" : "当事方、官员、机构或分析人士") + ", says: 说法}，" + (b.ask || "只写有人表态、或各家说法不一致的；who 写表态的人或机构；报道它的媒体（财联社、彭博、路透等）只是转述者，只有各家报道的事实或数字对不上时才把媒体写成 who（如 彭博：估值约1.4万亿美元）；says 要是导语和要点里没有的立场、判断或不同的数字；「未回应置评」这类不算说法；没有就给空数组") + wide(b) + "）"); json.push('"views":[{"who":"","says":"","refs":["M1"]}]'); }
+    else if (b.kind === "impact") { desc.push("impact 影响（不超过" + (b.chars || S.impact_chars) + "字，" + (b.ask || "这件事会带来什么后果：对谁、在哪方面、往哪个方向；不要复述事实本身；材料里没有依据就给空字符串") + "）"); json.push('"impact":""'); }
     else if (b.kind === "text") { desc.push(b.id + " " + b.name + "（不超过" + (b.chars || 80) + "字，" + (b.ask || "") + wide(b) + "；材料不足就给空字符串）"); json.push('"' + b.id + '":{"text":"","refs":["M1"]}'); }
     else if (b.kind === "list") { desc.push(b.id + " " + b.name + "（最多" + (b.max || 3) + "条，每条不超过" + (b.chars || 40) + "字，" + (b.ask || "") + wide(b) + "；没有就给空数组）"); json.push('"' + b.id + '":[{"text":"","refs":["M1"]}]'); }
   }
@@ -117,14 +117,17 @@ export function writePrompt(batch, layout) {
     // 前情：以前的相关故事线（H 编号），只能写进读法里能依据以前报道的块
     const hb = p.blocks.filter((x) => (x.materials || []).includes("history")).map((x) => x.name || x.id);
     const hist = (b.history || []).length && hb.length ? "\n以前的相关报道（前情，只能用在「" + hb.join("」「") + "」里，引用写 H 编号；和这件事没有直接关系就不要用）：\n" + b.history.map((h) => "[" + h.ref + "] " + String(h.at || "").slice(0, 10) + "｜" + historyText(h)).join("\n") : "";
+    // 材料只有一两句的快讯：只写导语，不硬凑要点、说法和影响
+    const thin = !b.rich && thinMaterial(b) ? "\n（这篇材料只有一两句：只写导语；要点、各方说法、影响没有导语之外的新内容就给空）" : "";
     const rich = b.rich ? "\n（这篇材料多：要点最多" + b.rich.points + "条，每条不超过" + b.rich.point_chars + "字，把经过、关键数字、各方动作写全，不要重复导语）" : "";
-    return "【报道" + (i + 1) + "】" + star + b.story.title + rich + prev + fbk + "\n材料：\n" + b.mats.map((it, k) => "[M" + (k + 1) + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + materialText(it, b.bodies, p.content)).join("\n") + hist;
+    return "【报道" + (i + 1) + "】" + star + b.story.title + rich + thin + prev + fbk + "\n材料：\n" + b.mats.map((it, k) => "[M" + (k + 1) + "] " + (it.source_name || it.source_id) + "｜" + tz(it.published_at || it.first_seen_at) + "｜" + materialText(it, b.bodies, p.content)).join("\n") + hist;
   });
   // 版式与输出格式：这一批的读法都一样时按它的输出块，否则用默认的四块
   const spec = blockSpec(profs.every((p) => p.blocks === profs[0].blocks) ? profs[0].blocks : DEFAULT_BLOCKS, S, profs.some((p) => p.content.comments > 0));
   // 这一批里用到的其他读法的写稿要求
   const asks = [...new Set(profs.filter((p) => p.id !== DEFAULT_PROFILE && promptOf(p, "write")))].map((p) => "标了（" + p.name + "）的报道，" + promptOf(p, "write"));
   return "请按版式为以下每篇报道写稿。写作要求：" + layout.style + "每句话只能依据该报道的材料，并在 refs 里标出依据的材料编号；材料里没有的数字、人名、机构名一律不写。" +
+    "材料里如果有和这篇报道说的不是同一件事的，忽略它，不要写进稿里。宁缺毋滥：材料只有一两句时，只写导语，其余各块给空。" +
     "\n版式：" + spec.text + "。" +
     asks.join("") + "\n\n" +
     "update：只对给了「上次导语」的报道写，说清相比上次有什么新进展（不超过40字，依据新增材料；没有实质进展给空字符串）。" +
@@ -173,6 +176,46 @@ export function batchByProfile(list, n) {
  * 模型写的一篇稿 → 报道字段，按读法的输出块取：读法里没有的块不收；自定义块收进 extra。
  * @param ids 把「M2」一类的材料编号换成文章 id
  */
+/**
+ * 材料只有一两句：每篇原文都不超过 120 字，合起来不到 200 字（同一句快讯被几家转发也算）。
+ * 实测 300 字的门槛太高：一篇 286 字、讲清了来龙去脉的报道也被当成「只写导语」，丢了有用的要点。
+ */
+export function thinMaterial(b) {
+  const lens = (b.mats || []).map((it) => String((b.bodies && b.bodies.get && b.bodies.get(it.id)) || it.summary || "").length);
+  return lens.length > 0 && Math.max(...lens) <= 120 && lens.reduce((x, y) => x + y, 0) < 200;
+}
+
+/** 两段话的字面重合（a 的二元组有多少在 b 里）。 */
+function overlap(a, b) {
+  const A = bigrams(a), B = bigrams(b);
+  if (!A.size) return 0;
+  let hit = 0;
+  for (const g of A) if (B.has(g)) hit++;
+  return hit / A.size;
+}
+/** 「未回应置评」之类：不是说法。 */
+const NO_COMMENT = /^(暂)?未(立即)?(回应|置评|回复)|拒绝置评|不予置评|未予置评|尚未回应/;
+/** 报道这件事的媒体、通讯社：只是转述者；只有各家说法对不上时才算「各方说法」。 */
+const MEDIA_WHO = /财联社|彭博|路透|华尔街见闻|同花顺|界面|新华社|央视|CCTV|中新社|媒体|报道|电报|快讯|通讯社|^据|Bloomberg|Reuters|CNBC|WSJ|华尔街日报|金融时报|FT$|链捕手|深潮|ChainCatcher|动察|数字生命卡兹克/i;
+/**
+ * 写稿结果的「去水」：模型偶尔不照要求做，程序再筛一遍——
+ * 导语去掉开头的「11月12日，」；和导语几乎一样的要点不要；表态方是媒体的、或说的和导语一样的「说法」不要；复述事实的「影响」不要。
+ */
+export function trimCopy(c) {
+  const lead = String(c.lead || "").replace(/^(\d{4}年)?\d{1,2}月\d{1,2}日(凌晨|早间|上午|中午|下午|傍晚|晚间|晚)?[，,]\s*/, "");
+  if (lead.length >= 10) c.lead = lead;
+  const L = c.lead || "";
+  // 只是链接、「详情见…」「点击查看」的不算信息
+  const linkOnly = (t) => /详情(见|请见|可见)|点击(查看|阅读)|原文链接|阅读原文|goo\.gl|bit\.ly|t\.co\/|https?:\/\/|\b[a-z0-9-]+\.(com|gle|ly|io|cn)\/\S+/i.test(String(t));
+  c.points = (c.points || []).filter((p) => overlap(p.text, L) < 0.6 && !linkOnly(p.text));
+  // 媒体只是转述者：说的和导语差不多就不算一方说法（各家数字对不上时，媒体的说法和导语不同，留着）
+  // 带导语里没有的数字的（各家数字对不上：财联社 64 人受伤、导语 80 人）一定留
+  const newNumber = (t) => (String(t).match(/\d+(\.\d+)?/g) || []).some((n) => !L.includes(n));
+  c.views = (c.views || []).filter((v) => !NO_COMMENT.test(v.says) && (newNumber(v.says) || (overlap(v.says, L) < (MEDIA_WHO.test(v.who) ? 0.4 : 0.6) && !c.points.some((p) => overlap(v.says, p.text) >= 0.75))));
+  if (c.impact && overlap(c.impact, L) >= 0.5) c.impact = "";
+  return c;
+}
+
 export function parseCopy(w, blocks, S, ids, rich) {
   const has = (k) => blocks.find((b) => b.kind === k);
   const P = has("points"), V = has("views"), I = has("impact"), L = has("lead");
@@ -194,13 +237,13 @@ export function parseCopy(w, blocks, S, ids, rich) {
     }
   }
   if (extra.length) out.extra = extra;
-  return out;
+  return trimCopy(out);
 }
 
 /** 模型服务断连一类的错误：值得等一会儿重试。 */
 const CONN_ERR = /connection error|econnreset|econnrefused|fetch failed|socket hang up|network|terminated/i;
 /** 写稿缓存的版本：写稿提示词或写法改了就加一，旧缓存自然失效。 */
-const WRITE_V = 1;
+const WRITE_V = 2;
 /** 一篇稿的材料指纹：材料、上次导语、读者报错、写法、重点领域标记与提示词版本都一样，才算同一份稿。 */
 export function writeFingerprint(entry, layout) {
   const p = entry.profile || storyProfile(layout, entry.story, entry.items);

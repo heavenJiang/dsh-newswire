@@ -268,12 +268,35 @@ return { lead, lead_refs: [first.id], points, views, impact: "", by: "rules" };
 // ------------------------------------------------------------------ 材料与出处
 /** 写稿与核对用的材料：不同媒体优先、按时间，最多 6 条；可追加稿件里引用到的其它新闻。 */
 export function pickMaterials(items, max) {
-  const sorted = items.slice().sort((a, b) => String(a.published_at || a.first_seen_at).localeCompare(String(b.published_at || b.first_seen_at)));
-  const seen = new Set();
-  const first = [];
-  const rest = [];
-  for (const it of sorted) { (seen.has(it.grp) ? rest : first).push(it); seen.add(it.grp); }
-  return first.concat(rest).slice(0, max || 6);
+  const M = max || 6;
+  const tOf = (it) => String(it.published_at || it.first_seen_at || "");
+  const sorted = items.slice().sort((a, b) => tOf(a).localeCompare(tOf(b)));
+  if (sorted.length <= M) return sorted;
+  // 几乎一样的（转载、同一条快讯的更新版）只留长的那篇，把位置让给有新内容的
+  const textLen = (it) => String(it.summary || "").length + String(it.title || "").length;
+  const uniq = [];
+  for (const it of sorted) {
+    const bg = bigrams(it.title);
+    const k = uniq.findIndex((x) => similarity(x._bg, bg) >= 0.6);
+    if (k < 0) uniq.push(Object.assign(Object.create(Object.getPrototypeOf(it)), it, { _bg: bg }));
+    else if (textLen(it) > textLen(uniq[k])) uniq[k] = Object.assign(Object.create(Object.getPrototypeOf(it)), it, { _bg: bg });
+  }
+  const pool = uniq.length >= M ? uniq : uniq.concat(sorted.filter((it) => !uniq.some((u) => u.id === it.id)));
+  // 起因（最早的一篇）+ 最新的进展（从新往旧，不同媒体优先）。以前只取最早的几篇：
+  // 一条故事线有十几篇报道时，导语停在最早那条，后来的关键进展（谁承认了、数字更新了）写不进去
+  const byNew = pool.slice(1).reverse();
+  const pick = [pool[0]].concat(byNew.slice(0, M - 1));
+  // 都是同一家的、而别的媒体也报过：换进一篇别家最新的（印证与不同说法要靠它），换掉同一家里最旧的那篇
+  const grps = new Set(pick.map((x) => x.grp));
+  const other = byNew.find((x) => !grps.has(x.grp));
+  if (other && pick.length >= 3) {
+    const counts = new Map();
+    for (const x of pick.slice(1)) counts.set(x.grp, (counts.get(x.grp) || 0) + 1);
+    const dom = [...counts].sort((x, y) => y[1] - x[1])[0];
+    if (dom && dom[1] >= 2) { const out = pick.slice(1).filter((x) => x.grp === dom[0]).pop(); pick[pick.indexOf(out)] = other; }
+  }
+  // 给模型看时按时间先后排（M1 最早），经过一目了然
+  return pick.map((it) => { const x = sorted.find((y) => y.id === it.id) || it; return x; }).sort((a, b) => tOf(a).localeCompare(tOf(b)));
 }
 /**
  * 材料文本：与写稿时给模型看的一致（核对只认模型看到过的内容）。

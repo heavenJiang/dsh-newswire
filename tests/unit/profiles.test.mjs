@@ -143,7 +143,7 @@ test("内置读法：技术长文与社区讨论都有自定义块，由源声�
 test("输出块 → 版式说明与 JSON：默认四块与原来一字不差；自定义块按 text / list 写", () => {
   const S = normalizeLayout(null).story;
   const def = blockSpec(builtinProfiles().def.blocks, S, false);
-  assert.match(def.text, /^lead 导语（不超过120字，说清谁、何时、何事）；points 要点（最多3条/);
+  assert.match(def.text, /^lead 导语（不超过120字，写这件事到现在的最新状态：谁、何事、结果；[^）]*）；points 要点（最多3条，每条不超过40字，每条都必须是导语里没有的新信息/);
   assert.equal(def.json, '{"stories":[{"ref":1,"lead":"","lead_refs":["M1"],"points":[{"text":"","refs":["M2"]}],"views":[{"who":"","says":"","refs":["M1"]}],"impact":"","update":"","title":""}]}');
   const com = blockSpec(builtinProfiles().get("community").blocks, S, true);
   assert.match(com.text, /debate 社区观点（最多4条，每条不超过60字，评论区的主要看法与分歧[^）]*可以依据【社区评论】；没有就给空数组）/);
