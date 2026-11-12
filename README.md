@@ -91,6 +91,10 @@ The evening digest has a one-line summary, the day's main threads, what to watch
 
 **Push path check**: "Follows & push" lists every step from the scheduled time to your phone (is the Switchboard direct-send service there, can it send, is there a schedule, has the plugin taken over the clock, did the last send go out) and says what is broken and how to fix it. With Switchboard installed and its "schedule chats" filled in, the plugin fetches on schedule and posts to the phone itself when the edition is written: no model relays the text, and the host's 10-minute limit on a tool call does not apply.
 
+### 🧭 See which step a round is on
+
+A round is a flow chart: fetch (each source's result) → edition (which grouping batch, how many stories written, sentences dropped by the fact check) → push. Every step has a state, its time and a line of detail; steps not yet started get an estimate from past durations. One line at the top of Today opens the full chart; the Runs page keeps it; asking the assistant "how far is it" works too.
+
 ### 🧠 Deep on the model, light on tokens
 
 - **Incremental by design**: news already grouped is never sent again, unchanged stories keep their copy, and a round with nothing new makes zero model calls.

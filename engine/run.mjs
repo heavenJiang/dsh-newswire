@@ -271,6 +271,17 @@ const localHour = Number(zdt(now, TZ, false).slice(11, 13));
 const overnight = A.overnight === true || (MODE === "cycle" && localHour < 10 && (gapHours == null || gapHours >= 6));
 const scale = overnight ? 4 : gapHours == null ? 1 : Math.min(3, Math.max(1, Math.ceil(gapHours / 2)));
 
+// 进度文件（--progress）：宿主读它在面板上画流程图。写不进去不影响抓取
+const PROGRESS = str(A.progress);
+// 每一步第一次出现的时间：跑得快的步骤宿主可能来不及读到，靠它补齐用时
+const marks = {};
+const progress = (o) => {
+  if (!PROGRESS) return;
+  if (o.stage && !marks[o.stage]) marks[o.stage] = Date.now();
+  try { const tmp = PROGRESS + ".tmp"; fs.writeFileSync(tmp, JSON.stringify(Object.assign({ at: new Date().toISOString(), marks }, o))); fs.renameSync(tmp, PROGRESS); } catch { /* 只是进度 */ }
+};
+const srcList = sel.map((s) => ({ id: s.id, name: s.name || s.id, status: "pending", items: null }));
+progress({ stage: "prep", detail: "检查浏览器通道，" + sel.length + " 个源" + (cooled.length ? "（" + cooled.length + " 个降频中跳过）" : "") });
 const pre = await preflight(sel);
 console.log("[preflight] browse:", pre.ok ? "OK browser=" + pre.browser : "不可用 reason=" + pre.reason + (pre.detail ? " " + pre.detail : ""));
 if (MODE === "cycle") console.log("[cycle] " + (PACK !== "all" ? "主题包 " + PACK + " " : "") + (overnight ? "隔夜模式 " : "") + "规模×" + scale + (gapHours != null ? " 距上一整轮 " + gapHours.toFixed(1) + "h" : " 首轮"));
@@ -285,10 +296,15 @@ const results = [];
 const totals = { raw: 0, fresh: 0, dup: 0 };
 const backfillBudget = { left: Number(A["backfill-budget"] ?? 3) };
 const noise = compileNoise(loadTaxonomy().doc.noise);
+progress({ stage: "sources", sources: { total: sel.length, done: 0, failed: 0, current: sel[0] ? sel[0].name || sel[0].id : null, list: srcList } });
 for (const src of sel) {
+  const li = srcList.find((x) => x.id === src.id);
+  if (li) li.status = "running";
+  progress({ stage: "sources", sources: { total: sel.length, done: results.length, failed: results.filter((x) => !x.ok).length, current: src.name || src.id, list: srcList } });
   const r = await processSource(src, { db, runId, now, nowIso, defaults: DEF, scale, backfillBudget, writeRaw, noise, fetchEnv: envFor(pre, writeRaw, null) });
   results.push(r);
   if (r.ok) { totals.raw += r.stored; totals.fresh += r.fresh; totals.dup += r.dup; }
+  if (li) { li.status = r.ok ? "ok" : "failed"; li.items = r.ok ? r.fresh : null; }
   console.log((r.ok ? "OK  " : "FAIL") + "  " + r.id.padEnd(18) + " 通道=" + (r.channel || "-") + " 条数=" + r.items + " 入库=" + r.stored + " 衔接=" + r.continuity + (r.pages > 1 ? " 翻页=" + r.pages : "") + (r.backfilled ? " 补回=" + r.backfilled : "") + (r.signals && r.signals.length ? " 信号=" + r.signals.join("/") : "") + (r.ok ? "" : " | " + r.attempts.map((x) => x.channel + ":" + (x.error_kind || "err")).join(" -> ")));
 }
 
@@ -296,6 +312,7 @@ const failed = results.filter((x) => !x.ok);
 const gapsOpen = results.filter((x) => x.continuity === "gap_open" || x.continuity === "gap_partial").length;
 finishRun(db, runId, { finished_at: isoUtc(new Date()), sources_total: results.length, sources_ok: results.length - failed.length, sources_failed: failed.length, items_raw: totals.raw, items_new: totals.fresh, items_dup: totals.dup, notes: "browse=" + (pre.ok ? "on" : "off:" + pre.reason) + (MODE === "cycle" ? " scale=" + scale + (overnight ? " overnight" : "") : "") + (gapsOpen ? " gaps=" + gapsOpen : "") });
 
+progress({ stage: "clean", detail: "本轮新增 " + totals.fresh + " 条，识别广告、拆分合集" });
 // 合集（早间精选、周末要闻汇总……）的正文常被列表截断：先抓全文，再重新拆条
 try {
   const dg = db.prepare(`SELECT DISTINCT a.id, a.url, a.title FROM observations ob JOIN articles a ON a.id = ob.article_id
@@ -309,6 +326,7 @@ try {
 } catch (e) {
   console.log("[digest] 失败：" + e.message);
 }
+progress({ stage: "events", detail: "给 " + totals.fresh + " 条新闻分类、按同一件事聚类、交叉验证" });
 // 分类 → 事件聚类 → 交叉验证打分（失败不影响抓取结果入库）
 const tax = loadTaxonomy();
 let ev = { touched: [], scored: [], merged: 0, fresh: 0 };
@@ -318,6 +336,7 @@ try {
 } catch (e) {
   console.log("[events] 失败：" + e.message);
 }
+progress({ stage: "bodies", detail: "触及 " + ev.touched.length + " 件事，给重点报道补正文" });
 // 补正文：按源学到的策略——便宜的源新条目逐条补，没记录的源试 2 篇来学（每轮预算 --fill-budget，最长 90 秒）
 const profiles = bodyProfiles(db, allSources());
 const fillBudget = Number(A["fill-budget"] ?? 150);
@@ -346,6 +365,7 @@ if (bodyBudget > 0 && ev.touched.length) {
   }
 }
 
+progress({ stage: "done" });
 const topEvents = ev.touched.length ? db.prepare("SELECT * FROM events WHERE event_id IN (" + ev.touched.map(() => "?").join(",") + ") ORDER BY importance DESC LIMIT 15").all(...ev.touched) : [];
 
 const digest = writeDigest(db, { runId, now, results, browse: pre, windowHours, categories: cfg.categories, outDir: OUT, perSource: Number(A["per-source"] || 12), tz: TZ, totals, events: topEvents, names: tax.names });

@@ -16,6 +16,7 @@ import { analysisMaterials, analyzeStory, autoAnalyzeTargets, saveAnalysis, sear
 import { linkAll, repairAliasLinks, repairThemeLinks, synthTargets, synthesize } from "./host/tracking.mjs";
 import { PRIORITY, createQueue } from "./host/queue.mjs";
 import { prune } from "./host/retention.mjs";
+import { createProgress, applyEngineProgress } from "./host/progress.mjs";
 import { prevCron, prewarmLead, cronMatches, minuteKey, nextCron, parseCron } from "./host/clock.mjs";
 import { REPLY_HELP, composeDetail, composeExpand, numberPicks, parseReply, storyOfNumber, trackedIn } from "./host/reply.mjs";
 import { applyDailyCap, loadPush, noteInterest, rulesFor, sectionPenalties } from "./host/push.mjs";
@@ -190,6 +191,29 @@ export function apply(ctx, config) {
     gate: makeGate(() => openIfExists(p.db), () => prefs()),
   });
   const llmReady = () => modeNow() === "llm" && model.available();
+  // 一轮的流程进度（面板画流程图）：抓取 → 编版面 → 推送。上一轮的流程和每步的历史耗时存 kv
+  const pg = createProgress({ load: (k) => kvGet(k), save: (k, v) => kvSet(k, v) });
+  /** 跑引擎抓取，同时每秒读一次它写的进度文件，更新「抓取」各步。 */
+  async function engineWithProgress(flags, timeoutMs) {
+    const file = path.join(p.tmp, "progress-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6) + ".json");
+    try { await mkdir(p.tmp, { recursive: true }); } catch { /* 进度文件写不了就没有细节 */ }
+    const read = () => { try { applyEngineProgress(pg, JSON.parse(readFileSync(file, "utf8"))); } catch { /* 还没写或正在写 */ } };
+    const timer = setInterval(read, 1000);
+    try {
+      const res = await runEngine(ctx, cfg, p, flags.concat(["--progress", file]), timeoutMs);
+      read();
+      if (res.ok) {
+        const j = engineJson(res.stdout) || {};
+        const st = j.stats || {};
+        if (st.sources != null) pg.update("sources", { detail: st.ok + "/" + st.sources + " 个源成功，新增 " + (st.fresh ?? 0) + " 条" + (st.dup ? "（重复 " + st.dup + " 条）" : "") });
+      } else {
+        const cur = (pg.view().active || {}).current || "sources";
+        pg.fail(cur, "抓取失败（" + res.stage + "）");
+        pg.finish("failed", "抓取失败：" + res.stage);
+      }
+      return res;
+    } finally { clearInterval(timer); rm(file, { force: true }).catch(() => {}); }
+  }
   const updates = new UpdateChecker({ token: () => githubToken(findBin("gh")) });
   const modelState = { busy: null, last: null };
 
@@ -222,15 +246,17 @@ export function apply(ctx, config) {
     return holder ? holder.run_id || holder.mode || "另一个进程" : null;
   }
 
-  async function guardedRun(args, runId) {
+  async function guardedRun(args, runId, kind) {
     const busy = busyWith();
     if (busy) return { ok: false, stage: "run_in_progress", tail: "已有一轮在跑：" + busy, run_id: busy };
     inflight.current = runId;
     let pf = null;
     try {
       await ensureData(p);
+      pg.begin(kind || "manual", { runId, pack: args.packs || null, model: modeNow() === "llm" && llmReady() });
+      pg.start("prep", { detail: "准备抓取" });
       pf = await modelReadPrefetch({ packs: args.packs, sources: args.sources, runId, budgetMs: args.read_budget_ms || 4 * 60000 });
-      return await runEngine(ctx, cfg, p, runFlags(p, cfg, Object.assign({}, args, { run_id: runId })).concat(pf ? ["--prefetched", pf.dir] : []));
+      return await engineWithProgress(runFlags(p, cfg, Object.assign({}, args, { run_id: runId })).concat(pf ? ["--prefetched", pf.dir] : []));
     } finally {
       inflight.current = null;
       if (pf) await rm(pf.dir, { recursive: true, force: true }).catch(() => {});
@@ -258,6 +284,7 @@ export function apply(ctx, config) {
         const per = rs.read ? Math.max(40000, (Date.now() - t0) / rs.read) : 40000;
         if (Date.now() + per > deadline) { rs.skipped = targets.length - rs.read; break; }
         rs.read++;
+        pg.update("prep", { detail: "模型在读网页类的源（" + rs.read + "/" + targets.length + "）：" + (src.name || src.id) });
         try {
           const r = await queue.run({ kind: "read", label: "读页面：" + src.id, priority: PRIORITY.background }, () => readSource({ read: (u, w) => pageRead(ctx, cfg, p, u, w), model }, src, { timeoutMs: Math.max(cfg.modelTimeoutMs, 240000) }));
           if (r.ok) { rs.ok++; rs.items += r.items.length; rs.dropped += r.dropped || 0; await writeFile(path.join(dir, src.id + ".json"), JSON.stringify({ items: r.items, dropped: r.dropped || 0, why: r.why || {}, ms: r.ms, model: model.label() })); }
@@ -278,11 +305,16 @@ export function apply(ctx, config) {
     try { const d = optional.defaultModel && optional.defaultModel.currentSelection(); return d && d.provider && d.model ? { provider: d.provider, model: d.model } : null; } catch { return null; }
   }
 
+  /** 正在跑的这一轮（面板每分钟问一次版面时顺带带回去，看到在跑就改成每几秒问一次流程）。 */
+  function flowBrief() {
+    const a = pg.view().active;
+    return a ? { id: a.id, kind: a.kind, label: a.label, pct: a.pct, current: a.current, eta_ms: a.eta_ms } : null;
+  }
   function modelView() {
     const pr = prefs();
     return {
       mode: modeNow(), mode_from: pr.mode ? "panel" : "settings", service: Boolean(optional.llm), available: model.available(), ready: llmReady(), label: model.label(),
-      pinned: pr.provider && pr.model ? { provider: pr.provider, model: pr.model } : null, default: defaultSelection(), busy: modelState.busy, queue: queue.view(), last: modelState.last, read: modelState.read || null,
+      pinned: pr.provider && pr.model ? { provider: pr.provider, model: pr.model } : null, default: defaultSelection(), busy: modelState.busy, queue: queue.view(), flow: flowBrief(), last: modelState.last, read: modelState.read || null,
       depth: depthOf(pr), depths: Object.fromEntries(Object.entries(DEPTHS).map(([k, v]) => [k, v])), daily_tokens: Number(pr.daily_tokens) || 0,
       speed: Object.assign({ concurrency: pr.concurrency || null, probe: pr.probe || null }, model.profile()),
     };
@@ -328,6 +360,9 @@ export function apply(ctx, config) {
     let error = null;
     const useLlm = o.wantLlm && llmReady();
     let progressCleanup = () => {};
+    // 流程：接着同一轮（run_id 对得上）；单独点「重新编排」时开一轮只有编版面的
+    pg.attach(o.runId ? "manual" : "refresh", { runId: o.runId || null, pack, model: useLlm });
+    if (!useLlm) for (const id of ["translate", "group", "plan", "write"]) pg.skip(id, o.wantLlm ? "模型不可用：由程序按规则编排" : "节省模式：由程序按规则编排");
     try {
       if (useLlm) {
         modelState.busy = "edition:" + pack;
@@ -348,12 +383,15 @@ export function apply(ctx, config) {
           // 外文标题译成中文；有新译的就按译名重新聚类近 24 小时（外文报道归入中文报道的同一件事）
           let tr = null;
           try {
+            pg.start("translate", { detail: "把外文标题译成中文，好和中文报道归到一起" });
             tr = await translateTitles(db, model, { since: base.since, max: depthParams(prefs()).translate, timeoutMs: cfg.modelTimeoutMs, deadline: Date.now() + 240000 });
             if (tr.ok) { const rr = await runEngine(ctx, cfg, p, ["--mode", "reprocess", "--config", p.cfgFile, "--db", p.db, ...taxFlags(p), "--stage", "events", "--hours", "24"], 300000); tr.reclustered = Boolean(rr && rr.ok); }
           } catch (err) { tr = { error: errText(err) }; }
           // 模型读合集：规则拆不开的（按小标题分段的要闻汇总）交给模型拆成单条
           let split = null;
+          pg.update("translate", { detail: (tr && tr.ok ? "译了 " + tr.ok + " 条标题" : "没有要译的标题") + "；再让模型拆开规则拆不了的要闻合集" });
           try { split = await modelSplitDigests(db, model, { since: base.since, timeoutMs: cfg.modelTimeoutMs }); } catch (err) { split = { error: errText(err) }; }
+          pg.done("translate", { detail: (tr && tr.ok ? "译了 " + tr.ok + " 条标题" : "没有要译的标题") + (split && split.items ? "，拆出合集 " + split.items + " 条" : "") });
           // 边写边出：归并统筹完先出一版，之后每写完一批更新同一行；正式版存好后删掉这行
           let progressId = null;
           const onProgress = (snap) => {
@@ -364,7 +402,7 @@ export function apply(ctx, config) {
             } catch { /* 进度版失败不影响正式版 */ }
           };
           progressCleanup = () => { if (progressId != null) try { db.prepare("DELETE FROM editions WHERE id = ?").run(progressId); } catch { /* 留着也是一份完整版面 */ } };
-          ed = await llmEdition(db, model, Object.assign({}, base, { onProgress, taxonomy: taxonomyLabels(), maxItems: depthParams(prefs()).maxItems, maxStories: depthParams(prefs()).maxStories, budgetMs: cfg.llmBudgetMs, callTimeoutMs: cfg.modelTimeoutMs, prev, deepRead: makeDeepRead(db, { runId: o.runId || null }),
+          ed = await llmEdition(db, model, Object.assign({}, base, { onStage: (id, act, patch) => { if (act === "start") pg.start(id, patch); else if (act === "done") pg.done(id, patch); else if (act === "skip") pg.skip(id, patch.detail); else pg.update(id, patch); }, onProgress, taxonomy: taxonomyLabels(), maxItems: depthParams(prefs()).maxItems, maxStories: depthParams(prefs()).maxStories, budgetMs: cfg.llmBudgetMs, callTimeoutMs: cfg.modelTimeoutMs, prev, deepRead: makeDeepRead(db, { runId: o.runId || null }),
             // 并发由实测决定：还没测过就让第一次有两批稿时并行试一次，结果记进 model.json
             concurrency: Number(prefs().concurrency) || 1, probe: !prefs().concurrency, onProbe: (r) => { void background(savePrefs({ concurrency: r.concurrency, probe: Object.assign({ at: new Date().toISOString() }, r) }), "save prefs"); } }));
           if (ed && ed.fallback) { error = ed.fallback; ed = null; }
@@ -372,7 +410,11 @@ export function apply(ctx, config) {
           if (ed && tr) ed.stats = Object.assign({}, ed.stats, { translate: tr });
         } catch (err) { error = errText(err); ed = null; }
       }
-      if (!ed) ed = ruleEdition(db, base);
+      if (!ed) {
+        if (useLlm) pg.update("save", { detail: "模型编排没成（" + (error || "未知原因") + "），改用程序编排" });
+        pg.start("save", { detail: "按版式组版" });
+        ed = ruleEdition(db, base);
+      } else pg.start("save", { detail: "按版式组版、存档" });
       try { ed.tickers = tickerBoard(db, { since: base.since, pack }); } catch { ed.tickers = []; }
       const saved = saveEdition(db, ed, { runId: o.runId, error, ms: Date.now() - t0 });
       progressCleanup();
@@ -380,11 +422,18 @@ export function apply(ctx, config) {
       if (ed.mode === "llm") notesFromEdition(db, ed);
       const st = ed.stats || {};
       if (useLlm) modelState.last = { at: new Date().toISOString(), run_id: o.runId || null, pack, mode: ed.mode, model: model.label(), items_read: ed.items_read, fresh_items: st.fresh_items ?? null, reused: st.reused || 0, calls: st.calls || 0, failed: st.failed || 0, written: st.written || 0, retried: (st.errors || []).length, error: error || ((st.fallbacks || []).length ? "fallback " + st.fallbacks.join(", ") + ((st.errors || []).length ? "：" + st.errors[0] : "") : null), ms: Date.now() - t0 };
+      const nStories = Object.keys(ed.stories || {}).length;
+      pg.done("save", { detail: "版面已更新：" + nStories + " 条故事线，头版 " + ((ed.front || []).length) + " 条" + (error && useLlm ? "（模型编排没成，用的程序编排）" : "") });
+      // 只编版面的（重新编排、预编排、手动抓取后不推送的）到这里就收尾
+      const fl = pg.view().active;
+      if (fl && (fl.kind === "refresh" || fl.kind === "prewarm" || o.noPush)) { pg.skip("push", o.noPush || (fl.kind === "prewarm" ? "到点再推" : "")); pg.finish("done"); }
       const out = Object.assign({ id: saved.id, created_at: saved.created_at, error }, ed);
       delete out._items;
       return out;
     } catch (err) {
       if (useLlm) modelState.last = { at: new Date().toISOString(), run_id: o.runId || null, pack, error: errText(err), ms: Date.now() - t0 };
+      pg.fail((pg.view().active || {}).current || "save", "编版面出错：" + errText(err));
+      pg.finish("failed", errText(err));
       return null;
     } finally {
       db.close();
@@ -668,8 +717,8 @@ export function apply(ctx, config) {
   }
 
   function backgroundEdition(runId, pack) {
-    if (modelState.busy) return;
-    void background(makeEdition({ pack, runId, wantLlm: modeNow() === "llm", priority: PRIORITY.background }), "edition");
+    if (modelState.busy) { pg.finish("done", "模型正忙，版面等它忙完再编"); return; }
+    void background(makeEdition({ pack, runId, wantLlm: modeNow() === "llm", priority: PRIORITY.background, noPush: "只编版面（没有可推送的定时任务，或这一轮已在推）" }), "edition");
   }
 
   function taxonomyNames() {
@@ -708,16 +757,18 @@ export function apply(ctx, config) {
       await ensureData(p);
       // 两种模式都按版面推送（版面认得关注与屏蔽）：引擎只算规则候选、不记推送；版面编不出来时退回规则候选
       const wantLlm = modeNow() === "llm" && model.available();
+      if (!(args && args.dry_run === true)) { pg.begin("cycle", { runId, pack: packKey, model: wantLlm && llmReady() }); pg.start("prep", { detail: "准备抓取" }); }
       // 「不限」档：先让模型读网页类的源；给抓取、编排和发送留出时间（预编排已经读过一轮，这里只补到点前的变化）
       const pf = await modelReadPrefetch({ packs: args && args.pack, runId, budgetMs: Math.min(5 * 60000, left() - 4 * 60000) });
       let res;
       try {
-        res = await runEngine(ctx, cfg, p, cycleFlags(p, cfg, Object.assign({}, args, { defer_push: !(args && args.dry_run === true) }), runId).concat(pf ? ["--prefetched", pf.dir] : []), Math.max(60000, Math.min(cfg.timeoutMs, left() - 120000)));
+        res = await (args && args.dry_run === true ? (f, t) => runEngine(ctx, cfg, p, f, t) : engineWithProgress)(cycleFlags(p, cfg, Object.assign({}, args, { defer_push: !(args && args.dry_run === true) }), runId).concat(pf ? ["--prefetched", pf.dir] : []), Math.max(60000, Math.min(cfg.timeoutMs, left() - 120000)));
       } finally { if (pf) await rm(pf.dir, { recursive: true, force: true }).catch(() => {}); }
       const out = engineJson(res.stdout);
       if (out && out.run_id && deferring && out.parts) {
         const pend = { source: "cycle", pack: packKey, ed_pack: out.pack || (args && args.pack) || "all", run_id: out.run_id, at: new Date().toISOString(), parts: out.parts, rules: out.rules || null, lookback: out.lookback_hours || 6, want_llm: modeNow() === "llm" && model.available(), ready: false, edition_id: null };
         writePending(pend);
+        pg.update("push", { detail: "「写完再推」：版面写完就推" });
         void background(composeThenDeliver(pend), "deferred push");
         delete out.parts;
         return Object.assign(out, { deferred: true, message: "", note: "本轮已抓取，版面写完后推送" });
@@ -744,8 +795,11 @@ export function apply(ctx, config) {
           const db = openIfExists(p.db);
           try {
             if (ed && out.parts) {
+              pg.start("push", { detail: "挑要推的、拼消息" });
               out.message = sendFromEdition(db, ed, out.parts, out.rules, out.run_id, out.lookback_hours || 6, out.defer_push, out);
               if (out.edition_note) out.message += "\n（" + out.edition_note + "）";
+              // 插件自己到点跑的由 fireTask 发出去后收尾；经宿主定时任务的，消息交给模型转发
+              if (!(args && args._direct)) { pg.done("push", { detail: (out.picks || []).length + " 条，消息交给定时任务里的模型转发" }); pg.finish("done"); }
             } else if (out.defer_push) {
               // 版面编不出来：按规则候选推送
               recordPushes(db, out.picks || [], out.run_id, nowIso);
@@ -759,6 +813,7 @@ export function apply(ctx, config) {
         delete out.parts;
       }
       if (out) return out;
+      pg.finish("failed", "本轮失败：" + res.stage);
       return { ok: false, run_id: runId, error: res.stage, message: hhmmShanghai() + " 本轮失败（" + res.stage + "），详情见面板「抓取日志」", tail: res.tail };
     } finally {
       inflight.current = null;
@@ -984,12 +1039,22 @@ export function apply(ctx, config) {
       if (r && r.message) await sendDirect(r.message);
       return;
     }
-    const out = await runCycle({ pack: t.pack });
-    if (out && out.message && !(await sendDirect(out.message))) {
-      // 发不出去：交给定时任务转发这条
-      writePending({ source: "cycle", pack: t.pack, ed_pack: t.pack, run_id: out.run_id || newRunId("cycle"), at: new Date().toISOString(), ready: true, ready_at: new Date().toISOString(), message: out.message, parts: partsNow(t.pack), lookback: 6 });
-      await triggerDelivery(t.pack);
+    const out = await runCycle({ pack: t.pack, _direct: true });
+    // 「写完再推」的由版面写完时 deliver 发；没有消息的（抓不了、出错）在 runCycle 里已经收尾
+    if (!out || out.deferred || !out.message) return;
+    pg.attach("deliver", { runId: out.run_id || null });
+    pg.start("push", { detail: "发到手机" });
+    if (await sendDirect(out.message)) {
+      pg.done("push", { detail: "已发到手机：" + (out.picks || []).length + " 条，" + out.message.length + " 字" });
+      pg.finish("done");
+      return;
     }
+    // 发不出去：交给定时任务转发这条
+    pg.update("push", { detail: "直接发送没成，交给定时任务转发" });
+      writePending({ source: "cycle", pack: t.pack, ed_pack: t.pack, run_id: out.run_id || newRunId("cycle"), at: new Date().toISOString(), ready: true, ready_at: new Date().toISOString(), message: out.message, parts: partsNow(t.pack), lookback: 6 });
+    await triggerDelivery(t.pack);
+    pg.done("push", { detail: "直接发送没成，已交给定时任务转发" });
+    pg.finish("done");
   }
   /** 下一次直接推送的时间（面板显示用）。 */
   function clockNext() {
@@ -999,15 +1064,22 @@ export function apply(ctx, config) {
 
   /** 推送写好的这一轮：能直接发就直接发（不经过模型）；发不出去时把拼好的消息留给定时任务转发。 */
   async function deliver(pack) {
+    const pend0 = readPending(pack);
+    pg.attach("deliver", { runId: (pend0 && pend0.run_id) || null });
+    pg.start("push", { detail: "挑要推的、拼消息" });
     if (direct()) {
       const pend = readPending(pack);
-      if (!pend || !pend.ready) return false;
+      if (!pend || !pend.ready) { pg.skip("push", "没有写好的推送"); pg.finish("done"); return false; }
       const out = deliverPending(pend);
-      if (!out.message) return true;
-      if (await sendDirect(out.message)) return true;
+      if (!out.message) { pg.done("push", { detail: "没有新内容，这一轮不打扰" }); pg.finish("done"); return true; }
+      pg.update("push", { detail: "发到手机：" + (out.picks || []).length + " 条" });
+      if (await sendDirect(out.message)) { pg.done("push", { detail: "已发到手机：" + (out.picks || []).length + " 条，" + out.message.length + " 字" }); pg.finish("done"); return true; }
       writePending(Object.assign({}, pend, { message: out.message, ready: true, ready_at: new Date().toISOString() }));
     }
-    return triggerDelivery(pack);
+    const ok = await triggerDelivery(pack);
+    pg.done("push", { detail: ok ? "已交给定时任务里的模型转发" : "没有可用的推送通道，留在面板里" });
+    pg.finish("done");
+    return ok;
   }
   /** 触发这个主题包的定时任务一次（它调 newswire_cycle，取到写好的版面就推送）。宿主忙时隔一分钟再试。 */
   const triggering = new Set();
@@ -1216,7 +1288,7 @@ export function apply(ctx, config) {
         if (!Number.isFinite(at) || until > lead || until < 4 * 60000 || prewarm.done.has(key)) continue;
         prewarm.done.set(key, at);
         const runId = newRunId("prep");
-        const res = await guardedRun({ packs: pack, read_budget_ms: Math.max(4 * 60000, until - 12 * 60000) }, runId);
+        const res = await guardedRun({ packs: pack, read_budget_ms: Math.max(4 * 60000, until - 12 * 60000) }, runId, "prewarm");
         if (res.ok) await makeEdition({ pack, runId: res.run_id || runId, wantLlm: true, priority: PRIORITY.background });
         prewarm.tasksAt = 0;
         return;
@@ -1249,7 +1321,7 @@ export function apply(ctx, config) {
       afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
       guardedRun, handleReply, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
       pushHealth, pushNow, queue, readTaken, reflowWithFeedback, runAnalysis, runCycle, runDetail, runSynthesis, startDetail, syncSourceState,
-      syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken,
+      syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
       route, tool, disposers,
     };
     Object.assign(app, registerRoutes(app));

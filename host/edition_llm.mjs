@@ -348,13 +348,23 @@ export async function llmEdition(db, model, o) {
   stats.units = units.length;
   const queue = [];
   for (let i = 0; i < units.length; i += size) queue.push(units.slice(i, i + size));
+  // 流程进度（面板的流程图）：o.onStage(步骤, start|update|done|skip, { done, total, detail })
+  const stage = (id, act, patch) => { try { if (o.onStage) o.onStage(id, act, patch || {}); } catch { /* 只是进度 */ } };
+  const gCount = { done: 0, total: queue.length };
+  const pre = [auto ? auto + " 条直接接上已有故事线" : "", triaged.length ? triaged.length + " 条分数低的按规则归并" : ""].filter(Boolean).join("，");
+  if (queue.length) stage("group", "start", { done: 0, total: queue.length, detail: units.length + " 条新新闻分 " + queue.length + " 批交给模型" + (pre ? "（" + pre + "）" : "") });
+  else stage("group", "done", { detail: "没有要模型归并的新新闻" + (pre ? "（" + pre + "）" : "") });
   // 归并最多用预算的 60%，留时间给统筹和写稿；超出后剩下的新闻按规则事件归并
   const groupDeadline = t0 + (o.budgetMs || 600000) * 0.6;
   const attach = (g, its) => { g.items.push(...its); g.fresh.push(...its); };
   // 服务端能并行时几批同时归并；本地单卡 concurrency=1 就是原来的一批一批
   const groupWorker = async () => {
+    let first = true;
     while (queue.length) {
+    if (!first) { gCount.done++; stage("group", "update", { done: gCount.done, total: gCount.total }); }
+    first = false;
     const batch = queue.shift();
+    stage("group", "update", { detail: "正在归并第 " + Math.min(gCount.total, gCount.done + 1) + "/" + gCount.total + " 批（" + batch.length + " 条）" });
     const inBatch = new Set(batch.map((it) => it.n));
     const cands = candidatesFor(batch);
     let got = null;
@@ -371,6 +381,8 @@ export async function llmEdition(db, model, o) {
       const a = batch.slice(0, half), b = batch.slice(half);
       a._split = b._split = true;
       queue.unshift(a, b);
+      gCount.total += 1;
+      stage("group", "update", { total: gCount.total, detail: "有一批没归并成，拆成两半重试" });
       continue;
     }
     if (got) {
@@ -413,6 +425,7 @@ export async function llmEdition(db, model, o) {
   }
   };
   await Promise.all(Array.from({ length: Math.max(1, o.concurrency || 1) }, groupWorker));
+  if (queue.length === 0 && gCount.total) stage("group", "done", { done: gCount.total, total: gCount.total, detail: "归成 " + groups.length + " 条故事线" + (stats.fallbacks.some((x) => x.startsWith("group")) ? "（有批次没成，按规则归并）" : "") });
   for (const g of groups) if (!g.id) { g.id = storyIdFor(g.items[0].id); g.isNew = true; }
   if (!groups.length) return { fallback: "no_stories" };
   groups.sort((a, b) => b.importance - a.importance);
@@ -433,12 +446,14 @@ export async function llmEdition(db, model, o) {
   const minor = Boolean(prevPlanOk && fresh.length && PL.reuse_hours > 0 && planAt && Date.now() - Date.parse(planAt) < PL.reuse_hours * 3600000 && prevFront.length
     && changed.filter((g) => !g.triage).length <= PL.reuse_changes && changed.every((g) => g.importance < frontFloor && !prevFront.includes(g.id)));
   if ((!fresh.length || minor) && prevPlanOk) {
+    stage("plan", "done", { detail: minor ? "变化小（" + changed.length + " 条都排不进头版），沿用上次的头版和总括" : "没有新新闻，沿用上次的头版和总括" });
     if (minor) stats.plan_minor = changed.length;
     if (planAt) stats.plan_at = planAt;
     plan = { reuse: true, headline: o.prev.headline, frontIds: (o.prev.front || []).filter((i) => ids.has(i)), watch: (o.prev.watch || []).map((w) => ({ text: w.text, stories: (w.stories || []).filter((i) => ids.has(i)) })), themesKept: (o.prev.themes || []).map((t) => Object.assign({}, t, { stories: (t.stories || []).filter((i) => ids.has(i)) })).filter((t) => t.stories.length >= 2) };
     stats.plan_reused = true;
   } else {
-    try { plan = await call("plan", planPrompt(top, layout), 6000); stats.plan_at = new Date().toISOString(); } catch { plan = {}; stats.fallbacks.push("plan"); }
+    stage("plan", "start", { detail: "从 " + top.length + " 条故事线里排头版、写总括、挑值得关注的" });
+    try { plan = await call("plan", planPrompt(top, layout), 6000); stats.plan_at = new Date().toISOString(); stage("plan", "done", { detail: "头版 " + (Array.isArray(plan.front) ? plan.front.length : 0) + " 条" + (plan.headline ? "：" + String(plan.headline).slice(0, 30) : "") }); } catch { plan = {}; stats.fallbacks.push("plan"); stage("plan", "done", { detail: "模型没排成，按重要度排头版" }); }
     for (const m of Array.isArray(plan.merge) ? plan.merge : []) {
       const ks = (Array.isArray(m) ? m : []).map(Number).filter((k) => k >= 1 && k <= top.length && !merged.has(k));
       if (ks.length < 2) continue;
@@ -517,6 +532,9 @@ export async function llmEdition(db, model, o) {
     } catch { /* 进度版出不来不影响正式版 */ }
   };
   const written = new Set();
+  const skipped = [reused ? reused + " 篇沿用旧稿" : "", stats.deferred ? stats.deferred + " 篇新报道少、先不重写" : "", stats.brief ? stats.brief + " 条快讯用原文" : ""].filter(Boolean).join("，");
+  if (toWrite.length) stage("write", "start", { done: 0, total: toWrite.length, detail: "要写 " + toWrite.length + " 篇（头版先写）" + (skipped ? "；" + skipped : "") });
+  else stage("write", "done", { done: 0, total: 0, detail: "没有要重写的稿" + (skipped ? "（" + skipped + "）" : "") });
   progress();
   // 深读：要写的报道里，只有标题或摘要被截断的材料先去原文抓正文（有预算），模型才有东西可写
   if (o.deepRead) {
@@ -525,6 +543,7 @@ export async function llmEdition(db, model, o) {
     // 读法要长材料的（技术长文、开源项目：正文 2000 字以上）：列表里的一两句说明也算不上正文，同样去原文抓
     const wantsBody = (s) => reg.get(s.profile).content.body_chars >= 2000;
     for (const s of toWrite) for (const it of pickMaterials(s._g.items, 4)) if ((it.completeness !== "full" || wantsBody(s)) && !have.has(it.id) && !need.some((x) => x.id === it.id)) need.push(it);
+    if (need.length) stage("write", "update", { detail: "先去原文抓 " + need.length + " 篇正文，模型才有东西可写" });
     try { stats.deep = await o.deepRead(need); } catch (e) { stats.deep = { tried: 0, ok: 0, error: String(e.message || e).slice(0, 120) }; }
   }
   const bodies = bodiesFor(db, toWrite.flatMap((s) => s._g.items.map((it) => it.id)));
@@ -557,9 +576,10 @@ export async function llmEdition(db, model, o) {
     toWrite.splice(i, 1);
     stats.cached++;
   }
-  if (stats.cached) progress(bodies);
+  if (stats.cached) { progress(bodies); stage("write", "update", { done: written.size, detail: stats.cached + " 篇上次已写好，直接用" }); }
   const writeBatch = async (group) => {
       const batch = group.map(entryOf);
+      stage("write", "update", { detail: "正在写：" + group.map((s) => s.title).join("、").slice(0, 60) });
       try {
         // 材料是正文，推理更长：上限按篇数给足（实测 3 篇约 6400 个输出 token），超时放宽到 5 分钟
         const j = await call("write", writePrompt(batch, layout), 4000 + 3000 * batch.length, 300000);
@@ -586,6 +606,7 @@ export async function llmEdition(db, model, o) {
           if (nt) { b.story.retitled = b.story.title; b.story.title = nt; stats.retitled = (stats.retitled || 0) + 1; }
           written.add(b.story.id);
           cachePut(db, writeFingerprint(b, layout), b.story);
+          stage("write", "update", { done: written.size });
         }
       } catch { stats.fallbacks.push("write:" + batch.length); /* 这一批用程序拼的稿 */ }
   };
@@ -621,11 +642,14 @@ export async function llmEdition(db, model, o) {
     Object.assign(s, { lead: copy.lead, lead_refs: copy.lead_refs, points: copy.points, views: copy.views, impact: copy.impact, by: s.by === "llm" ? "llm-group" : "rules" });
   }
   for (const s of stories) if (s.updated && !s.update_text) Object.assign(s, programUpdate(s._g.fresh));
+  stage("write", "done", { done: written.size, total: toWrite.length + (stats.cached || 0), detail: "写了 " + written.size + " 篇" + (stats.fallbacks.some((x) => x.startsWith("write")) ? "，有批次没写成，用程序稿" : "") + (stats.retitled ? "，" + stats.retitled + " 条换了标题" : "") });
+  stage("check", "start", { detail: "逐句核对数字、专名、引语是否在原文里" });
   // 4. 核对：模型稿（新写的与沿用的）逐句核对，整理出处
   const allBodies = bodiesFor(db, stories.filter((s) => s.by === "llm" && !written.has(s.id)).flatMap((s) => s._g.items.map((it) => it.id)));
   for (const [k, v] of bodies) allBodies.set(k, v);
   for (const s of stories) { verifyStory(db, s, s._g.items, allBodies, contentOf(s), reg.get(s.profile).blocks); if (!written.has(s.id)) scrubStory(s, fb.errors.get(s.id)); }
   stats.check = sumChecks(stories);
+  stage("check", "done", { detail: "核对 " + (stats.check.checked || 0) + " 句，" + (stats.check.dropped ? "删掉 " + stats.check.dropped + " 句" : "全部通过") + (stats.check.flagged ? "，" + stats.check.flagged + " 条导语标「待核」" : "") });
   Object.assign(stats, { written: written.size, reused, groups: groups.length, ms: Date.now() - t0 });
   const out = finish(o, stories.map(strip), parts, { mode: "llm", model: model.label(), items_read: items.length, stats });
   out.themes = themes;

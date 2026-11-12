@@ -2,6 +2,17 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.33 (2026-11-12)
+
+- **See which step a round is on.** A round on a local model takes ten to twenty minutes, and the panel used to say only "laying out". A round is now a flow chart of three phases and 12 steps:
+  - **Fetch**: prepare → fetch sources (each source's result and new items) → clean & split → classify & cluster → fill bodies
+  - **Edition**: translate titles → group storylines (which batch) → front page (or "little changed, kept the last one") → write (how many written, which ones now) → fact check (sentences checked, dropped) → lay out & save
+  - **Push**: sent to the phone / push when written / handed to the scheduled task / not pushed this round, and why
+  - Each step shows its state (done, running, skipped, failed), time taken and one line of detail; steps not yet started show an estimate. Estimates come from each step's last 8 real durations (model and program layouts counted separately); on a first run without history, progress is counted by steps.
+- **Where.** At the top of Today, while a round runs (or within 10 minutes after): one line with the trigger, current step, time so far, time left and overall progress, and "Show flow" for the full chart; the edition reloads when the round ends. The Runs page keeps the current (or last) round's full chart at the top. Phases sit side by side on wide screens and stack on narrow ones.
+- **Ask from the phone.** `newswire_snapshot` includes a text version of the flow, so asking the assistant "how far is the news" or "why no push yet" gets the current step and time left, or how the last round ended.
+- Every trigger feeds the same flow: scheduled rounds (the plugin's clock or the host task), manual fetches, pre-push warm-ups, re-layouts, push-when-written, and the panel's Push button. A round with no activity for 45 minutes is marked interrupted instead of running forever.
+
 ## 1.1.32 (2026-11-12)
 
 - **A missed slot is caught up.** When the plugin pushes on its own clock it fires only in the exact minute of a slot; if the host is restarting, the plugin is being upgraded or the computer is asleep at that minute, the round was lost until the next slot two hours later. It happened in real use: today's 09:00 round (Beijing time) did not run because the host was down for those minutes. Each clock check now looks back: if a slot was missed within the last 75 minutes, no round has run since, and no push is being written, it runs once. A slot is caught up at most once; beyond 75 minutes it waits for the next one. This applies to direct pushes only (rounds triggered by the host's scheduled task are the host's business).

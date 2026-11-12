@@ -30,7 +30,7 @@ export function registerRoutes(app) {
     afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
     guardedRun, handleReply, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
     pushHealth, pushNow, queue, readTaken, reflowWithFeedback, route, runAnalysis, runDetail, runSynthesis, startDetail, syncSourceState,
-    syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken,
+    syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
   } = app;
 
   // ---------------------------------------------------------------- 路由
@@ -574,6 +574,12 @@ export function registerRoutes(app) {
       startDetail(id);
       return jsonResponse({ ok: true, running: true }, 202);
     },
+  });
+  // 一轮的流程与进度：正在跑的（没有就是 null）和上一轮的；面板据此画流程图
+  route({
+    path: "/api/newswire/progress",
+    methods: ["GET"],
+    fetch: async () => jsonResponse(Object.assign({ ok: true }, pg.view()), 200),
   });
   // 手机上回复序号（「3」「3 详」「3 没用」）：和工具 newswire_reply 同一个处理
   route({

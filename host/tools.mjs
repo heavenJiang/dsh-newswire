@@ -16,8 +16,21 @@ export function registerTools(app) {
   const {
     afterManualFetch, applyPush, background, busyWith, cfg, ctx, dailyRun, disposers, dropTrackerFollows, editFollows, errText, guardedRun,
     handleReply, latestThemes, llmReady, makeEdition, modeNow, modelState, modelView, newRunId, p, pushView, runAnalysis, runCycle, runSynthesis,
-    scheduleSetup, syncSourceState, syncTrackerFollows, taxEntities, taxRegions, tool,
+    scheduleSetup, syncSourceState, syncTrackerFollows, taxEntities, taxRegions, tool, pg,
   } = app;
+
+  /** 一轮流程的一句话（给对话里的助手看）：正在跑的到了哪一步、还要多久；没在跑就说上一轮怎么结束的。 */
+  function flowText() {
+    const v = pg.view();
+    const f = v.active || v.last;
+    if (!f) return "";
+    const min = (ms) => (ms >= 60000 ? Math.round(ms / 60000) + " 分钟" : Math.max(1, Math.round(ms / 1000)) + " 秒");
+    const lines = f.steps.map((s) => ({ done: "✓", running: "▶", pending: "·", skipped: "–", failed: "✕" }[s.status] || "·") + " " + s.label + (s.total ? " " + s.done + "/" + s.total : "") + (s.detail && s.status !== "pending" ? "：" + s.detail : ""));
+    const head = v.active
+      ? "本轮流程（" + f.label + "，已用 " + min(f.ms) + (f.eta_ms ? "，预计还要约 " + min(f.eta_ms) : "") + "，进度 " + f.pct + "%）："
+      : "上一轮流程（" + f.label + "，" + ({ done: "已完成", failed: "失败", stalled: "中断", replaced: "被新一轮取代" }[f.outcome] || f.outcome) + "，用时 " + min(f.ms) + (f.note ? "，" + f.note : "") + "）：";
+    return head + "\n" + lines.join("\n");
+  }
 
   // ---------------------------------------------------------------- 工具
   tool({
@@ -405,7 +418,7 @@ export function registerTools(app) {
 
   tool({
     name: "newswire_snapshot",
-    description: "Status of the latest run: run id and time, whether it is stale (>26h), counts per category, hot keywords, failed sources with error_kind and hint, digest path and excerpt. Always cite the data time; not investment advice.",
+    description: "Status of the latest run, including `flow`: which step the current round is on (fetch → edition → push), how long it has taken and roughly how long is left, or how the last round ended. Use it when the user asks how far the news is or why a push has not arrived. Also: run id and time, whether it is stale (>26h), counts per category, hot keywords, failed sources with error_kind and hint, digest path and excerpt. Always cite the data time; not investment advice.",
     parameters: { type: "object", additionalProperties: false, properties: {} },
     timeoutMs: 30000,
     output: {
@@ -419,13 +432,14 @@ export function registerTools(app) {
           "热点：" + (value.keywords || []).map((k) => k.tag + " " + k.n).join(" ｜ "),
           value.failed && value.failed.length ? "失败：" + value.failed.map((f) => f.source_id + "=" + f.error_kind).join(" ｜ ") : "失败：无",
           "汇总：" + (value.digest_path ?? "（未生成）"),
+          value.flow ? value.flow : "",
           String(value.disclaimer ?? DISCLAIMER),
         ].join("\n"),
       }],
     },
     async execute() {
       await ensureData(p);
-      return await snapshotOf(cfg, p);
+      return Object.assign(await snapshotOf(cfg, p), { flow: flowText() });
     },
   });
 

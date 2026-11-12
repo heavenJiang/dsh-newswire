@@ -389,6 +389,15 @@ const lbl = await callRoute("/api/newswire/items", "POST", { hours: 24, label: "
 if (!lbl || lbl.status !== 200) bad++;
 const ran = await callRoute("/api/newswire/run", "POST", { sources: "bbc_world", window_hours: 6, max_items: 4, export: "none" });
 if (!ran || ran.status !== 200 || ran.value.ok !== true) bad++;
+// 流程进度：手动抓取这一轮从抓取各源走到编版面；引擎写的进度文件被读进来（抓取各源有计数和各源的成败）
+{
+  let pr = await callRoute("/api/newswire/progress", "GET");
+  for (let i = 0; i < 40 && pr && pr.value.active; i++) { await new Promise((r) => setTimeout(r, 250)); pr = await callRoute("/api/newswire/progress", "GET"); }
+  const fl = pr && pr.value && (pr.value.active || pr.value.last);
+  const src = fl && fl.steps.find((s) => s.id === "sources");
+  if (!fl || fl.kind !== "manual" || !src || src.status !== "done" || src.total !== 1 || !(src.items || []).length) { bad++; console.log("流程进度不对", JSON.stringify(fl && fl.steps.map((s) => [s.id, s.status, s.done, s.total]))); }
+  else console.log("  flow:", fl.kind, fl.outcome || "running", fl.steps.map((s) => s.id + ":" + s.status[0]).join(" "));
+}
 
 // 写完再推：到点只抓取、消息为空；版面写完后插件触发同一个定时任务，那一次推本轮全部新内容
 await callTool("newswire_schedule_setup", {});
