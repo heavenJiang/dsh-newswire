@@ -76,7 +76,7 @@ export function composeExpand(n, d) {
   if (views.length) { L.push("", "**各方说法**"); for (const t of views) L.push("· " + md(t)); }
   for (const b of c.extra || []) { if (b && b.name && b.text) L.push("", "**" + md(b.name) + "**", md(b.text)); }
   if (c.impact) L.push("", "影响：" + md(c.impact));
-  const up = (d.updates || []).slice(-2);
+  const up = (d.updates || []).slice(-2).reverse(); // 最新的在上面
   if (up.length) { L.push("", "**进展**"); for (const u of up) L.push("· " + hhmm(u.at).slice(-5) + " " + md(u.text)); }
   // 没有模型稿时（只有标题）：给最近几篇报道的原文开头
   if (!c.lead) for (const it of (d.items || []).slice(-3)) if (it.text) L.push("", md(clip(it.text, 240)));
@@ -93,7 +93,7 @@ export function composeDetail(n, title, dt) {
   const nw = (x) => (x.new ? "🆕 " : "");
   if (dt.since && dt.since.added) L.push("比上一篇新增 " + dt.since.added + " 条（标 🆕）");
   if (dt.overview && dt.overview.text) L.push("", md(dt.overview.text));
-  if ((dt.timeline || []).length) { L.push("", "**经过**"); for (const x of dt.timeline) L.push("· " + nw(x) + (x.time ? md(x.time) + " " : "") + md(x.text)); }
+  if ((dt.timeline || []).length) { L.push("", "**经过**"); for (const x of dt.timeline.slice().reverse()) L.push("· " + nw(x) + (x.time ? md(x.time) + " " : "") + md(x.text)); }
   if ((dt.numbers || []).length) { L.push("", "**关键数字**"); for (const x of dt.numbers) L.push("· " + nw(x) + md(x.text)); }
   if ((dt.views || []).length) { L.push("", "**各方说法**"); for (const x of dt.views) L.push("· " + nw(x) + md(x.who) + "：" + md(x.says)); }
   if (dt.background && dt.background.text) L.push("", "**背景**", md(dt.background.text));

@@ -261,7 +261,9 @@ const V26 = [
 ];
 // v27：推送的当天序号（消息里每条前面的数字；读者在手机上回复序号来展开、要详细报道、反馈有用没用）
 const V27 = ["ALTER TABLE pushes ADD COLUMN n INTEGER", "CREATE INDEX IF NOT EXISTS idx_pushes_n ON pushes(n, id)"];
-export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26, V27];
+// v28：修正落在将来的发布时间（正文里「将于某日」的日期被当成了发布时间）：比首见时间晚 1 小时以上的，改用首见时间
+const V28 = ["UPDATE articles SET published_at = first_seen_at, time_confidence = 'fetched' WHERE published_at IS NOT NULL AND first_seen_at IS NOT NULL AND published_at > datetime(first_seen_at, '+1 hour')"];
+export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26, V27, V28];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
 export function migrate(db) {

@@ -2,6 +2,19 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.35 (2026-11-12)
+
+Nine problems a reader pointed out, each fixed:
+- **Every timeline is newest first.** Storyline detail (reports, updates, pushes), tracker detail (storylines and single reports), tracker milestones, the detailed report's timeline, event detail reports, each round in Timeline, and the expanded updates and detailed report on the phone.
+- **Buttons by weight.** "Text" in a timeline is now a blue "Show text ▾" on its own line; "Not this story" sits at the end of the row and asks "Move this report out of the storyline?" before doing anything. The tracker's "Not this story" works the same way. "Full analysis", "More: views, impact and sources" and "Expand all" are blue links; grey is kept for feedback actions such as mute and report.
+- **"Markets" in the right column becomes "Latest".** The market box was filled once per edition, and a local-model edition takes 20–30 minutes, so it was always stale. The new column does not wait for the edition: it updates after every fetch, newest first, one entry per event, skipping low-scored single-outlet items, at most 3 per source; items the edition has not covered yet are marked "new"; clicking opens the storyline (or the original when there is none).
+- **Back returns to where you were.** Opening a storyline or tracker from Today, Recap or Tracking and coming back keeps the list loaded and restores the scroll position (measured: opened at 5635 px, back at 5635 px).
+- **The recap writes itself.** After each edition the program puts together "today so far" (no model call, a second or two); after 21:30, with the model idle, the model writes the full recap, and the program version never replaces it. Opening a past day with no recap builds one on the spot. Recap opens on today, and a program-made recap says the model version comes in the evening.
+- **Quiet trackers explain themselves.** 华谊兄弟 and 中科曙光 never updated because every report about them came from sources that are now off (股吧, 雪球) and none made the edition, while tracking only counted storylines. Company, technology and person trackers now also list single reports that mention them (tagged "single"); after two days without a mention they say how long the sources that are on have been silent, where the last mention came from, whether that source is off, and offer "Turn it back on (trial)". With no storylines, the synthesis button that could not work is gone. Themes do not list single reports (their keywords are too broad).
+- **Events opens the first item.** On wide screens, Events and Timeline show the first event on the right right away, with the storyline's impact analysis when there is one.
+- **Fixed: publish times in the future.** "11月13日" in a 36kr flash about a car launch on 13 November was taken as the publish time, so the item sat at the top of Items for days. A publish time more than an hour after the fetch is no longer accepted; the fetch time is used, and existing rows are corrected by a migration (v28).
+- **Fixed: a newly added source did not appear.** The source list came only from the database, which learns about a source on its next fetch. It now comes from the source config, with new sources first and marked "just added · data after the next fetch".
+
 ## 1.1.34 (2026-11-12)
 
 Two real rounds on a local model, on a copy of the data, and what they showed:

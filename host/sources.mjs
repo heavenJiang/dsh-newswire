@@ -69,7 +69,12 @@ export function sourceScores(db, o) {
   }
   const fetch = new Map(db.prepare(`SELECT source_id, COUNT(DISTINCT run_id) runs, COUNT(DISTINCT CASE WHEN ok = 1 THEN run_id END) ok
     FROM fetch_attempts WHERE attempted_at >= ? GROUP BY source_id`).all(since).map((r) => [r.source_id, r]));
-  const meta = db.prepare("SELECT id, name, category, pack, enabled, removed_at, trial FROM sources").all();
+  // 源的名单以配置为准（刚加的源还没抓过、库里没有，也要列出来）；库里有、配置里删掉的照旧列（显示为关）
+  const fromDb = db.prepare("SELECT id, name, category, pack, enabled, removed_at, trial FROM sources").all();
+  const everFetched = new Set(db.prepare("SELECT DISTINCT source_id FROM fetch_attempts").all().map((r) => r.source_id));
+  const meta = o && Array.isArray(o.config) ? o.config.map((c) => Object.assign({}, fromDb.find((r) => r.id === c.id) || {}, { id: c.id, name: c.name || c.id, category: c.category || "", pack: c.pack || "core", enabled: c.enabled === false ? 0 : 1, removed_at: c.removed_at || null, trial: c.trial ? 1 : 0, added_at: c.added_at || null }))
+    .concat(fromDb.filter((r) => !o.config.some((c) => c.id === r.id)).map((r) => Object.assign({}, r, { enabled: 0 })))
+    : fromDb;
   // 实际有数据的天数（新装或刚恢复的源不足 7 天）：按它折算每天的贡献
   const span = new Map(db.prepare("SELECT source_id, MIN(first_seen_at) a, MAX(first_seen_at) b FROM articles WHERE first_seen_at >= ? GROUP BY source_id").all(since).map((r) => [r.source_id, Math.max(1, (Date.parse(r.b.replace(" ", "T") + "Z") - Date.parse(r.a.replace(" ", "T") + "Z")) / 86400000)]));
   return meta.map((s) => {
@@ -96,10 +101,12 @@ export function sourceScores(db, o) {
       : state === "off" ? "trial" : state;
     // 排序分：上版、首报、独家最值钱，印证次之，低价值与广告扣分
     const score = x.n ? Math.round(100 * Math.max(0, Math.min(1, (2 * x.board + 2 * x.first + 2 * x.exclusive + x.corrob - 0.5 * x.low - 2 * x.promo) / (x.n * 1.5) + 0.3))) : 0;
-    return { id: s.id, name: s.name || s.id, category: s.category, pack: s.pack, state, verdict, suggest, score, days,
+    // 刚加、还没抓过一轮的：排在最前面，读者一眼看得到「已经加上了」
+    const fresh = !f.runs && !x.n && state !== "off" && !everFetched.has(s.id);
+    return { id: s.id, name: s.name || s.id, category: s.category, pack: s.pack, state, verdict: fresh ? "new" : verdict, suggest: fresh ? state : suggest, score, days, fresh, added_at: s.added_at || null,
       n: x.n, per_day: Math.round((x.n / Math.min(days, span.get(s.id) || days)) * 10) / 10, full: x.full, reposts: x.reposts || 0, promo: x.promo, corrob: x.corrob, first: x.first, exclusive: x.exclusive, low: x.low, board: x.board,
       fetch_ok: fetchOk == null ? null : Math.round(fetchOk * 100) };
-  }).sort((a, b) => ["on", "trial", "off"].indexOf(a.state) - ["on", "trial", "off"].indexOf(b.state) || b.score - a.score);
+  }).sort((a, b) => (b.fresh ? 1 : 0) - (a.fresh ? 1 : 0) || ["on", "trial", "off"].indexOf(a.state) - ["on", "trial", "off"].indexOf(b.state) || b.score - a.score);
 }
 
 /** 改一个源的状态（写配置对象，调用方负责落盘）。@returns 改后的源，或 null */

@@ -19,6 +19,7 @@ window.__ModuleLoader__.load({
     var API = {
       summary: '/api/newswire/summary',
       progress: '/api/newswire/progress',
+      latest: '/api/newswire/latest',
       digest: '/api/newswire/digest',
       sources: '/api/newswire/sources',
       items: '/api/newswire/items',
@@ -67,7 +68,7 @@ window.__ModuleLoader__.load({
         'tk.upToDate': '综述已是最新',
         'tab.track': '追踪', 'tk.title': '追踪', 'tk.dekAll': '持续追踪一家公司、一项技术、一个人或一条主线：相关报道自动挂上，模型把几周来的动态串起来，判断趋势与影响。', 'tk.sug': '值得追踪', 'tk.sugTheme': '版面里串起 {n} 篇报道的主线', 'tk.sugEntity': '近 7 天出现在 {n} 条故事线里（近 3 天 {r} 条）',
         'tk.theme': '主线', 'tk.mentions': '{n} 条', 'tk.addPh': '公司、技术、人物或话题，如：英伟达、固态电池、伊朗战事', 'tk.tickerPh': '股票代码', 'tk.add': '开始追踪', 'tk.none': '还没有追踪的对象：从上面的建议里挑一个，或自己添加。追踪的对象会自动进「我的关注」，有新进展会推送。',
-        'tk.kind.company': '公司', 'tk.kind.technology': '技术', 'tk.kind.person': '人物', 'tk.kind.theme': '主线', 'tk.freshN': '{n} 条新进展', 'tk.pending': '综述将在下一份版面后生成', 'tk.storiesN': '{n} 条故事线，近 7 天 {w} 条', 'tk.latest': '最新：{t}',
+        'tk.kind.company': '公司', 'tk.kind.technology': '技术', 'tk.kind.person': '人物', 'tk.kind.theme': '主线', 'tk.freshN': '{n} 条新进展', 'tk.pending': '综述将在下一份版面后生成', 'tk.storiesN': '{n} 条故事线，近 7 天 {w} 条', 'tk.latest': '最新：{t}', 'tk.quietCard': '{d} 天没有报道提到它', 'tk.quietCardOff': '，原来报道它的「{s}」已关掉 · 点开看怎么办', 'tk.noStoriesYet': '还没有进版面的报道；提到它的单篇报道在详情里', 'tk.mentionsN': '单篇 {n} 条',
         'tk.sparkTip': '近 30 天每天的相关报道数', 'tk.back': '‹ 返回追踪', 'tk.stop': '停止追踪', 'tk.delete': '删除追踪', 'tk.confirm': '连同挂上的动态、综述和它加的关注一起删掉？', 'tk.unlink': '不属于这里', 'tk.aliases': '也认：{a}', 'tk.dek': '{n} 条相关故事线 · {t} 起追踪', 'tk.synth': '追踪综述', 'tk.synthMeta': '{t} · 由 {m} 依据 {n} 条故事线写成', 'tk.incremental': '增量更新',
         'tk.trend': '趋势', 'tk.changed': '和上次相比', 'tk.milestones': '关键节点', 'tk.implications': '对股价、行业与技术趋势的影响', 'tk.noSynth': '还没有综述：点下面的按钮生成（约 1–2 分钟）。', 'tk.noSynthEconomy': '综述需要 LLM 模式；下面是挂上的动态。',
         'tk.synthBusy': '模型正在写综述（约 1–2 分钟）…', 'tk.resynth': '更新综述（{n} 条新进展）', 'tk.synthNow': '生成综述', 'tk.timeline': '动态 · {n}', 'tk.empty': '暂时没有相关报道，之后的版面里出现会自动挂上。', 'tk.new': '综述后新增', 'sd.entities': '关键主体', 'tk.trackIt': '追踪', 'ask.track': '追踪这个话题',
@@ -97,7 +98,7 @@ window.__ModuleLoader__.load({
         'fw.k.cycle': '定时一轮', 'fw.k.manual': '手动抓取', 'fw.k.prewarm': '推送前预编排', 'fw.k.refresh': '重新编排', 'fw.k.deliver': '推送',
         'fw.s.prep': '准备通道', 'fw.s.sources': '抓取各源', 'fw.s.clean': '清洗与拆条', 'fw.s.events': '分类与聚类', 'fw.s.bodies': '补正文', 'fw.s.translate': '译外文标题', 'fw.s.group': '归并故事线', 'fw.s.plan': '统筹头版', 'fw.s.write': '写稿', 'fw.s.check': '逐句核对', 'fw.s.save': '组版存档', 'fw.s.push': '发到手机',
         'fw.partial': '已完成，{n} 步没做全', 'fw.instant': '不到 1 秒', 'fw.sec': '{n} 秒', 'fw.min': '{n} 分钟', 'fw.minsec': '{m} 分 {s} 秒', 'fw.hour': '{h} 小时 {m} 分',
-        'ts.title': '追踪动态', 'ts.fresh': '+{n}', 'ts.all': '全部追踪 ›', 'dt.since': '比上一篇（{t}）新增 {n} 条，已标「新」', 'dt.new': '新', 'sb.thin': '「{s}」近 24 小时的 {n} 条故事线里有 {k} 条只有一家在报（多为 {top}）：多家印证、各方说法用不上，可以给这个版块再开一两个来源。',
+        'lw.title': '最新快讯', 'lw.at': '{t} 抓取', 'lw.new': '新', 'lw.newHint': '版面还没写到，刚抓到的', 'lw.outlets': '{n} 家', 'lw.none': '近 6 小时没有新的快讯', 'ts.title': '追踪动态', 'ts.fresh': '+{n}', 'ts.all': '全部追踪 ›', 'dt.since': '比上一篇（{t}）新增 {n} 条，已标「新」', 'dt.new': '新', 'sb.thin': '「{s}」近 24 小时的 {n} 条故事线里有 {k} 条只有一家在报（多为 {top}）：多家印证、各方说法用不上，可以给这个版块再开一两个来源。',
         'rd.retitled': '事情有了变化，标题已更新。原标题：{t}', 'sb.cooling': '「{s}」连续 {n} 轮抓取失败（{r}），已降频：平时跳过，下次 {t} 再试一次，抓到了就恢复。一直抓不到可以把它关掉。', 'ph.title': '推送链路', 'ph.fix': '怎么修：', 'mq.running': '模型正在跑：', 'mq.waiting': '排队：', 'mq.secs': '{n} 秒', 'mq.hint': '读者点的（详细报道、影响分析、问答）排在版面和后台任务前面',
         'ps.save': '保存', 'ps.saved': '已保存。', 'ps.noSvc': '当前宿主没有定时任务服务，只能保存偏好。', 'ps.noTask': '还没有安排定时推送：在对话里说「每 2 小时推送要闻」即可。', 'ps.task': '定时任务：{s}，下一次 {n}', 'ps.learned': '根据你对推送的反馈，这些版块的门槛已自动提高：{s}',
         'ps.log': '推送记录', 'ps.up': '有用', 'ps.down': '没用', 'ps.none': '还没有推送过。',
@@ -106,8 +107,8 @@ window.__ModuleLoader__.load({
         'sb.title': '源的取舍', 'sb.hint': '近 {d} 天每个源带来了什么。开：正常上版与推送；试用：照常抓取、为别家报道提供印证，但不能单独让一件事上版或推送；关：不抓取。', 'sb.sum': '开 {on} · 试用 {trial} · 关 {off}', 'sb.applyAll': '按建议调整（{n} 个）', 'sb.applied': '已按建议调整 {n} 个源，下一轮抓取生效',
         'sb.on': '开', 'sb.trial': '试用', 'sb.off': '关', 'sb.suggest': '建议：{s}', 'sb.advanced': '高级：编辑源配置（地址、类型、通道、权重……）', 'sb.foot': '统计每天随新数据更新；关掉的源没有新数据，评估停在关掉前。不确定的源先「试用」：它只能为别家印证，不会让版面变乱，几天后再看数据决定。',
         'sb.perDay': '日均 {n} 条', 'sb.board': '上版 {n}', 'sb.first': '首报 {n}', 'sb.excl': '独家 {n}', 'sb.corrob': '印证 {n}', 'sb.low': '低价值 {p}%', 'sb.full': '内容完整 {p}%', 'sb.promo': '广告 {n}', 'sb.fetch': '抓取成功 {p}%',
-        'sb.v.core': '核心', 'sb.v.support': '印证', 'sb.v.ok': '一般', 'sb.v.low': '低价值', 'sb.v.unstable': '抓取不稳', 'sb.v.insufficient': '数据不足',
-        'sb.why.core': '常上版面，或常常最先报道、独家报道，值得保留。', 'sb.why.support': '多为别家的报道提供印证，让可信度判断更准。', 'sb.why.ok': '贡献一般：不常上版，也不常与别家重合。', 'sb.why.low': '绝大多数是低价值内容，几乎不与别家报道重合，开着主要是增加噪声。', 'sb.why.unstable': '近期一半以上的轮次抓取失败，先在下面「高级」里试抓排查。', 'sb.why.insufficient': '数据太少，还看不出价值：可以先试用。',
+        'sb.v.core': '核心', 'sb.v.support': '印证', 'sb.v.ok': '一般', 'sb.v.low': '低价值', 'sb.v.unstable': '抓取不稳', 'sb.v.insufficient': '数据不足', 'sb.v.new': '刚加上 · 下一轮抓取后有数据',
+        'sb.why.new': '刚加上，还没抓过。下一轮抓取后开始统计，攒够几天数据再决定开不开。', 'sb.why.core': '常上版面，或常常最先报道、独家报道，值得保留。', 'sb.why.support': '多为别家的报道提供印证，让可信度判断更准。', 'sb.why.ok': '贡献一般：不常上版，也不常与别家重合。', 'sb.why.low': '绝大多数是低价值内容，几乎不与别家报道重合，开着主要是增加噪声。', 'sb.why.unstable': '近期一半以上的轮次抓取失败，先在下面「高级」里试抓排查。', 'sb.why.insufficient': '数据太少，还看不出价值：可以先试用。',
         'ct.adv.degraded': '页面可能改版了：去「数据源」试抓这个源，看解析结果', 'ct.adv.blocked': '正文被拦截或是动态页面，抓不到：只能提供标题，可考虑停用或换成有全文的源', 'ct.adv.slow': '正文抓得到但慢：只给上版和重点事件补正文', 'ct.adv.fetch': '正文抓得到：新条目每轮逐条补', 'ct.adv.probe': '正在试抓正文，几轮后定下策略', 'ct.adv.none': '付费墙或配置为不抓正文', 'ct.adv.list': '列表自带全文：抽查了 {c} 篇原文，与列表一致', 'ct.adv.listPending': '列表看起来是全文，正在抽查原文核实',
         'ct.advice': '全文', 'ct.mode.list': '列表自带', 'ct.mode.fetch': '逐条补', 'ct.mode.slow': '只补重点', 'ct.mode.blocked': '抓不到', 'ct.mode.probe': '试抓中', 'ct.mode.none': '不抓',
         'sd.fromDigest': '摘自《{t}》',
@@ -173,12 +174,12 @@ window.__ModuleLoader__.load({
         'mode.llm': 'LLM 模式', 'mode.economy': '节省 token', 'mode.llmDesc': '模型阅读每轮新闻，归并、分版、判断重要度并按版式写稿；推送按模型版面。',
         'mode.economyDesc': '不调用模型；版面由程序按规则编排，推送按规则。', 'model.default': 'harness 默认（{m}）', 'model.defaultNone': 'harness 默认模型',
         'model.noService': '当前宿主没有模型服务，LLM 模式会退回程序编排。', 'model.ready': '可用：{m}', 'model.notReady': '模型不可用，LLM 模式会退回程序编排。',
-        'model.saved': '已保存', 'ed.preview': '先显示程序排的预览；模型正在编写正式版面，完成后自动替换', 'view.daily': '日报', 'dy.make': '生成日报', 'dy.remake': '重新生成', 'dy.none': '这一天还没有日报，点「生成日报」。', 'dy.busy': '正在写今天的回顾，约 1 分钟',
+        'model.saved': '已保存', 'ed.preview': '先显示程序排的预览；模型正在编写正式版面，完成后自动替换', 'view.daily': '日报', 'dy.byProgram': '由程序按版面自动整理', 'dy.autoToday': '今天到 {t} 为止，程序按版面自动整理（每次版面更新后刷新）；晚上 21:30 以后由模型写成完整的回顾。', 'dy.autoPast': '这一天的回顾由程序自动整理；想要模型写的完整版，点「重新生成」。', 'dy.make': '生成日报', 'dy.remake': '重新生成', 'dy.none': '这一天还没有日报，点「生成日报」。', 'dy.busy': '正在写今天的回顾，约 1 分钟',
         'dy.tomorrow': '明日关注', 'dy.stats': '新闻 {i} 条 · 故事线 {s} 条 · 来源 {r} 个 · 推送 {p} 次', 'dy.today': '今天', 'dy.items': '当天 {n} 篇', 'dy.hint': '想每晚收到回顾？在对话里说「每晚推送新闻回顾」。',
         'hs.latest': '最新版面', 'hs.viewing': '正在看历史版面（{t}）', 'fb.report': '报错', 'fb.wrong': '有误', 'fb.note': '哪里不对（可不填）', 'fb.done': '已撤下，下次重写时会避开', 'fb.cancel': '收起',
         'fb.misplaced': '不属于这里', 'fb.moved': '已移出，下次重新归并', 'q.title': '质量', 'q.when': '时间', 'q.mode': '模式', 'q.ms': '耗时', 'q.calls': '调用', 'q.fresh': '新/沿用', 'q.check': '核对', 'q.fallback': '退回', 'q.reported': '报错',
         'q.fb': '读者报错 {n} 条，已处理 {r} 条', 'q.re': '重组', 'sn.banner': '自你上次查看（{t}）以来：{n} 条新故事线，{m} 条有进展', 'sn.first': '这是你第一次打开版面：以后这里会告诉你自上次查看以来的变化。',
-        'sn.new': '新', 'sn.added': '+{n} 自上次', 'sn.nothing': '自你上次查看（{t}）以来没有新进展。', 'up.label': '进展', 'sd.back': '‹ 返回', 'sd.timeline': '时间轴', 'sd.full': '原文', 'sd.fold': '收起', 'sd.expandAll': '全部展开', 'sd.foldAll': '全部收起', 'dt.title': '详细报道', 'dt.run': '写详细报道', 'dt.rerun': '重写详细报道', 'dt.busy': '正在读 {n} 篇报道写详细报道，约需 2–4 分钟，可以先去看别的…', 'dt.hint': '模型读这条故事线的全部报道，写成概述、经过、关键数字、各方说法；每句与原文核对。', 'dt.by': '由 {m} 依据 {n} 篇报道写成（{t}），每句已与原文核对', 'dt.dropped': '，{n} 句核对不上已删去', 'dt.newer': '写完后又有 {n} 篇新报道，可以重写。', 'dt.overview': '概述', 'dt.timeline': '经过', 'dt.numbers': '关键数字', 'dt.views': '各方说法', 'dt.background': '背景', 'dt.open': '说法不一或待确认', 'sd.reports': '{n} 篇报道',
+        'sn.new': '新', 'sn.added': '+{n} 自上次', 'sn.nothing': '自你上次查看（{t}）以来没有新进展。', 'up.label': '进展', 'sd.back': '‹ 返回', 'sd.timeline': '时间轴', 'sd.full': '展开原文', 'sd.fold': '收起原文', 'cf.sure': '确定', 'cf.cancel': '取消', 'fb.misplacedQ': '把这篇移出这条故事线？', 'tk.unlinkQ': '从追踪里摘掉这条？', 'tk.mention': '单篇', 'tk.mentionHint': '提到它、但没进版面的单篇报道', 'tk.quiet': '现在开着的 {n} 个源里，{d} 天没有报道提到「{name}」。', 'tk.quietLast': '最后一次是 {t}，来自「{s}」{off}。', 'tk.quietOff': '（这个源已关掉）', 'tk.quietNone': '开着的源里从没有报道提到它。', 'tk.reopen': '重新打开「{s}」（试用）', 'tk.reopened': '已打开，下一轮抓取生效', 'sd.expandAll': '全部展开', 'sd.foldAll': '全部收起', 'dt.title': '详细报道', 'dt.run': '写详细报道', 'dt.rerun': '重写详细报道', 'dt.busy': '正在读 {n} 篇报道写详细报道，约需 2–4 分钟，可以先去看别的…', 'dt.hint': '模型读这条故事线的全部报道，写成概述、经过、关键数字、各方说法；每句与原文核对。', 'dt.by': '由 {m} 依据 {n} 篇报道写成（{t}），每句已与原文核对', 'dt.dropped': '，{n} 句核对不上已删去', 'dt.newer': '写完后又有 {n} 篇新报道，可以重写。', 'dt.overview': '概述', 'dt.timeline': '经过', 'dt.numbers': '关键数字', 'dt.views': '各方说法', 'dt.background': '背景', 'dt.open': '说法不一或待确认', 'sd.reports': '{n} 篇报道',
         'sd.pushed': '已推送到手机 · {r}', 'sd.merged': '并入了：{t}', 'sd.since': '始于 {t}', 'sd.copy': '当前稿件', 'view.follows': '关注', 'fl.section': '我的关注', 'fl.follow': '☆ 关注', 'fl.following': '★ 已关注', 'fl.mute': '屏蔽', 'fl.muted': '已屏蔽，下一份版面起不再出现',
         'fl.saved': '已保存，下一份版面起生效', 'as.open': '添加数据源', 'as.learn': '让模型学会解析这个页面', 'as.learning': '通用解析没认出来，模型正在读页面结构、写解析规则…（本地模型可能要一两分钟）', 'as.relearn': '让模型再学一次', 'as.learnHint': '通用解析认不出这个页面（比如社交平台的帖子流）。模型读一遍页面结构，写出解析规则，程序试抓验证；学会后每轮由程序照着规则抓，不再调用模型。', 'as.learned': '解析规则由模型学会（{n} 次），已试抓验证。', 'as.learnFail': '模型没学会：', 'as.noModel': '需要 LLM 模式和可用的模型（在「运行 → 模型」里设置）', 'as.title': '添加数据源', 'as.close': '收起', 'as.name': '名称，如 证券时报', 'as.url': 'RSS 地址或新闻列表页地址', 'as.test': '试抓', 'as.testing': '试抓中…（约半分钟）', 'as.save': '添加（先试用）', 'as.hint': '先试抓看看能抓到什么，满意再添加。新源先「试用」：照常抓取、帮别家印证，但不单独上版或推送；攒几天数据后，下面的成绩单会告诉你值不值得开。地址、通道、翻页等细节可以在最下方的「高级」里改。', 'as.got': '抓到 {n} 条（{k}，通道 {c}），最新几条：', 'as.list': '列表页', 'as.fail': '没抓到内容：', 'as.weak': '抓到 {n} 条，但看起来不对：', 'as.dup': '这个地址已经在数据源里了', 'as.added': '已添加「{n}」，处于试用中；下一轮抓取起生效', 'fl.kind.story': '故事线', 'fl.kind.theme': '主线', 'fl.storyCount': '{n} 条故事线', 'fl.kind.keyword': '关键词', 'fl.kind.topic': '主题', 'fl.kind.source': '来源', 'fl.add': '关注', 'fl.addMute': '屏蔽',
         'fl.ph': '人名、公司或词，别名用 | 分隔，如 英伟达|NVIDIA', 'fl.listFollow': '关注中', 'fl.listMute': '已屏蔽', 'fl.none': '还没有', 'fl.remove': '移除',
@@ -189,7 +190,7 @@ window.__ModuleLoader__.load({
         'tk.upToDate': 'Synthesis is up to date',
         'tab.track': 'Tracking', 'tk.title': 'Tracking', 'tk.dekAll': 'Follow a company, technology, person or theme over time: related reports attach automatically, and the model connects weeks of developments to judge the trend and its implications.', 'tk.sug': 'Worth tracking', 'tk.sugTheme': 'a theme linking {n} reports in the edition', 'tk.sugEntity': 'in {n} storylines over 7 days ({r} in the last 3)',
         'tk.theme': 'theme', 'tk.mentions': '{n}', 'tk.addPh': 'Company, technology, person or topic, e.g. Nvidia, solid-state batteries, the Iran war', 'tk.tickerPh': 'Ticker', 'tk.add': 'Track', 'tk.none': 'Nothing tracked yet: pick a suggestion above or add your own. Tracked subjects join Following and new developments are pushed.',
-        'tk.kind.company': 'company', 'tk.kind.technology': 'technology', 'tk.kind.person': 'person', 'tk.kind.theme': 'theme', 'tk.freshN': '{n} new', 'tk.pending': 'Synthesis after the next edition', 'tk.storiesN': '{n} storylines, {w} in 7 days', 'tk.latest': 'latest: {t}',
+        'tk.kind.company': 'company', 'tk.kind.technology': 'technology', 'tk.kind.person': 'person', 'tk.kind.theme': 'theme', 'tk.freshN': '{n} new', 'tk.pending': 'Synthesis after the next edition', 'tk.storiesN': '{n} storylines, {w} in 7 days', 'tk.latest': 'latest: {t}', 'tk.quietCard': 'not mentioned for {d} days', 'tk.quietCardOff': '; the source that covered it ("{s}") is off · open for options', 'tk.noStoriesYet': 'No storyline yet; single mentions are in the detail', 'tk.mentionsN': '{n} single',
         'tk.sparkTip': 'related reports per day, last 30 days', 'tk.back': '‹ Back to tracking', 'tk.stop': 'Stop tracking', 'tk.delete': 'Delete', 'tk.confirm': 'Delete it with its linked developments, syntheses and the follows it added?', 'tk.unlink': 'Not related', 'tk.aliases': 'also: {a}', 'tk.dek': '{n} related storylines · tracking since {t}', 'tk.synth': 'Synthesis', 'tk.synthMeta': '{t} · by {m} from {n} storylines', 'tk.incremental': 'incremental',
         'tk.trend': 'Trend', 'tk.changed': 'Since last time', 'tk.milestones': 'Milestones', 'tk.implications': 'Implications for stock, industry and technology trends', 'tk.noSynth': 'No synthesis yet: generate one below (1–2 minutes).', 'tk.noSynthEconomy': 'Syntheses need LLM mode; developments are listed below.',
         'tk.synthBusy': 'The model is writing the synthesis (1–2 minutes)…', 'tk.resynth': 'Update synthesis ({n} new)', 'tk.synthNow': 'Write synthesis', 'tk.timeline': 'Developments · {n}', 'tk.empty': 'No related reports yet; they attach automatically when they appear.', 'tk.new': 'new since synthesis', 'sd.entities': 'Key entities', 'tk.trackIt': 'Track', 'ask.track': 'Track this topic',
@@ -219,7 +220,7 @@ window.__ModuleLoader__.load({
         'fw.k.cycle': 'Scheduled round', 'fw.k.manual': 'Manual fetch', 'fw.k.prewarm': 'Pre-push warm-up', 'fw.k.refresh': 'Re-layout', 'fw.k.deliver': 'Push',
         'fw.s.prep': 'Prepare', 'fw.s.sources': 'Fetch sources', 'fw.s.clean': 'Clean & split', 'fw.s.events': 'Classify & cluster', 'fw.s.bodies': 'Fill bodies', 'fw.s.translate': 'Translate titles', 'fw.s.group': 'Group storylines', 'fw.s.plan': 'Front page', 'fw.s.write': 'Write', 'fw.s.check': 'Fact check', 'fw.s.save': 'Lay out & save', 'fw.s.push': 'Send to phone',
         'fw.partial': 'Done, {n} step(s) incomplete', 'fw.instant': '<1s', 'fw.sec': '{n}s', 'fw.min': '{n} min', 'fw.minsec': '{m}m {s}s', 'fw.hour': '{h}h {m}m',
-        'ts.title': 'Tracking', 'ts.fresh': '+{n}', 'ts.all': 'All trackers ›', 'dt.since': '{n} new since the previous report ({t}), marked "new"', 'dt.new': 'new', 'sb.thin': '{k} of the {n} storylines in "{s}" over the last 24 hours have a single outlet (mostly {top}): corroboration and differing views cannot work there. Consider turning on one or two more sources for this section.',
+        'lw.title': 'Latest', 'lw.at': 'fetched {t}', 'lw.new': 'new', 'lw.newHint': 'just fetched, not in the edition yet', 'lw.outlets': '{n} outlets', 'lw.none': 'Nothing new in the last 6 hours', 'ts.title': 'Tracking', 'ts.fresh': '+{n}', 'ts.all': 'All trackers ›', 'dt.since': '{n} new since the previous report ({t}), marked "new"', 'dt.new': 'new', 'sb.thin': '{k} of the {n} storylines in "{s}" over the last 24 hours have a single outlet (mostly {top}): corroboration and differing views cannot work there. Consider turning on one or two more sources for this section.',
         'rd.retitled': 'The story moved on, so the headline was updated. It was: {t}', 'sb.cooling': '"{s}" failed {n} rounds in a row ({r}) and is now throttled: skipped in normal rounds, retried at {t}, and back to normal once a fetch works. Turn it off if it never recovers.', 'ph.title': 'Push path', 'ph.fix': 'Fix: ', 'mq.running': 'Model is running: ', 'mq.waiting': 'Waiting: ', 'mq.secs': '{n}s', 'mq.hint': 'What you ask for (detailed report, impact analysis, Q&A) goes ahead of editions and background work',
         'ps.save': 'Save', 'ps.saved': 'Saved.', 'ps.noSvc': 'This host has no schedule service; only the preferences are saved.', 'ps.noTask': 'No scheduled push yet: say "push the news every 2 hours" in the chat.', 'ps.task': 'Scheduled task: {s}, next {n}', 'ps.learned': 'From your feedback, these sections now have a higher bar: {s}',
         'ps.log': 'Push history', 'ps.up': 'Useful', 'ps.down': 'Not useful', 'ps.none': 'Nothing pushed yet.',
@@ -228,8 +229,8 @@ window.__ModuleLoader__.load({
         'sb.title': 'Choosing sources', 'sb.hint': 'What each source brought in the last {d} days. On: in the edition and pushes; Trial: fetched and used to corroborate other outlets, but cannot put a story on the board or in a push alone; Off: not fetched.', 'sb.sum': '{on} on · {trial} on trial · {off} off', 'sb.applyAll': 'Apply suggestions ({n})', 'sb.applied': '{n} sources changed; takes effect next round',
         'sb.on': 'On', 'sb.trial': 'Trial', 'sb.off': 'Off', 'sb.suggest': 'Suggested: {s}', 'sb.advanced': 'Advanced: edit source config (URL, type, channels, weight…)', 'sb.foot': 'Stats update with new data; a source that is off has no new data, so its numbers stop where it was turned off. Not sure? Put it on trial: it only corroborates, so it cannot clutter the edition; decide after a few days.',
         'sb.perDay': '{n}/day', 'sb.board': 'in edition {n}', 'sb.first': 'first {n}', 'sb.excl': 'exclusive {n}', 'sb.corrob': 'corroborates {n}', 'sb.low': 'low value {p}%', 'sb.full': 'complete {p}%', 'sb.promo': 'ads {n}', 'sb.fetch': 'fetch ok {p}%',
-        'sb.v.core': 'core', 'sb.v.support': 'corroborates', 'sb.v.ok': 'average', 'sb.v.low': 'low value', 'sb.v.unstable': 'unstable', 'sb.v.insufficient': 'too little data',
-        'sb.why.core': 'Often in the edition, or often first or exclusive; worth keeping.', 'sb.why.support': 'Mostly corroborates other outlets, which sharpens credibility.', 'sb.why.ok': 'Average: rarely in the edition, rarely overlaps with others.', 'sb.why.low': 'Mostly low-value items that rarely overlap with other outlets; it mainly adds noise.', 'sb.why.unstable': 'Over half of recent rounds failed to fetch; test it under Advanced.', 'sb.why.insufficient': 'Too little data to judge; try it on trial.',
+        'sb.v.core': 'core', 'sb.v.support': 'corroborates', 'sb.v.ok': 'average', 'sb.v.low': 'low value', 'sb.v.unstable': 'unstable', 'sb.v.insufficient': 'too little data', 'sb.v.new': 'just added · data after the next fetch',
+        'sb.why.new': 'Just added, not fetched yet. Stats start with the next fetch; decide after a few days of data.', 'sb.why.core': 'Often in the edition, or often first or exclusive; worth keeping.', 'sb.why.support': 'Mostly corroborates other outlets, which sharpens credibility.', 'sb.why.ok': 'Average: rarely in the edition, rarely overlaps with others.', 'sb.why.low': 'Mostly low-value items that rarely overlap with other outlets; it mainly adds noise.', 'sb.why.unstable': 'Over half of recent rounds failed to fetch; test it under Advanced.', 'sb.why.insufficient': 'Too little data to judge; try it on trial.',
         'ct.adv.degraded': 'The page may have changed: test this source under Sources and check what it parses', 'ct.adv.blocked': 'Bodies are blocked or rendered by script: titles only; consider disabling it or using a source with full text', 'ct.adv.slow': 'Bodies come through but slowly: fetched only for edition and key stories', 'ct.adv.fetch': 'Bodies come through: every new item is filled each round', 'ct.adv.probe': 'Trying a few bodies; a strategy is set after a few rounds', 'ct.adv.none': 'Paywalled or set not to fetch bodies', 'ct.adv.list': 'Full text in the list: {c} original pages checked and they match', 'ct.adv.listPending': 'The list looks complete; checking a few original pages to confirm',
         'ct.advice': 'Full text', 'ct.mode.list': 'in list', 'ct.mode.fetch': 'every item', 'ct.mode.slow': 'key items only', 'ct.mode.blocked': 'blocked', 'ct.mode.probe': 'probing', 'ct.mode.none': 'off',
         'sd.fromDigest': 'from “{t}”',
@@ -295,12 +296,12 @@ window.__ModuleLoader__.load({
         'mode.llm': 'LLM mode', 'mode.economy': 'Save tokens', 'mode.llmDesc': 'A model reads each round\'s news, groups, sections, ranks and writes it to the layout; pushes follow the model edition.',
         'mode.economyDesc': 'No model calls; the program lays out the edition by rules and pushes by rules.', 'model.default': 'harness default ({m})', 'model.defaultNone': 'harness default model',
         'model.noService': 'This host has no model service; LLM mode falls back to the rules.', 'model.ready': 'Ready: {m}', 'model.notReady': 'No model available; LLM mode falls back to the rules.',
-        'model.saved': 'Saved', 'ed.preview': 'This is a quick preview laid out by the program; the model is laying out the edition and it will replace this when done.', 'view.daily': 'Daily', 'dy.make': 'Write digest', 'dy.remake': 'Rewrite', 'dy.none': 'No digest for this day yet; press Write digest.', 'dy.busy': 'The model is writing the digest… (1–2 minutes)',
+        'model.saved': 'Saved', 'ed.preview': 'This is a quick preview laid out by the program; the model is laying out the edition and it will replace this when done.', 'view.daily': 'Daily', 'dy.byProgram': 'Put together by the program from the editions', 'dy.autoToday': 'Today up to {t}, put together by the program from the editions (refreshed after each edition); after 21:30 the model writes the full recap.', 'dy.autoPast': 'This recap was put together by the program; click Regenerate for the model-written version.', 'dy.make': 'Write digest', 'dy.remake': 'Rewrite', 'dy.none': 'No digest for this day yet; press Write digest.', 'dy.busy': 'The model is writing the digest… (1–2 minutes)',
         'dy.tomorrow': 'Tomorrow', 'dy.stats': '{i} items · {s} storylines · {r} sources · {p} pushes', 'dy.today': 'Today', 'dy.items': '{n} that day', 'dy.hint': 'Want it every evening? Say "push the news recap every night" in the chat.',
         'hs.latest': 'Latest edition', 'hs.viewing': 'Viewing a past edition ({t})', 'fb.report': 'Report', 'fb.wrong': 'Wrong', 'fb.note': 'What is wrong (optional)', 'fb.done': 'Removed; the next rewrite avoids it', 'fb.cancel': 'Close',
         'fb.misplaced': 'Not this story', 'fb.moved': 'Moved out; it will be regrouped', 'q.title': 'Quality', 'q.when': 'Time', 'q.mode': 'Mode', 'q.ms': 'Time taken', 'q.calls': 'Calls', 'q.fresh': 'New/reused', 'q.check': 'Check', 'q.fallback': 'Fallbacks', 'q.reported': 'Reports',
         'q.fb': '{n} reader reports, {r} handled', 'q.re': 'reflow', 'sn.banner': 'Since you last looked ({t}): {n} new storylines, {m} developing', 'sn.first': 'First visit: from now on this shows what changed since you last looked.',
-        'sn.new': 'new', 'sn.added': '+{n} since last visit', 'sn.nothing': 'Nothing new since you last looked ({t}).', 'up.label': 'Update', 'sd.back': '‹ Back', 'sd.timeline': 'Timeline', 'sd.full': 'Text', 'sd.fold': 'Hide', 'sd.expandAll': 'Expand all', 'sd.foldAll': 'Collapse all', 'dt.title': 'Detailed report', 'dt.run': 'Write detailed report', 'dt.rerun': 'Rewrite detailed report', 'dt.busy': 'Reading {n} reports to write the detailed report, about 2–4 minutes; feel free to look elsewhere…', 'dt.hint': 'The model reads every report in this storyline and writes an overview, timeline, key numbers and who said what; every sentence is checked against the originals.', 'dt.by': 'Written by {m} from {n} reports ({t}); every sentence checked against the originals', 'dt.dropped': '; {n} sentences did not match and were removed', 'dt.newer': '{n} new reports since it was written; you can rewrite it.', 'dt.overview': 'Overview', 'dt.timeline': 'What happened', 'dt.numbers': 'Key numbers', 'dt.views': 'Who said what', 'dt.background': 'Background', 'dt.open': 'Disputed or unconfirmed', 'sd.reports': '{n} reports',
+        'sn.new': 'new', 'sn.added': '+{n} since last visit', 'sn.nothing': 'Nothing new since you last looked ({t}).', 'up.label': 'Update', 'sd.back': '‹ Back', 'sd.timeline': 'Timeline', 'sd.full': 'Show text', 'sd.fold': 'Hide text', 'cf.sure': 'Yes', 'cf.cancel': 'Cancel', 'fb.misplacedQ': 'Move this report out of the storyline?', 'tk.unlinkQ': 'Remove this from the tracker?', 'tk.mention': 'single', 'tk.mentionHint': 'reports that mention it but did not make the edition', 'tk.quiet': 'None of the {n} sources that are on has mentioned "{name}" in {d} days.', 'tk.quietLast': 'The last mention was {t}, from "{s}"{off}.', 'tk.quietOff': ' (that source is off now)', 'tk.quietNone': 'No source that is on has ever mentioned it.', 'tk.reopen': 'Turn "{s}" back on (trial)', 'tk.reopened': 'Turned on; takes effect next fetch', 'sd.expandAll': 'Expand all', 'sd.foldAll': 'Collapse all', 'dt.title': 'Detailed report', 'dt.run': 'Write detailed report', 'dt.rerun': 'Rewrite detailed report', 'dt.busy': 'Reading {n} reports to write the detailed report, about 2–4 minutes; feel free to look elsewhere…', 'dt.hint': 'The model reads every report in this storyline and writes an overview, timeline, key numbers and who said what; every sentence is checked against the originals.', 'dt.by': 'Written by {m} from {n} reports ({t}); every sentence checked against the originals', 'dt.dropped': '; {n} sentences did not match and were removed', 'dt.newer': '{n} new reports since it was written; you can rewrite it.', 'dt.overview': 'Overview', 'dt.timeline': 'What happened', 'dt.numbers': 'Key numbers', 'dt.views': 'Who said what', 'dt.background': 'Background', 'dt.open': 'Disputed or unconfirmed', 'sd.reports': '{n} reports',
         'sd.pushed': 'pushed ({r})', 'sd.merged': 'Merged in: {t}', 'sd.since': 'since {t}', 'sd.copy': 'Current copy', 'view.follows': 'Following', 'fl.section': 'Following', 'fl.follow': '☆ Follow', 'fl.following': '★ Following', 'fl.mute': 'Mute', 'fl.muted': 'Muted; gone from the next edition',
         'fl.saved': 'Saved; takes effect from the next edition', 'as.open': 'Add a source', 'as.learn': 'Let the model learn this page', 'as.learning': 'The generic parser couldn\'t read it; the model is reading the page structure and writing rules… (a local model may take a minute or two)', 'as.relearn': 'Let the model try again', 'as.learnHint': 'The generic parser can\'t read this page (a social feed, say). The model reads the page structure once and writes parsing rules, which a test fetch verifies; after that the program follows the rules every round with no model calls.', 'as.learned': 'Parsing rules learned by the model ({n} tries) and verified by a test fetch.', 'as.learnFail': 'The model couldn\'t learn it: ', 'as.noModel': 'Needs LLM mode and an available model (Runs → Model)', 'as.title': 'Add a source', 'as.close': 'Close', 'as.name': 'Name, e.g. Securities Times', 'as.url': 'RSS feed or news list page URL', 'as.test': 'Test fetch', 'as.testing': 'Testing… (about 30 s)', 'as.save': 'Add (on trial)', 'as.hint': 'Test-fetch first to see what comes back, then add it. New sources start on trial: fetched and used to corroborate others, but never leading a story or a push alone. After a few days the scorecard below tells you whether to keep it on. URL, channels and paging can be fine-tuned under Advanced at the bottom.', 'as.got': 'Got {n} items ({k}, via {c}). Latest:', 'as.list': 'list page', 'as.fail': 'Nothing fetched: ', 'as.weak': 'Got {n} items, but they look wrong: ', 'as.dup': 'This URL is already a source', 'as.added': 'Added "{n}" on trial; it takes effect from the next round', 'fl.kind.story': 'storyline', 'fl.kind.theme': 'theme', 'fl.storyCount': '{n} storylines', 'fl.kind.keyword': 'keyword', 'fl.kind.topic': 'topic', 'fl.kind.source': 'source', 'fl.add': 'Follow', 'fl.addMute': 'Mute',
         'fl.ph': 'person, company, or term; aliases with |, e.g. 英伟达|NVIDIA', 'fl.listFollow': 'Following', 'fl.listMute': 'Muted', 'fl.none': 'none yet', 'fl.remove': 'Remove',
@@ -500,6 +501,8 @@ window.__ModuleLoader__.load({
       var firstId = indep.length ? indep[0].article_id : null
       var reposts = members.length - indep.length
       var days = []
+      // 报道按时间倒排：最新的在上面
+      members = members.slice().sort(function (a, b) { return String(b.published_at || b.joined_at).localeCompare(String(a.published_at || a.joined_at)) })
       members.forEach(function (m) { var ms = toMs(m.published_at || m.joined_at); var day = isFinite(ms) ? dayOf(ms) : ''; if (!days.length || days[days.length - 1].day !== day) days.push({ day: day, list: [] }); days[days.length - 1].list.push(m) })
       return h('div', { className: 'nw-sd nw-evd' },
         props.onBack ? h('button', { className: 'nw-act nw-back-link nw-back', onClick: props.onBack }, t('sd.back')) : null,
@@ -507,7 +510,7 @@ window.__ModuleLoader__.load({
           h('span', { className: 'nw-mast-date' }, [(e.labels || []).slice(0, 2).map(function (l) { return (props.names && props.names[l]) || l }).join(' · '), (e.regions || []).slice(0, 3).join(' ')].filter(Boolean).join(' · ')),
           h('a', { className: 'nw-mast-head nw-evd-title', href: e.lead_url || '#', target: '_blank', rel: 'noopener noreferrer' }, e.title),
           h('div', { className: 'nw-mast-dek' }, [t('ev.indep', { n: e.source_count }) + (reposts ? '，' + t('rd.reposts', { n: reposts }) : ''), when(e.first_seen_at) + ' → ' + when(e.last_seen_at), e.credibility !== 'single' ? t('cred.' + e.credibility) : t('ev.single'), e.pushed ? t('txt.pushed') : ''].filter(Boolean).join(' · '))),
-        h(NotesBox, { notes: e.notes, analyze: props.onAnalyze, phase: props.analyzePhase, model: props.model }),
+        e.analysis ? h(AnalysisFull, { analysis: e.analysis }) : h(NotesBox, { notes: e.notes, analyze: props.onAnalyze, phase: props.analyzePhase, model: props.model }),
         e.dispute ? h('div', { className: 'nw-callout nw-warnbox' }, h('b', null, t('head.dispute') + '（' + e.dispute.kind + '）'), ' ',
           e.dispute.values.map(function (v) { var o = (e.outlets || []).find(function (x) { return x.grp === v.outlet }); return shortName(o || { name: v.outlet }) + ' ' + v.value }).join(' / ')) : null,
         h('section', { className: 'nw-rail-box' }, h('h4', null, t('ev.reports', { n: members.length })),
@@ -638,7 +641,7 @@ window.__ModuleLoader__.load({
         s.state ? h('p', { className: 'nw-rs-lead' }, s.state) : null,
         s.trend ? h('div', { className: 'nw-rs-block' }, h('div', { className: 'nw-rs-k' }, t('tk.trend')), h('p', { className: 'nw-rs-p nw-tktrend' }, s.trend)) : null,
         s.changed && s.changed !== '首次综述' ? h('div', { className: 'nw-rs-update' }, h('b', null, t('tk.changed')), s.changed) : null,
-        (s.milestones || []).length ? [h('div', { key: 'k', className: 'nw-rs-k' }, t('tk.milestones')), h('ol', { key: 'm', className: 'nw-tkmiles' }, s.milestones.map(function (m, i) { return h('li', { key: i }, h('span', { className: 'nw-tl2-t' }, m.date), m.text) }))] : null,
+        (s.milestones || []).length ? [h('div', { key: 'k', className: 'nw-rs-k' }, t('tk.milestones')), h('ol', { key: 'm', className: 'nw-tkmiles' }, s.milestones.slice().sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')) }).map(function (m, i) { return h('li', { key: i }, h('span', { className: 'nw-tl2-t' }, m.date), m.text) }))] : null,
         (s.implications || []).length ? [h('div', { key: 'k2', className: 'nw-rs-k' }, t('tk.implications')), h(ImpactList, { key: 'l', impacts: s.implications })] : null,
         (s.outlook || []).length ? [h('div', { key: 'k3', className: 'nw-rs-k' }, t('ia.scenarios')),
           h('ul', { key: 'o', className: 'nw-imp-list' }, s.outlook.map(function (x, i) { return h('li', { key: i }, h('span', { className: 'nw-scn nw-scn-' + ({ '高': 'hi', '中': 'mid', '低': 'lo' }[x.likelihood] || 'lo') }, x.likelihood), h('span', null, h('b', null, x.name), ' ', x.what, x.signals ? h('div', { className: 'nw-muted nw-xs' }, t('ia.signals') + x.signals) : null)) }))] : null,
@@ -657,8 +660,15 @@ window.__ModuleLoader__.load({
         setIn(setSt, { busy: true, error: null })
         postJson(API.track, { action: 'synth', id: d.id }).then(function () { load() }).catch(function (e) { setIn(setSt, { busy: false, error: e.status === 409 ? t('ia.noModel') : e.message }) })
       }
+      // 时间轴：挂上的故事线和没进版面的单篇报道合在一起，按时间倒排（最新的在上面）
+      var rows = d.timeline.map(function (x) { return { k: 's', t: x.first_at, x: x } }).concat((d.mentions || []).map(function (m) { return { k: 'm', t: m.at, m: m } }))
+        .sort(function (a, b) { return String(b.t).localeCompare(String(a.t)) })
       var days = []
-      d.timeline.forEach(function (x) { var ms = toMs(x.first_at); var day = isFinite(ms) ? dayOf(ms) : ''; if (!days.length || days[days.length - 1].day !== day) days.push({ day: day, list: [] }); days[days.length - 1].list.push(x) })
+      rows.forEach(function (r) { var ms = toMs(r.t); var day = isFinite(ms) ? dayOf(ms) : ''; if (!days.length || days[days.length - 1].day !== day) days.push({ day: day, list: [] }); days[days.length - 1].list.push(r) })
+      var q = d.quiet
+      var quietBox = q ? h('div', { className: 'nw-callout nw-warnbox nw-tkquiet' },
+        h('div', null, t('tk.quiet', { n: (q.sources_on || []).length, d: q.days_quiet == null ? '30+' : Math.max(2, q.days_quiet), name: d.name }) + ' ' + (q.last ? t('tk.quietLast', { t: when(q.last.at), s: q.last.source, off: q.last.source_on ? '' : t('tk.quietOff') }) : t('tk.quietNone'))),
+        q.last && !q.last.source_on && q.last.source_id ? (st.reopened ? h('span', { className: 'nw-saved' }, t('tk.reopened')) : h('button', { className: 'nw-btn nw-sm', onClick: function () { postJson(API.state, { id: q.last.source_id, state: 'trial' }).then(function () { setIn(setSt, { reopened: true }) }).catch(function (e) { setIn(setSt, { error: e.message }) }) } }, t('tk.reopen', { s: q.last.source }))) : null) : null
       return h('div', { className: 'nw-sd nw-tkd' },
         h('div', { className: 'nw-mast-row' }, back,
           st.confirm ? h('span', { className: 'nw-tkconfirm' }, h('span', { className: 'nw-muted nw-xs' }, t('tk.confirm')),
@@ -669,17 +679,23 @@ window.__ModuleLoader__.load({
           h('span', { className: 'nw-mast-date' }, t('tk.kind.' + d.kind) + (d.ticker ? ' · ' + d.ticker : '') + (d.aliases.length > 1 ? ' · ' + t('tk.aliases', { a: d.aliases.slice(1, 5).join('、') }) : '')),
           h('h1', { className: 'nw-mast-head' }, d.name),
           h('div', { className: 'nw-mast-dek' }, t('tk.dek', { n: d.timeline.length, t: when(d.created_at) }), ' ', h(MiniSpark, { values: d.spark }))),
-        d.synthesis ? h(TrackSynthesis, { s: d.synthesis }) : h('p', { className: 'nw-muted' }, d.can_synth ? t('tk.noSynth') : t('tk.noSynthEconomy')),
-        h('div', { className: 'nw-impact-acts' },
+        quietBox,
+        // 综述要有故事线才写得出来：一条都没有时不放按钮，免得点了也写不成
+        d.synthesis ? h(TrackSynthesis, { s: d.synthesis }) : d.timeline.length ? h('p', { className: 'nw-muted' }, d.can_synth ? t('tk.noSynth') : t('tk.noSynthEconomy')) : null,
+        !d.timeline.length && !d.synthesis ? null : h('div', { className: 'nw-impact-acts' },
           d.can_synth ? h('button', { className: 'nw-btn nw-sm' + (d.fresh ? ' nw-primary' : ''), disabled: st.busy || Boolean(d.synthesis && !d.fresh), onClick: synth }, st.busy ? t('tk.synthBusy') : d.synthesis ? (d.fresh ? t('tk.resynth', { n: d.fresh }) : t('tk.upToDate')) : t('tk.synthNow')) : null,
           st.error ? h('span', { className: 'nw-error' }, st.error) : null),
-        h('section', { className: 'nw-rail-box' }, h('h4', null, t('tk.timeline', { n: d.timeline.length })),
-          !d.timeline.length ? h('p', { className: 'nw-muted' }, t('tk.empty')) : days.map(function (g) {
+        h('section', { className: 'nw-rail-box' }, h('h4', null, t('tk.timeline', { n: rows.length })),
+          !rows.length ? h('p', { className: 'nw-muted' }, t('tk.empty')) : days.map(function (g) {
             return h('div', { key: g.day, className: 'nw-tl-day' }, h('div', { className: 'nw-tl-dh' }, longDate(g.day + 'T12:00:00+08:00')),
-              h('ol', { className: 'nw-tl2' }, g.list.map(function (x) {
+              h('ol', { className: 'nw-tl2' }, g.list.map(function (r) {
+                if (r.k === 'm') return h('li', { key: 'm' + r.m.id, className: 'nw-rs nw-tkm' }, h('span', { className: 'nw-tl2-t' }, hhmm(r.m.at)),
+                  h('span', { className: 'nw-tl2-body' }, h('span', { className: 'nw-tkm-tag', title: t('tk.mentionHint') }, t('tk.mention')), h('span', { className: 'nw-tl2-src' }, r.m.source),
+                    h('a', { className: 'nw-tl2-a', href: r.m.url, target: '_blank', rel: 'noopener noreferrer' }, r.m.title)))
+                var x = r.x
                 return h('li', { key: x.id, className: 'nw-rs' }, h('span', { className: 'nw-tl2-t' }, hhmm(x.first_at)),
                   h('span', { className: 'nw-tl2-body' }, h('button', { className: 'nw-brief-link nw-tkstory', onClick: function () { props.onOpen(x.id) } }, h('b', null, x.title)), h('span', { className: 'nw-muted nw-xs' }, ' · ' + t('ask.reports', { n: x.n }) + (d.synthesis && x.updated_at > d.synthesis.at ? ' · ' + t('tk.new') : '')),
-                    h('span', { className: 'nw-acts' }, h('button', { className: 'nw-act', onClick: function () { postJson(API.track, { action: 'unlink', id: d.id, story_id: x.id }).then(load) } }, t('tk.unlink'))),
+                    h('span', { className: 'nw-tl2-end' }, h(ConfirmAct, { label: t('tk.unlink'), question: t('tk.unlinkQ'), onConfirm: function () { postJson(API.track, { action: 'unlink', id: d.id, story_id: x.id }).then(load) } })),
                     x.update ? h('div', { className: 'nw-muted nw-xs' }, t('up.label') + '：' + x.update) : x.lead ? h('div', { className: 'nw-muted nw-xs nw-tklead' }, x.lead) : null))
               })))
           })))
@@ -703,10 +719,10 @@ window.__ModuleLoader__.load({
         setForm(Object.assign({}, form, { note: '…' }))
         return postJson(API.track, Object.assign({ action: 'add' }, body)).then(function (r) { setForm({ name: '', kind: form.kind, ticker: '', note: '' }); load(); setSel(r.id) }).catch(function (e) { setForm(Object.assign({}, form, { note: e.message })) })
       }
-      if (story) return h('div', { className: 'nw-news' }, h(StoryDetail, { id: story, names: props.names, onBack: function () { setStory(null) } }))
-      if (sel) return h(TrackDetail, { id: sel, onBack: function () { setSel(null); load() }, onOpen: setStory })
-      if (!v.list) return Empty({ children: '…' })
-      return h('div', { className: 'nw-tracking' },
+      // 列表 → 追踪详情 → 故事线：往里走时外层只藏起来，返回时回到原处
+      var storyEl = story ? h('div', { className: 'nw-news' }, h(StoryDetail, { id: story, names: props.names, onBack: function () { setStory(null); returnPlace('track:detail') } })) : null
+      var detailEl = sel ? h(TrackDetail, { id: sel, onBack: function () { setSel(null); returnPlace('track:list'); load() }, onOpen: function (id) { leavePlace('track:detail'); setStory(id) } }) : null
+      var listEl = !v.list ? Empty({ children: '…' }) : h('div', { className: 'nw-tracking' },
         h('header', { className: 'nw-mast' }, h('h1', { className: 'nw-mast-head' }, t('tk.title')), h('div', { className: 'nw-mast-dek' }, t('tk.dekAll'))),
         v.sug.length ? h('section', { className: 'nw-rail-box' }, h('h4', null, t('tk.sug')),
           h('div', { className: 'nw-tksug' }, v.sug.map(function (x) {
@@ -720,12 +736,15 @@ window.__ModuleLoader__.load({
           h('button', { className: 'nw-btn nw-primary nw-sm', disabled: !form.name.trim(), onClick: function () { add({ name: form.name.trim(), kind: form.kind, ticker: form.ticker || undefined }) } }, t('tk.add')),
           form.note ? h('span', { className: 'nw-muted nw-xs' }, form.note) : null),
         !v.list.length ? h('p', { className: 'nw-muted' }, t('tk.none')) : h('ul', { className: 'nw-tklist' }, v.list.map(function (x) {
-          return h('li', { key: x.id }, h('button', { className: 'nw-tkcard', onClick: function () { setSel(x.id) } },
+          return h('li', { key: x.id }, h('button', { className: 'nw-tkcard', onClick: function () { leavePlace('track:list'); setSel(x.id) } },
             h('div', { className: 'nw-tkhead' }, h('b', null, x.name), h('span', { className: 'nw-muted nw-xs' }, ' ' + t('tk.kind.' + x.kind) + (x.ticker ? ' · ' + x.ticker : '')), x.fresh && x.synthesis ? h('span', { className: 'nw-rs-tag nw-rs-dev' }, ' ' + t('tk.freshN', { n: x.fresh })) : null, h(MiniSpark, { values: x.spark })),
-            x.synthesis && x.synthesis.state ? h('div', { className: 'nw-tkstate' }, x.synthesis.state) : h('div', { className: 'nw-muted nw-xs' }, v.can ? t('tk.pending') : ''),
-            h('div', { className: 'nw-muted nw-xs' }, [t('tk.storiesN', { n: x.stories, w: x.week }), x.latest ? t('tk.latest', { t: x.latest.title }) : ''].filter(Boolean).join(' · '))))
+            x.synthesis && x.synthesis.state ? h('div', { className: 'nw-tkstate' }, x.synthesis.state)
+              : x.quiet ? h('div', { className: 'nw-tkquiet-line' }, t('tk.quietCard', { d: x.quiet.days_quiet == null ? '30+' : Math.max(2, x.quiet.days_quiet) }) + (x.quiet.last && !x.quiet.last.source_on ? t('tk.quietCardOff', { s: x.quiet.last.source }) : ''))
+              : h('div', { className: 'nw-muted nw-xs' }, v.can && x.stories ? t('tk.pending') : t('tk.noStoriesYet')),
+            h('div', { className: 'nw-muted nw-xs' }, [t('tk.storiesN', { n: x.stories, w: x.week }), x.mentions_week ? t('tk.mentionsN', { n: x.mentions_week }) : '', x.latest ? t('tk.latest', { t: x.latest.title }) : ''].filter(Boolean).join(' · '))))
         })),
         v.error ? h('div', { className: 'nw-error' }, v.error) : null)
+      return h('div', null, h('div', { style: sel || story ? HIDE : null }, listEl), detailEl ? h('div', { style: story ? HIDE : null }, detailEl) : null, storyEl)
     }
 
     // ------------------------------------------------------------------ 影响与走势
@@ -747,7 +766,7 @@ window.__ModuleLoader__.load({
         a.summary ? h('p', { className: 'nw-rs-p nw-impact-sum' }, a.summary) : null,
         h(ImpactList, { impacts: a.impacts }),
         h('div', { className: 'nw-impact-acts' },
-          props.onOpen ? h('button', { className: 'nw-act', onClick: props.onOpen }, t('ia.more')) : null,
+          props.onOpen ? h('button', { className: 'nw-link-btn', onClick: props.onOpen }, t('ia.more')) : null,
           props.onFollow && !props.followed ? h('button', { className: 'nw-act nw-on', onClick: props.onFollow }, '☆ ' + t('ia.follow')) : props.followed ? h('span', { className: 'nw-muted nw-xs' }, '★ ' + t('ia.following')) : null))
     }
     function AnalysisFull(props) {
@@ -1171,8 +1190,7 @@ window.__ModuleLoader__.load({
         h('div', { className: 'nw-read' },
           h('div', { className: 'nw-read-main' }, keyBox, folEl, frontEl, body),
           h('aside', { className: 'nw-rail' },
-            (c.tickers || []).length ? h('section', { className: 'nw-rail-box nw-ticks' }, h('h4', null, t('rd.ticks')),
-              h('ul', null, c.tickers.map(function (x) { var d = tickDir(x.rest || x.text); return h('li', { key: x.instrument }, h('a', { className: 'nw-tick' + (d ? ' nw-tick-' + d : ''), href: x.url, target: '_blank', rel: 'noopener noreferrer', title: x.source }, h('b', null, x.instrument), h('span', null, d === 'up' ? '▲ ' : d === 'down' ? '▼ ' : '', x.rest || x.text), h('time', null, hhmm(x.t)))) }))) : null,
+            h(LatestRail, { stamp: props.stamp, onOpen: open }),
             h(NoteList, { title: t('head.watch'), items: c.watch, stories: st, onOpen: open }),
             h(NoteList, { title: t('head.verify'), items: c.verify, stories: st, onOpen: open, tone: 'warn' }),
             skim, about)),
@@ -1220,7 +1238,7 @@ window.__ModuleLoader__.load({
         d.since && d.since.added ? h('p', { className: 'nw-note' }, t('dt.since', { n: d.since.added, t: d.since.at ? when(d.since.at) : '' })) : null,
         h('p', { className: 'nw-muted nw-xs' }, t('dt.by', { m: d.model || '', n: mats.length, t: when(d.created_at) }) + (ck.dropped ? t('dt.dropped', { n: ck.dropped }) : '')),
         d.overview ? [k('dt.overview'), h('p', { key: 'o', className: 'nw-rs-p' }, d.overview.text, refs(d.overview.refs))] : null,
-        (d.timeline || []).length ? [k('dt.timeline'), h('ol', { key: 't', className: 'nw-dt-tl' }, d.timeline.map(function (x, i) { return h('li', { key: i }, nb(x), x.time ? h('span', { className: 'nw-dt-time' }, x.time) : null, h('span', null, x.text, refs(x.refs))) }))] : null,
+        (d.timeline || []).length ? [k('dt.timeline'), h('ol', { key: 't', className: 'nw-dt-tl' }, d.timeline.slice().reverse().map(function (x, i) { return h('li', { key: i }, nb(x), x.time ? h('span', { className: 'nw-dt-time' }, x.time) : null, h('span', null, x.text, refs(x.refs))) }))] : null,
         (d.numbers || []).length ? [k('dt.numbers'), h('ul', { key: 'n', className: 'nw-rs-points' }, d.numbers.map(function (x, i) { return h('li', { key: i }, nb(x), x.text, refs(x.refs)) }))] : null,
         (d.views || []).length ? [k('dt.views'), h('ul', { key: 'v', className: 'nw-rs-views' }, d.views.map(function (x, i) { return h('li', { key: i }, nb(x), h('b', null, x.who), '　' + x.says, refs(x.refs)) }))] : null,
         d.background ? [k('dt.background'), h('p', { key: 'b', className: 'nw-rs-p' }, d.background.text, refs(d.background.refs))] : null,
@@ -1272,7 +1290,7 @@ window.__ModuleLoader__.load({
       // 时间轴：报道、进展、推送按时间合在一起，按天分组
       var ev = st.items.map(function (it) { return { k: 'i', t: it.published_at || it.first_seen_at, it: it } })
         .concat(st.updates.map(function (u) { return { k: 'u', t: u.at, u: u } }), st.pushes.map(function (x) { return { k: 'p', t: x.pushed_at, p: x } }))
-        .sort(function (a, b) { return String(a.t).localeCompare(String(b.t)) })
+        .sort(function (a, b) { return String(b.t).localeCompare(String(a.t)) })
       var days = []
       ev.forEach(function (x) { var ms = toMs(x.t); var day = isFinite(ms) ? dayOf(ms) : ''; if (!days.length || days[days.length - 1].day !== day) days.push({ day: day, ev: [] }); days[days.length - 1].ev.push(x) })
       var outlets = {}
@@ -1310,7 +1328,7 @@ window.__ModuleLoader__.load({
           !st.detail && !busyDt ? h('span', { className: 'nw-muted nw-xs' }, t('dt.hint')) : null,
           dt.error || (!busyDt && st.detail_error) ? h('span', { className: 'nw-error' }, dt.error || st.detail_error) : null) : null,
         h('section', { className: 'nw-rail-box' }, h('h4', null, t('sd.timeline'),
-          st.items.some(function (it) { return it.text }) ? h('button', { className: 'nw-act nw-sd-all', onClick: function () {
+          st.items.some(function (it) { return it.text }) ? h('button', { className: 'nw-link-btn nw-sd-all', onClick: function () {
             var all = st.items.every(function (it) { return !it.text || opened[it.id] })
             var n = {}
             if (!all) st.items.forEach(function (it) { if (it.text) n[it.id] = true })
@@ -1328,9 +1346,10 @@ window.__ModuleLoader__.load({
                     h('a', { className: 'nw-tl2-a', href: x.it.url, target: '_blank', rel: 'noopener noreferrer', title: x.it.title_zh ? x.it.title : undefined }, x.it.title_zh || x.it.title),
                     x.it.title_zh ? h('div', { className: 'nw-tl2-orig' }, x.it.title) : null,
                     x.it.kind === 'digest_item' ? h('span', { className: 'nw-muted nw-xs' }, ' · ' + t('sd.fromDigest', { t: x.it.kind_note || '' })) : null,
-                    x.it.text ? h('button', { className: 'nw-act nw-sd-toggle', onClick: function () { setOpened(function (m) { var n = Object.assign({}, m); n[x.it.id] = !m[x.it.id]; return n }) } }, opened[x.it.id] ? t('sd.fold') : t('sd.full')) : null,
-                    x.it.text && opened[x.it.id] ? h('div', { className: 'nw-sd-text' }, x.it.text) : null,
-                    moved[x.it.id] ? h('span', { className: 'nw-saved' }, ' ' + t('fb.moved')) : h('span', { className: 'nw-acts' }, h('button', { className: 'nw-act', onClick: function () { misplace(x.it.id) } }, t('fb.misplaced')))))
+                    h('div', { className: 'nw-tl2-row' },
+                      x.it.text ? h('button', { className: 'nw-link-btn', 'aria-expanded': Boolean(opened[x.it.id]), onClick: function () { setOpened(function (m) { var n = Object.assign({}, m); n[x.it.id] = !m[x.it.id]; return n }) } }, (opened[x.it.id] ? t('sd.fold') : t('sd.full')) + (opened[x.it.id] ? ' ▴' : ' ▾')) : h('span'),
+                      moved[x.it.id] ? h('span', { className: 'nw-saved' }, t('fb.moved')) : h(ConfirmAct, { label: t('fb.misplaced'), question: t('fb.misplacedQ'), onConfirm: function () { misplace(x.it.id) } })),
+                    x.it.text && opened[x.it.id] ? h('div', { className: 'nw-sd-text' }, x.it.text) : null))
               })))
           })))
     }
@@ -1338,9 +1357,8 @@ window.__ModuleLoader__.load({
     // ------------------------------------------------------------------ 日报
     function DailyView(props) {
       var today = dayOf(Date.now())
-      // 回顾是晚间产品：18 点前默认看昨天的
-      var bjHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hour12: false }).format(new Date()))
-      var dPair = useState({ date: bjHour < 18 ? addDays(today, -1) : today, d: null, dates: [], busy: false, phase: 'busy', error: null })
+      // 回顾自动生成：白天是程序整理的「今天到目前为止」，21:30 后由模型写成完整版。默认看今天
+      var dPair = useState({ date: today, d: null, dates: [], busy: false, phase: 'busy', error: null })
       var d = dPair[0]
       var setD = dPair[1]
       var pack = props.pack || 'all'
@@ -1367,6 +1385,7 @@ window.__ModuleLoader__.load({
           h('button', { className: 'nw-act', 'aria-label': '+1', disabled: d.date >= today, onClick: function () { load(addDays(d.date, 1)) } }, '›'),
           d.date !== today ? h('button', { className: 'nw-act', onClick: function () { load(today) } }, t('dy.today')) : null),
         h('button', { className: 'nw-btn nw-ghost nw-sm', disabled: d.busy, onClick: make }, d.busy ? '…' : x ? t('dy.remake') : t('dy.make')))
+      var autoNote = x && x.mode !== 'llm' ? h('p', { className: 'nw-muted nw-xs nw-dy-auto' }, d.date === today ? t('dy.autoToday', { t: hhmm(x.created_at) }) : t('dy.autoPast')) : null
       var body
       if (d.phase === 'busy') body = Empty({ children: '…' })
       else if (!x) body = Empty({ children: t('dy.none') })
@@ -1383,12 +1402,12 @@ window.__ModuleLoader__.load({
           x.tomorrow.length ? h('section', { className: 'nw-rail-box' }, h('h4', null, t('dy.tomorrow')), h('ul', null, x.tomorrow.map(function (w, i) { return h('li', { key: i }, w.text) }))) : null,
           h('section', { className: 'nw-rail-box nw-about' }, h('h4', null, t('rd.aboutDay')),
             h('p', null, t('dy.stats', { i: x.stats.items, s: x.stats.storylines, r: x.stats.sources, p: x.stats.pushes })),
-            h('p', null, (x.mode === 'llm' ? t('rd.byModel', { m: x.model || '' }) : t('rd.byRules')) + ' · ' + when(x.created_at)),
+            h('p', null, (x.mode === 'llm' ? t('rd.byModel', { m: x.model || '' }) : t('dy.byProgram')) + ' · ' + when(x.created_at)),
             h('p', { className: 'nw-muted' }, t('dy.hint')))))
       return h('div', { className: 'nw-edition' },
         h('header', { className: 'nw-mast' }, nav,
           x && x.headline ? h('h1', { className: 'nw-mast-head' }, x.headline) : null,
-          x ? h('div', { className: 'nw-mast-dek' }, t('rd.dayDek', { n: x.stories.length })) : null),
+          x ? h('div', { className: 'nw-mast-dek' }, t('rd.dayDek', { n: x.stories.length })) : null, autoNote),
         d.busy ? h('div', { className: 'nw-working' }, h('span', { className: 'nw-pulse' }), t('dy.busy')) : null,
         d.error ? h('div', { className: 'nw-error' }, d.error) : null, body)
     }
@@ -1451,6 +1470,18 @@ window.__ModuleLoader__.load({
               h('td', null, when(r.created_at)), h('td', null, r.reassembled ? t('q.re') : r.mode === 'llm' ? '✦ ' + (r.model || '') : t('mode.economy')), h('td', null, r.ms != null ? Math.round(r.ms / 1000) + 's' : ''), h('td', null, String(r.calls || 0)),
               h('td', null, (r.fresh ?? '–') + ' / ' + (r.reused ?? '–')), h('td', null, ck), h('td', null, String(r.fallbacks || 0)), h('td', null, String(r.reported || 0)))
           })))))
+    }
+
+    // ------------------------------------------------------------------ 需要确认的小动作
+    /** 「不属于这里」这类会改数据的动作：点一下先问一句，再点「确定」才做；平时是不显眼的灰字，放在行尾。 */
+    function ConfirmAct(props) {
+      var oPair = useState(false)
+      var open = oPair[0]
+      var setOpen = oPair[1]
+      if (!open) return h('button', { className: 'nw-act nw-act-quiet', title: props.question, onClick: function (e) { e.stopPropagation(); setOpen(true) } }, props.label)
+      return h('span', { className: 'nw-confirm' }, h('span', { className: 'nw-confirm-q' }, props.question),
+        h('button', { className: 'nw-act nw-act-danger', onClick: function (e) { e.stopPropagation(); setOpen(false); props.onConfirm() } }, t('cf.sure')),
+        h('button', { className: 'nw-act', onClick: function (e) { e.stopPropagation(); setOpen(false) } }, t('cf.cancel')))
     }
 
     // ------------------------------------------------------------------ 一轮的流程图
@@ -1561,6 +1592,37 @@ window.__ModuleLoader__.load({
         props.full ? h('h2', { className: 'nw-sec-h' }, v.active ? t('fw.title') : t('fw.last')) : null,
         h(FlowHead, { flow: f, toggle: toggle }),
         open ? h(FlowChart, { flow: f }) : null)
+    }
+
+    // ------------------------------------------------------------------ 最新快讯（右栏）
+    /**
+     * 刚抓到的新闻，按时间倒排；不等版面（版面要等模型写，这一栏每轮抓取后就是新的）。
+     * 版面还没写到的标「新」。有故事线的点开进故事线，没有的打开原文。每分钟取一次。
+     */
+    function LatestRail(props) {
+      var vPair = useState(null)
+      var v = vPair[0]
+      var setV = vPair[1]
+      useEffect(function () {
+        var alive = true
+        function tick() { getJson(API.latest + '?limit=12').then(function (r) { if (alive) setV(r) }).catch(function () {}) }
+        tick()
+        var timer = setInterval(tick, 60000)
+        return function () { alive = false; clearInterval(timer) }
+      }, [props.stamp])
+      if (!v) return null
+      return h('section', { className: 'nw-rail-box nw-lw' },
+        h('h4', null, t('lw.title'), v.fetched_at ? h('span', { className: 'nw-lw-at' }, t('lw.at', { t: hhmm(v.fetched_at) })) : null),
+        !(v.items || []).length ? h('p', { className: 'nw-muted nw-xs' }, t('lw.none')) : h('ol', { className: 'nw-lw-list' }, v.items.map(function (x) {
+          var title = x.story_id && props.onOpen
+            ? h('button', { className: 'nw-lw-title', onClick: function () { props.onOpen(x.story_id) } }, x.title)
+            : h('a', { className: 'nw-lw-title', href: x.url, target: '_blank', rel: 'noopener noreferrer' }, x.title)
+          return h('li', { key: x.id, className: 'nw-lw-item' },
+            h('span', { className: 'nw-lw-t' }, (x.approx ? '~' : '') + hhmm(x.at)),
+            h('div', { className: 'nw-lw-body' },
+              h('div', { className: 'nw-lw-line' }, x.fresh ? h('span', { className: 'nw-lw-new', title: t('lw.newHint') }, t('lw.new')) : null, title),
+              h('div', { className: 'nw-lw-meta' }, x.source + (x.outlets > 1 ? ' · ' + t('lw.outlets', { n: x.outlets }) : ''))))
+        })))
     }
 
     // ------------------------------------------------------------------ 首页的追踪动态
@@ -1745,6 +1807,31 @@ window.__ModuleLoader__.load({
     }
 
     // ------------------------------------------------------------------ 要闻
+    // ------------------------------------------------------------------ 返回时回到原来的位置
+    // 列表 → 详情 → 返回：详情打开时列表只是藏起来（不卸载，已加载的内容、展开的状态都在），
+    // 打开前记下滚动位置，返回后恢复，读者接着往下看，不用从头翻。
+    var places = {}
+    function scrollBox() {
+      var el = document.querySelector('.nw-root')
+      for (var n = el && el.parentElement; n; n = n.parentElement) {
+        var o = getComputedStyle(n).overflowY
+        if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight + 4) return n
+      }
+      return document.scrollingElement || document.documentElement
+    }
+    /** 离开列表前：记下位置，详情从顶上开始看。 */
+    function leavePlace(key) {
+      var box = scrollBox()
+      places[key] = box ? box.scrollTop : 0
+      requestAnimationFrame(function () { var b = scrollBox(); if (b) b.scrollTop = 0 })
+    }
+    /** 回到列表：等列表重新显示出来，再滚回记下的位置。 */
+    function returnPlace(key) {
+      var top = places[key] || 0
+      requestAnimationFrame(function () { requestAnimationFrame(function () { var b = scrollBox(); if (b) b.scrollTop = top }) })
+    }
+    var HIDE = { display: 'none' }
+
     function NewsTab(props) {
       var fPair = useState({ hours: Number(store('hours')) || 24, cred: 'any', label: '', region: '', query: '', limit: 60, pack: store('pack') || '' })
       var f = fPair[0]
@@ -1767,7 +1854,11 @@ window.__ModuleLoader__.load({
       var setFlw = flPair[1]
       useEffect(function () { getJson(API.follows).then(setFlw).catch(function () {}) }, [props.stamp])
       function storyFollow(action, kind, value, name) { postJson(API.follows, { action: action, kind: kind, value: value, name: name }).then(setFlw).catch(function () {}) }
-      function openFromEdition(id) { setStorySel(id) }
+      function openFromEdition(id) { leavePlace('news:' + (props.view || 'edition')); setStorySel(id) }
+      function backFromStory() { setStorySel(null); returnPlace('news:' + (props.view || 'edition')) }
+      var mfPair = useState(false)
+      var moreF = mfPair[0]
+      var setMoreF = mfPair[1]
       function back() { setSel(null); setFrom(null) }
       var load = useCallback(function () {
         setIn(setD, { phase: 'busy' })
@@ -1777,18 +1868,22 @@ window.__ModuleLoader__.load({
           .catch(function (e) { setD({ phase: 'error', events: [], error: e.message }) })
       }, [f.hours, f.cred, f.label, f.region, f.query, f.limit, f.pack])
       useEffect(function () { load() }, [load, props.stamp])
+      // 事件页：宽屏上默认在右边打开第一条，不用先点
+      useEffect(function () {
+        if (view !== 'events' || sel || !d.events.length) return
+        if (window.matchMedia && window.matchMedia('(min-width: 820px)').matches) setSel(d.events[0].event_id)
+      }, [view, d.events])
       var tax = props.taxonomy || {}
       var packs = Object.keys(props.packs || {})
       var kw = (props.summary && props.summary.keywords) || []
       var model = props.summary && props.summary.model
       function setPack(v) { store('pack', v); setF(Object.assign({}, f, { pack: v })) }
       if (view === 'follows') return h('div', { className: 'nw-news' }, h(FollowsView, { stamp: props.stamp, taxonomy: props.taxonomy, names: props.names, sources: props.sources }))
-      if (view !== 'events' && storySel) return h('div', { className: 'nw-news' }, h(StoryDetail, { id: storySel, names: props.names, onBack: function () { setStorySel(null) }, onFollow: storyFollow, followed: Boolean(flw && flw.follow.some(function (x) { return x.kind === 'story' && x.value === storySel })) }))
-      if (view === 'daily') return h('div', { className: 'nw-news' }, h(DailyView, { pack: f.pack || 'all', stamp: props.stamp, names: props.names, onOpen: openFromEdition }))
-      if (view === 'edition') return h('div', { className: 'nw-news' }, h(EditionView, { pack: f.pack || 'all', packs: props.packs, onPack: setPack, stamp: props.stamp, names: props.names, onOpen: openFromEdition, firstRun: Boolean(props.ready && !(props.summary && props.summary.latest_run)), onReload: props.reload }))
-      var mfPair = useState(false)
-      var moreF = mfPair[0]
-      var setMoreF = mfPair[1]
+      // 今日、回顾：点进故事线时列表只藏起来，返回时还在原处
+      var storyEl = view !== 'events' && storySel ? h(StoryDetail, { id: storySel, names: props.names, onBack: backFromStory, onFollow: storyFollow, followed: Boolean(flw && flw.follow.some(function (x) { return x.kind === 'story' && x.value === storySel })) }) : null
+      var mainEl = view === 'daily' ? h(DailyView, { pack: f.pack || 'all', stamp: props.stamp, names: props.names, onOpen: openFromEdition }) : view === 'edition' ? h(EditionView, { pack: f.pack || 'all', packs: props.packs, onPack: setPack, stamp: props.stamp, names: props.names, onOpen: openFromEdition, firstRun: Boolean(props.ready && !(props.summary && props.summary.latest_run)), onReload: props.reload }) : null
+      if (mainEl) return h('div', { className: 'nw-news' }, h('div', { style: storySel ? HIDE : null }, mainEl), storyEl)
+      if (storyEl) return h('div', { className: 'nw-news' }, storyEl)
       var set = function (patch) { setF(Object.assign({}, f, patch)) }
       return h('div', { className: 'nw-news' + (sel ? ' nw-has-sel' : '') },
         h('div', { className: 'nw-filters nw-filters-1' },
@@ -1850,9 +1945,19 @@ window.__ModuleLoader__.load({
       useEffect(function () {
         setIn(setD, { phase: 'busy' })
         postJson(API.timeline, { date: s.date, run_id: s.run || undefined, kind: s.kind, limit: 60 })
-          .then(function (res) { setD({ phase: 'ready', runs: res.runs || [], entries: res.entries || [], run_id: res.run_id, ms: res.ms }) })
+          .then(function (res) {
+            // 这一轮的条目按时间倒排（最新的在上面）
+            var tOf = function (e) { return String(e.published_at || e.first_seen_at || e.last_seen_at || '') }
+            setD({ phase: 'ready', runs: res.runs || [], entries: (res.entries || []).slice().sort(function (a, b) { return tOf(b).localeCompare(tOf(a)) }), run_id: res.run_id, ms: res.ms })
+          })
           .catch(function (e) { setD({ phase: 'error', runs: [], entries: [], run_id: null, error: e.message }) })
       }, [s.date, s.run, s.kind, props.stamp])
+      // 宽屏上默认打开这一轮的第一件事
+      useEffect(function () {
+        if (s.kind !== 'events' || !d.entries.length) return
+        if (sel && d.entries.some(function (e) { return e.event_id === sel })) return
+        if (window.matchMedia && window.matchMedia('(min-width: 820px)').matches) setSel(d.entries[0].event_id)
+      }, [d.entries])
       var cur = (d.runs || []).find(function (r) { return r.run_id === d.run_id })
       return h('div', { className: 'nw-timeline' + (sel ? ' nw-has-sel' : '') },
         h('div', { className: 'nw-filters' },
@@ -2085,7 +2190,7 @@ window.__ModuleLoader__.load({
       var setStamp = stPair[1]
       return h('div', { className: 'nw-sources' },
         h(AddSource, { packs: props.sources && props.sources.packs, onAdded: function () { setStamp(stamp + 1); if (props.reload) props.reload() } }),
-        h(SourceBoard, { stamp: String(props.stamp || '') + ':' + stamp, onChanged: props.reload, packs: props.sources && props.sources.packs }),
+        h(SourceBoard, { stamp: String(props.stamp || '') + ':' + stamp, onChanged: props.reload, packs: props.sources && props.sources.packs, names: props.names }),
         h('button', { className: 'nw-act nw-adv-toggle', onClick: function () { setAdv(!adv) } }, (adv ? '▾ ' : '▸ ') + t('sb.advanced')),
         adv ? h(SourceEditor, props) : null)
     }
@@ -2546,7 +2651,7 @@ window.__ModuleLoader__.load({
           tab === 'track' ? h(TrackTab, common) : null,
           tab === 'timeline' ? h(TimelineTab, common) : null,
           tab === 'items' ? h(ItemsTab, Object.assign({ sources: data.sources }, common)) : null,
-          tab === 'sources' ? h(SourcesTab, { sources: data.sources, reload: reload }) : null,
+          tab === 'sources' ? h(SourcesTab, { sources: data.sources, reload: reload, names: names }) : null,
           tab === 'runs' ? h(RunsTab, Object.assign({ schedule: data.schedule, digest: data.digest }, common)) : null)))
     }
 
@@ -2681,7 +2786,7 @@ window.__ModuleLoader__.load({
       '.nw-sb-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}',
       '.nw-sb-row{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid ' + C.line1 + ';flex-wrap:wrap} .nw-sb-off .nw-sb-name b{color:' + C.l3 + '}',
       '.nw-sb-main{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 360px} .nw-sb-name{display:flex;gap:8px;align-items:baseline;font-size:14px} .nw-sb-why{font-size:13px;color:' + C.l2 + ';line-height:1.6}',
-      '.nw-sb-v{font-size:11px;font-weight:600;padding:0 6px;border-radius:4px;background:' + C.hover + ';color:' + C.l2 + '} .nw-sb-v-core{background:' + C.okBg + ';color:' + C.ok + '} .nw-sb-v-support{background:' + C.accentBg + ';color:' + C.accent + '} .nw-sb-v-low,.nw-sb-v-unstable{background:' + C.warnBg + ';color:' + C.warn + '}',
+      '.nw-sb-v{font-size:11px;font-weight:600;padding:0 6px;border-radius:4px;background:' + C.hover + ';color:' + C.l2 + '} .nw-sb-v-new{background:' + C.accentBg + ';color:' + C.accent + '} .nw-sb-v-core{background:' + C.okBg + ';color:' + C.ok + '} .nw-sb-v-support{background:' + C.accentBg + ';color:' + C.accent + '} .nw-sb-v-low,.nw-sb-v-unstable{background:' + C.warnBg + ';color:' + C.warn + '}',
       '.nw-sb-ctl{display:flex;flex-direction:column;align-items:flex-end;gap:4px} .nw-sb-sug{color:' + C.link + '!important;font-size:12px}',
       '.nw-adv-toggle{align-self:flex-start;font-size:13px!important;color:' + C.l2 + '!important;padding-left:0!important}',
       '.nw-tl2-orig{font-size:11px;color:' + C.l3 + ';line-height:1.5}',
@@ -2739,6 +2844,13 @@ window.__ModuleLoader__.load({
       '.nw-btn.nw-sm{padding:4px 10px;font-size:12px}',
       '.nw-edition{display:flex;flex-direction:column;gap:18px;padding-top:4px}',
       '.nw-working{display:flex;align-items:center;gap:8px;font-size:12px;color:' + C.l2 + '} .nw-queue{flex-wrap:wrap}',
+      '.nw-lw h4{display:flex;align-items:baseline;gap:8px} .nw-lw-at{margin-left:auto;font-size:11px;font-weight:400;color:' + C.l3 + '}',
+      '.nw-lw-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}',
+      '.nw-lw-item{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px;padding:7px 0;border-top:1px solid ' + C.line1 + '} .nw-lw-item:first-child{border-top:0}',
+      '.nw-lw-t{font-size:12px;color:' + C.l3 + ';font-variant-numeric:tabular-nums;padding-top:1px} .nw-lw-body{min-width:0;display:flex;flex-direction:column;gap:2px}',
+      '.nw-lw-title{border:0;background:none;padding:0;font:inherit;font-size:13px;line-height:1.5;color:' + C.l1 + ';text-align:left;cursor:pointer;text-decoration:none;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden} .nw-lw-title:hover{color:' + C.accent + '}',
+      '.nw-lw-new{display:inline-block;font-size:10px;line-height:15px;padding:0 4px;margin-right:5px;border-radius:3px;background:' + C.accent + ';color:#fff;vertical-align:1px}',
+      '.nw-lw-meta{font-size:11px;color:' + C.l3 + '} .nw-lw-line{display:flex;align-items:flex-start;gap:0;min-width:0} .nw-lw-line .nw-lw-new{flex:none;margin-top:3px}',
       '.nw-flow{display:flex;flex-direction:column;gap:12px;border:1px solid ' + C.line1 + ';border-radius:12px;padding:12px 14px;background:' + C.bg + '} .nw-flow-on{border-color:' + C.accent + '}',
       '.nw-fh{display:flex;flex-direction:column;gap:6px} .nw-fh-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px} .nw-fh-st{color:' + C.accent + ';font-weight:600} .nw-fh-time{font-size:12px}',
       '.nw-fh-toggle{margin-left:auto} .nw-fh-end{display:inline-flex;width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center;font-size:10px;color:#fff;background:' + C.ok + '} .nw-fh-failed,.nw-fh-stalled{background:' + C.err + '} .nw-fh-replaced{background:' + C.idle + '} .nw-fh-end.nw-fh-warn{background:' + C.warn + '} .nw-fh-st-warn{color:' + C.warn + '}',
@@ -2813,6 +2925,11 @@ window.__ModuleLoader__.load({
       '.nw-full-note{font-size:12px;line-height:1.6;color:' + C.l2 + ';background:' + C.accentBg + ';border-radius:8px;padding:8px 10px} .nw-as-learn{display:flex;align-items:center;gap:10px;flex-wrap:wrap} .nw-as-learned{font-size:12px;color:' + C.accent + '} .nw-as-bar{display:flex;align-items:center;gap:10px;margin:0 0 12px} .nw-as{margin:0 0 16px;display:flex;flex-direction:column;gap:8px} .nw-as-h{display:flex;justify-content:space-between;align-items:center} .nw-as-form{display:flex;flex-wrap:wrap;gap:8px} .nw-as-form .nw-in{flex:1 1 160px;min-width:0} .nw-as-form .nw-as-url{flex:2 1 260px} .nw-as-ok{font-size:13px;margin-bottom:4px} .nw-as-items{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:13px} .nw-as-items li{display:flex;gap:8px;min-width:0} .nw-as-items a{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .nw-as-t{flex:none;width:72px}',
       '.nw-acts{margin-left:auto;display:inline-flex;flex:none;white-space:nowrap;gap:2px;opacity:0;transition:opacity .15s} .nw-rs:hover .nw-acts, .nw-rs:focus-within .nw-acts, .nw-acts:has(.nw-on){opacity:1}',
       '@media (hover:none){.nw-acts{opacity:1}}',
+      '.nw-tkquiet-line{font-size:12px;color:' + C.warn + '}',
+      '.nw-tkm-tag{display:inline-block;font-size:10px;line-height:15px;padding:0 4px;margin-right:6px;border-radius:3px;border:1px solid ' + C.line + ';color:' + C.l3 + ';vertical-align:1px} .nw-tkquiet{display:flex;flex-direction:column;gap:8px;align-items:flex-start}',
+      '.nw-link-btn{border:0;background:none;padding:0;font:inherit;font-size:12px;font-weight:600;color:' + C.accent + ';cursor:pointer} .nw-link-btn:hover{text-decoration:underline}',
+      '.nw-tl2-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:3px;min-height:22px} .nw-tl2-end{margin-left:auto;flex:none}',
+      '.nw-act-quiet{color:' + C.l3 + ';font-size:11px} .nw-act-danger{color:' + C.err + ';font-weight:600} .nw-confirm{display:inline-flex;align-items:center;gap:4px;font-size:12px;flex-wrap:wrap} .nw-confirm-q{color:' + C.l2 + '}',
       '.nw-act{border:0;background:transparent;color:' + C.l3 + ';font:inherit;font-size:12px;padding:1px 6px;border-radius:4px;cursor:pointer} .nw-act:hover{color:' + C.l1 + ';background:' + C.hover + '} .nw-act.nw-on{color:' + C.accent + '} .nw-act:disabled{opacity:.3;cursor:default}',
       '.nw-rs-points{margin:2px 0 0;padding-left:1.1em;font-size:14px;line-height:1.75;color:' + C.l1 + ';display:flex;flex-direction:column;gap:3px} .nw-rs-points li::marker{color:' + C.l3 + '}',
       '.nw-rs-block{display:flex;flex-direction:column;gap:4px;margin-top:6px} .nw-rs-k{font-size:11px;font-weight:700;letter-spacing:.06em;color:' + C.l3 + '}',
@@ -2822,7 +2939,7 @@ window.__ModuleLoader__.load({
       '.nw-refs{font-size:10px;line-height:0;margin-left:1px;white-space:nowrap} .nw-ref{color:' + C.link + ';text-decoration:none;padding:0 1px} .nw-ref:hover{text-decoration:underline}',
       '.nw-unver{font-size:11px;color:' + C.warn + ';margin-left:6px;border-bottom:1px dotted ' + C.warn + ';cursor:help}',
       '.nw-rs-update{font-size:13px;line-height:1.7;color:' + C.l1 + ';padding:6px 10px;background:' + C.accentBg + ';border-radius:6px} .nw-rs-update b{color:' + C.accent + ';margin-right:8px;font-size:12px}',
-      '.nw-more-btn{align-self:flex-start;border:0;background:transparent;color:' + C.l3 + ';font:inherit;font-size:12px;padding:2px 0;cursor:pointer} .nw-more-btn:hover{color:' + C.link + '}',
+      '.nw-more-btn{align-self:flex-start;border:0;background:transparent;color:' + C.link + ';font:inherit;font-size:12px;font-weight:600;padding:2px 0;cursor:pointer} .nw-more-btn:hover{text-decoration:underline}',
       '.nw-rail{display:flex;flex-direction:column;gap:22px;min-width:0}',
       '.nw-v-lead{gap:10px} .nw-rail-warn h4{color:' + C.warn + ';border-bottom-color:' + C.warn + '}',
       '.nw-rail-box{display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.6}',
@@ -2928,7 +3045,7 @@ window.__ModuleLoader__.load({
     }
 
     var plugin = { inject: ['slots'], apply: apply }
-    plugin.__test = { DailyView, PushPanel, PushHealth, QueueLine, TrackStrip, FlowPanel, FlowChart, FlowHead, AskView, Welcome, ImpactBlock, AnalysisFull, DetailFull, TrackTab, TrackDetail, TrackSynthesis, ContentCard, SourceBoard, SourceEditor, QualityCard, StoryDetail, FollowsView, EditionView, ReadStory, NoteList, ModelCard, Topics, NotesBox, VersionSection, UpdateBanner, checkForUpdate, applyUpdate, remotes, Page, NewsTab, TimelineTab, ItemsTab, SourcesTab, RunsTab, EventCard, EventDetailView, EventDetail, RunBars, ScheduleCard, StatusLine, TestResult, SignalChips, Spark, PanelIcon, t, setLang: function (v) { lang = v }, DICT, CSS }
+    plugin.__test = { DailyView, PushPanel, PushHealth, QueueLine, TrackStrip, LatestRail, FlowPanel, FlowChart, FlowHead, AskView, Welcome, ImpactBlock, AnalysisFull, DetailFull, TrackTab, TrackDetail, TrackSynthesis, ContentCard, SourceBoard, SourceEditor, QualityCard, StoryDetail, FollowsView, EditionView, ReadStory, NoteList, ModelCard, Topics, NotesBox, VersionSection, UpdateBanner, checkForUpdate, applyUpdate, remotes, Page, NewsTab, TimelineTab, ItemsTab, SourcesTab, RunsTab, EventCard, EventDetailView, EventDetail, RunBars, ScheduleCard, StatusLine, TestResult, SignalChips, Spark, PanelIcon, t, setLang: function (v) { lang = v }, DICT, CSS }
     return plugin
   },
 })

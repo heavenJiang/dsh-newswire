@@ -127,7 +127,7 @@ Which profile a story uses: if every item's source declares a `profile` in `sour
 ## Times from links
 When a source gives no time, the link is checked: a full timestamp (`/2026101415255489242/`) counts as `page_text`; a date only (`t20261107_`, `/20261029/`, `/2026/11-08/`) is stored as `url_date` (Beijing midnight) for display and datasets, but continuity and clustering treat it as untrusted. Time confidence only rises on merge: fetched < url_date < page_text < feed. Push selection skips events whose lead article's time (including a link date) is more than a day before the look-back window, so a new source's old list items are not pushed.
 
-## Data model (schema v27)
+## Data model (schema v28)
 | Table | Contents |
 |---|---|
 | `sources` | Source config snapshot (with weight / tier / grp / pack / adapter / removed_at / profile) |

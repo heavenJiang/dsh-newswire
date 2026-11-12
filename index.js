@@ -419,6 +419,7 @@ export function apply(ctx, config) {
       const saved = saveEdition(db, ed, { runId: o.runId, error, ms: Date.now() - t0 });
       progressCleanup();
       autoAnalyze(ed);
+      setTimeout(() => { void background(dailyAfterEdition(), "daily after edition"); }, 0);
       if (ed.mode === "llm") notesFromEdition(db, ed);
       const st = ed.stats || {};
       if (useLlm) modelState.last = { at: new Date().toISOString(), run_id: o.runId || null, pack, mode: ed.mode, model: model.label(), items_read: ed.items_read, fresh_items: st.fresh_items ?? null, reused: st.reused || 0, calls: st.calls || 0, failed: st.failed || 0, written: st.written || 0, retried: (st.errors || []).length, error: error || ((st.fallbacks || []).length ? "fallback " + st.fallbacks.join(", ") + ((st.errors || []).length ? "：" + st.errors[0] : "") : null), ms: Date.now() - t0 };
@@ -476,14 +477,43 @@ export function apply(ctx, config) {
   }
 
   /** 编一份日报并存档。LLM 模式且模型可用时由模型写，否则程序写。 */
-  function makeDaily(o) { return queue.run({ kind: "daily", label: "日报", priority: PRIORITY.push }, () => makeDailyNow(o)); }
+  function makeDaily(o) { return o && o.program ? makeDailyNow(o) : queue.run({ kind: "daily", label: "日报", priority: PRIORITY.push }, () => makeDailyNow(o)); }
+
+  // ---------------------------------------------------------------- 回顾自动生成
+  // 回顾不用读者去点：白天每次版面更新后，用程序把「今天到目前为止」写一份（不调用模型，一两秒）；
+  // 晚上 21:30 以后由模型写成完整的一份（模型可用时）。模型写过的当天回顾不会被程序版盖掉。
+  const DAILY_EVENING = { h: 21, m: 30 };
+  function bjNow() { const bj = new Date(Date.now() + 8 * 3600000); return { h: bj.getUTCHours(), m: bj.getUTCMinutes() }; }
+  /** 版面更新后：今天还没有回顾，或程序写的那份已经过了 1 小时，就用程序重写一份。 */
+  async function dailyAfterEdition() {
+    const date = todayBj();
+    const cur = withDb(p, (db) => (db ? latestDaily(db, "all", date) : null));
+    if (cur && cur.mode === "llm") return;
+    if (cur && Date.now() - Date.parse(String(cur.created_at).replace(" ", "T") + "Z") < 3600000) return;
+    await makeDaily({ pack: "all", date, program: true });
+  }
+  /** 每分钟看一次：到了 21:30、今天还没有模型写的回顾、模型闲着，就写一份（一天一次）。 */
+  function dailyEveningTick() {
+    const now = bjNow();
+    if (now.h * 60 + now.m < DAILY_EVENING.h * 60 + DAILY_EVENING.m) return;
+    if (!(modeNow() === "llm" && llmReady()) || modelState.busy || busyWith()) return;
+    const date = todayBj();
+    const done = kvGet("daily_auto");
+    if (done && done.date === date) return;
+    const cur = withDb(p, (db) => (db ? latestDaily(db, "all", date) : null));
+    kvSet("daily_auto", { date, at: new Date().toISOString() });
+    if (cur && cur.mode === "llm") return;
+    void background(makeDaily({ pack: "all", date }), "evening daily");
+  }
   async function makeDailyNow(o) {
     const db = openIfExists(p.db);
     if (!db) return null;
-    const useLlm = modeNow() === "llm" && model.available();
+    // program：只用程序写（不调用模型，一两秒）——白天随版面更新、点开没有回顾的日子时用
+    const useLlm = !o.program && modeNow() === "llm" && model.available();
     if (useLlm) modelState.busy = "daily";
     try {
       const d = await buildDaily(db, { pack: o.pack || "all", date: o.date || todayBj(), names: taxonomyNames(), follows: loadFollows(p.follows), model: useLlm ? model : null, timeoutMs: cfg.modelTimeoutMs * 2 });
+      if (o.program && !(d.stories || []).length) return null; // 这一天没有可回顾的，不存空的
       return saveDaily(db, d);
     } finally {
       db.close();
@@ -928,6 +958,7 @@ export function apply(ctx, config) {
   // ---------------------------------------------------------------- 数据保留
   /** 每天清理一次只增不减的表（版面、账本、抓取记录等），模型和抓取都闲着时做。 */
   function maintenanceTick() {
+    try { dailyEveningTick(); } catch { /* 下一分钟再看 */ }
     if (modelState.busy || busyWith()) return;
     // 一次性修复：摘掉以前按过宽的规则挂到主线对象上的故事线（见 repairThemeLinks）
     if (!kvGet("tracker_links_v3")) {

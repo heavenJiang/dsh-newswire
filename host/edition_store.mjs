@@ -205,3 +205,40 @@ export function notesFromEdition(db, ed) {
   }
   return n;
 }
+
+/**
+ * 最新快讯：刚抓到的新闻，按时间倒排，每件事（规则事件）只取最早的一篇。不依赖版面——版面要等模型写，
+ * 本地模型一轮二三十分钟，这一栏每轮抓取后就是新的。广告、行情跳动、合集原稿不算。
+ * fresh：版面（最新一份）编出来之后才抓到的，读者在版面里还看不到。
+ * @param o { hours（默认 6）, limit（默认 12）, editionAt: 最新一份版面的时间 }
+ */
+export function latestWire(db, o) {
+  const since = new Date(Date.now() - ((o && o.hours) || 6) * 3600000).toISOString().replace("T", " ").slice(0, 19);
+  const rows = db.prepare(`SELECT a.id, COALESCE(NULLIF(a.title_zh, ''), a.title) title, a.url, a.first_seen_at, ${PUB} AS published_at, a.time_confidence,
+      COALESCE(s.name, a.source_id) source, m.event_id, si.story_id, e.importance, e.source_count
+    FROM articles a LEFT JOIN sources s ON s.id = a.source_id LEFT JOIN event_members m ON m.article_id = a.id LEFT JOIN events e ON e.event_id = m.event_id
+      LEFT JOIN story_items si ON si.article_id = a.id
+    WHERE a.first_seen_at >= ? AND COALESCE(a.kind, 'news') IN ('news', 'digest_item')
+    ORDER BY COALESCE(${PUB}, a.first_seen_at) DESC LIMIT 400`).all(since);
+  const seen = new Set();
+  const perSource = new Map();
+  const out = [];
+  // 标题前面常带的「2026.11.11 - 9分钟前」「17:49 」这类列表页残留去掉
+  const cleanTitle = (t) => String(t || "").replace(/^\s*\d{4}[./-]\d{1,2}[./-]\d{1,2}\s*(-\s*\d+\s*(分钟|小时|天)前)?\s*/, "").replace(/^\d{1,2}:\d{2}\s+/, "").trim();
+  for (const r of rows) {
+    const key = r.event_id || r.story_id || r.id;
+    if (seen.has(key)) continue;
+    // 规则打分很低的（分数已算出来、又只有一家报道）不进这一栏；一个源最多占 3 条，免得一家刷屏
+    if (r.importance != null && r.importance < 25 && (r.source_count || 1) < 2) continue;
+    if ((perSource.get(r.source) || 0) >= 3) continue;
+    seen.add(key);
+    perSource.set(r.source, (perSource.get(r.source) || 0) + 1);
+    // 有的源把摘要拼在标题后面：截到第一个句号或 60 字
+    const tt = cleanTitle(r.title) || r.title;
+    const short = tt.length > 60 ? (tt.slice(0, 60).match(/^.{12,}?[。！？]/) || [tt.slice(0, 58) + "…"])[0] : tt;
+    out.push({ id: r.id, title: short, url: r.url, at: r.published_at || r.first_seen_at, approx: r.time_confidence === "fetched", source: r.source, story_id: r.story_id || null,
+      importance: r.importance == null ? null : Math.round(r.importance), outlets: r.source_count || 1, fresh: Boolean(o && o.editionAt && r.first_seen_at > o.editionAt) });
+    if (out.length >= ((o && o.limit) || 12)) break;
+  }
+  return out;
+}

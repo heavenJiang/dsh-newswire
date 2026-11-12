@@ -19,7 +19,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { attemptRows, continuityRows, dayRange, eventDetail, eventRows, itemRows, labelCounts, openIfExists, recentGaps, recentPushes, recentRuns, signalTrail, sinceIso, timelineDay, timelineRun } from "../engine/query.mjs";
 import { analyzeEvents } from "./model.mjs";
 import { judgeRecipe, learnRecipe } from "./recipe.mjs";
-import { bodiesFor, editionById, editionDiff, editionList, latestEdition, loadLayout, qualityRows, reassemble, saveEdition, sinceSeen, storyDetail } from "./edition.mjs";
+import { latestWire, bodiesFor, editionById, editionDiff, editionList, latestEdition, loadLayout, qualityRows, reassemble, saveEdition, sinceSeen, storyDetail } from "./edition.mjs";
 import { composeDailyMessage, dailyDates, latestDaily, todayBj } from "./daily.mjs";
 import { KINDS as FOLLOW_KINDS, loadFollows, updateFollows } from "./follows.mjs";
 import { installedPackage } from "./update.mjs";
@@ -186,7 +186,14 @@ export function registerRoutes(app) {
       const body = await bodyOf(request);
       const id = strOrNull(body.id);
       if (!id) return jsonResponse({ error: "id_required" }, 400);
-      const ev = withDb(p, (db) => eventDetail(db, id));
+      const ev = withDb(p, (db) => {
+        const e = eventDetail(db, id);
+        if (!e) return null;
+        // 这件事所在的故事线有影响分析的：一起带上，右侧打开就能看到，不用再点
+        const row = db.prepare("SELECT story_id FROM story_items WHERE event_id = ? GROUP BY story_id ORDER BY COUNT(*) DESC LIMIT 1").get(id);
+        if (row) { e.story_id = row.story_id; try { e.analysis = latestAnalysis(db, row.story_id) || null; } catch { e.analysis = null; } }
+        return e;
+      });
       return ev ? jsonResponse(ev, 200) : jsonResponse({ error: "not_found" }, 404);
     },
   });
@@ -362,6 +369,10 @@ export function registerRoutes(app) {
         if (modeNow() === "llm" && model.available()) { void background(makeDaily({ pack, date }), "daily"); return jsonResponse({ ok: true, started: true, model: modelView() }, 202); }
         await makeDaily({ pack, date });
       }
+      // 这一天还没有回顾（今天一早、以前没生成过的日子）：当场用程序写一份（不调用模型，一两秒），不让读者面对空页
+      if (body.refresh !== true && date <= todayBj() && !withDb(p, (db) => (db ? latestDaily(db, pack, date) : null))) {
+        try { await ensureData(p); await makeDaily({ pack, date, program: true }); } catch { /* 写不出就照旧显示空 */ }
+      }
       return jsonResponse(withDb(p, (db) => ({ ok: true, model: modelView(), date, daily: db ? latestDaily(db, pack, date) : null, dates: db ? dailyDates(db, pack, 60) : [] })), 200);
     },
   });
@@ -431,7 +442,9 @@ export function registerRoutes(app) {
     methods: ["GET", "HEAD"],
     fetch: async (request) => {
       const days = Number(new URL(request.url, "http://x").searchParams.get("days")) || 7;
-      return jsonResponse({ sources: withDb(p, (db) => (db ? sourceScores(db, { days }) : [])), thin: withDb(p, (db) => (db ? thinCoverage(db) : [])), cooling: withDb(p, (db) => (db ? [...coolingMap(db, db.prepare("SELECT id FROM sources WHERE enabled = 1 AND removed_at IS NULL").all().map((r) => r.id))].map(([id, c]) => Object.assign({ id, name: (db.prepare("SELECT name FROM sources WHERE id = ?").get(id) || {}).name || id }, c)) : [])) }, 200);
+      let config = null;
+      try { config = (await readConfigSources(p)).data.sources || null; } catch { config = null; }
+      return jsonResponse({ sources: withDb(p, (db) => (db ? sourceScores(db, { days, config }) : [])), thin: withDb(p, (db) => (db ? thinCoverage(db) : [])), cooling: withDb(p, (db) => (db ? [...coolingMap(db, db.prepare("SELECT id FROM sources WHERE enabled = 1 AND removed_at IS NULL").all().map((r) => r.id))].map(([id, c]) => Object.assign({ id, name: (db.prepare("SELECT name FROM sources WHERE id = ?").get(id) || {}).name || id }, c)) : [])) }, 200);
     },
   });
   route({
@@ -575,6 +588,22 @@ export function registerRoutes(app) {
       return jsonResponse({ ok: true, running: true }, 202);
     },
   });
+  // 最新快讯：刚抓到的新闻（不等版面），今日页右栏每分钟取一次
+  route({
+    path: "/api/newswire/latest",
+    methods: ["GET"],
+    fetch: async (request) => {
+      const q = new URL(request.url, "http://x").searchParams;
+      const out = withDb(p, (db) => {
+        if (!db) return [];
+        const ed = db.prepare("SELECT created_at FROM editions WHERE pack = 'all' AND COALESCE(json_extract(content, '$.stats.partial'), 0) = 0 ORDER BY id DESC LIMIT 1").get();
+        return latestWire(db, { hours: Number(q.get("hours")) || 6, limit: Math.min(30, Number(q.get("limit")) || 12), editionAt: ed ? ed.created_at : null });
+      });
+      const run = withDb(p, (db) => (db ? db.prepare("SELECT MAX(finished_at) t FROM runs WHERE mode IN ('cycle', 'fetch')").get() : null));
+      return jsonResponse({ ok: true, items: out || [], fetched_at: run && run.t ? run.t : null }, 200);
+    },
+  });
+
   // 一轮的流程与进度：正在跑的（没有就是 null）和上一轮的；面板据此画流程图
   route({
     path: "/api/newswire/progress",

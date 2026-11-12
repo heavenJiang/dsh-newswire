@@ -61,7 +61,7 @@ export function listTrackers(db) {
       stories: c.n, week: recent.get(r.id, daysAgo(7)).n, latest: latest ? { id: latest.story_id, title: latest.title, at: latest.updated_at } : null,
       synthesis: sc ? { at: sy.at, state: sc.state || "", trend: sc.trend || "", changed: sc.changed || "" } : null,
       fresh: sy ? db.prepare(`SELECT COUNT(*) n FROM tracker_stories ts JOIN stories s ON s.story_id = ts.story_id WHERE ts.tracker_id = ? AND ts.how != 'banned' AND (COALESCE(${LAST_AT}, s.created_at) > ? OR ts.linked_at > ?)`).get(r.id, sy.at, sy.at).n : c.n,
-      spark: daily(db, r.id, 30) };
+      spark: daily(db, r.id, 30), mentions_week: mentions(db, r, { days: 7, limit: 99 }).length, quiet: c.n ? null : quietReason(db, r) };
   });
 }
 
@@ -263,12 +263,50 @@ export function timeline(db, id, limit) {
       lead: (parseJ(r.copy, null) || {}).lead || "", update: r.update_text || "" }));
 }
 
+/**
+ * 提到它、但没归进任何一条故事线的单篇报道（标题里有别名）：版面只收重要的新闻进故事线，
+ * 一家公司的公告、小消息常常只有一篇、进不了版面，追踪里却应该看得到。按时间倒排。
+ */
+export function mentions(db, t, o) {
+  // 主线的关键词很宽（「英伟达」一周上百篇），单篇报道只会淹没时间轴；主线只看挂上的故事线
+  if (t.kind === "theme") return [];
+  const aliases = parseJ(t.aliases, []).filter(usable);
+  if (!aliases.length) return [];
+  const since = daysAgo((o && o.days) || 30);
+  const cond = aliases.map(() => "(a.title LIKE ? OR COALESCE(a.title_zh, '') LIKE ?)").join(" OR ");
+  return db.prepare(`SELECT a.id, COALESCE(NULLIF(a.title_zh, ''), a.title) title, a.url, a.source_id, COALESCE(s.name, a.source_id) source, COALESCE(a.published_at, a.first_seen_at) at
+    FROM articles a LEFT JOIN sources s ON s.id = a.source_id
+    WHERE a.first_seen_at >= ? AND COALESCE(a.kind, 'news') NOT IN ('promo', 'ticker', 'digest') AND (${cond})
+      AND NOT EXISTS (SELECT 1 FROM story_items si JOIN tracker_stories ts ON ts.story_id = si.story_id AND ts.tracker_id = ? AND ts.how != 'banned' WHERE si.article_id = a.id)
+    ORDER BY at DESC LIMIT ?`).all(since, ...aliases.flatMap((x) => ["%" + x + "%", "%" + x + "%"]), t.id, (o && o.limit) || 40);
+}
+
+/**
+ * 为什么没有动静：现在开着的源里多少天没提到它、最后一次是什么时候在哪个源（那个源现在开没开）。
+ * @returns null（两天内有动静）或 { days_quiet, last: { at, source, source_on } | null, sources_on }
+ */
+export function quietReason(db, t) {
+  const aliases = parseJ(t.aliases, []).filter(usable);
+  if (!aliases.length) return null;
+  const cond = aliases.map(() => "(a.title LIKE ? OR COALESCE(a.title_zh, '') LIKE ?)").join(" OR ");
+  const args = aliases.flatMap((x) => ["%" + x + "%", "%" + x + "%"]);
+  const last = db.prepare(`SELECT COALESCE(a.published_at, a.first_seen_at) at, a.source_id, COALESCE(s.name, a.source_id) source, COALESCE(s.enabled, 0) on_, s.removed_at
+    FROM articles a LEFT JOIN sources s ON s.id = a.source_id WHERE COALESCE(a.kind, 'news') != 'promo' AND (${cond}) ORDER BY a.first_seen_at DESC LIMIT 1`).get(...args);
+  // 两天内有提到就算有动静；一家公司两天没有任何消息，读者就会觉得「怎么一直没更新」，要说明原因
+  const recent = last && last.at >= daysAgo(2);
+  if (recent) return null;
+  return { days_quiet: last ? Math.floor((Date.now() - Date.parse(String(last.at).replace(" ", "T") + "Z")) / 86400000) : null,
+    last: last ? { at: last.at, source: last.source, source_id: last.source_id, source_on: Boolean(last.on_ && !last.removed_at) } : null,
+    sources_on: db.prepare("SELECT name FROM sources WHERE enabled = 1 AND removed_at IS NULL").all().map((r) => r.name) };
+}
+
 export function trackerDetail(db, id) {
   const t = db.prepare("SELECT * FROM trackers WHERE id = ?").get(id);
   if (!t) return null;
   const sy = db.prepare("SELECT * FROM tracker_syntheses WHERE tracker_id = ? ORDER BY id DESC LIMIT 1").get(id);
   const tl = timeline(db, id, 80);
   return { id: t.id, name: t.name, kind: t.kind, ticker: t.ticker, aliases: parseJ(t.aliases, []), origin: t.origin, created_at: t.created_at, status: t.status,
+    mentions: mentions(db, t), quiet: quietReason(db, t),
     synthesis: sy ? Object.assign({ at: sy.at, model: sy.model, stories: sy.stories }, parseJ(sy.content, {})) : null,
     fresh: sy ? tl.filter((x) => x.updated_at > sy.at).length : tl.length, timeline: tl, spark: daily(db, id, 30) };
 }

@@ -38,7 +38,7 @@ It is a plugin for DeepSeek Harness. It gathers news from dozens of Chinese and 
 
 ### 🗞 An edition you can actually read
 
-The edition has top stories, your follows, sections, things to watch and items awaiting confirmation, with a markets box on the side. Each story has a lead, key points, who said what, and why it matters. The top tells you **what changed since your last visit**; click any headline for that story's full timeline.
+The edition has top stories, your follows, sections, things to watch and items awaiting confirmation, with a "Latest" column on the side that updates after every fetch. Each story has a lead, key points, who said what, and why it matters. The top tells you **what changed since your last visit**; click any headline for that story's full timeline.
 
 ### 🔭 Tracking, the flagship feature
 
@@ -179,7 +179,7 @@ Too many pushes? Say "push less" or "three times a day is enough" in chat, or ad
 
 | Tab | What's there |
 |---|---|
-| **Today** | The edition, your follows, Ask, the markets box. Every story can be followed, muted, flagged or analyzed. |
+| **Today** | The edition, your follows, Ask, the Latest column. Every story can be followed, muted, flagged or analyzed. |
 | **Tracking** | Tracked subjects, suggestions, and each subject's synthesis and timeline |
 | **Recap** | Daily digests, day by day |
 | **Follow & push** | Followed and muted keywords, topics and sources; push cadence, thresholds, daily cap, push history with useful / not useful |

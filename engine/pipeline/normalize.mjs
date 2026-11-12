@@ -91,8 +91,11 @@ export function toRecord(it, src, o) {
   const fromFeed = parseDate(it.published_at);
   const fromText = fromFeed ? "" : resolveTime(it.published_raw, o.nowMs);
   const fromUrl = fromFeed || fromText ? null : timeFromUrl(url);
-  const published_at = fromFeed || fromText || (fromUrl && fromUrl.at) || null;
-  const time_confidence = fromFeed ? "feed" : fromText ? "page_text" : fromUrl ? (fromUrl.precise ? "page_text" : "url_date") : "fetched";
+  let published_at = fromFeed || fromText || (fromUrl && fromUrl.at) || null;
+  let time_confidence = fromFeed ? "feed" : fromText ? "page_text" : fromUrl ? (fromUrl.precise ? "page_text" : "url_date") : "fetched";
+  // 发布时间不可能在将来：「将于11月13日上市」这类正文里的日期被当成了发布时间（会一直排在最前面）。
+  // 比抓取时间晚 1 小时以上的不认，按抓取时间算
+  if (published_at && o.nowMs && Date.parse(String(published_at).replace(" ", "T") + (String(published_at).includes("T") ? "" : "Z")) > o.nowMs + 3600000) { published_at = null; time_confidence = "fetched"; }
   const textLen = (body || summary).length;
   const paywalled = Boolean(src.paywall) || Boolean(it.paywall);
   return {
