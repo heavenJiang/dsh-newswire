@@ -71,6 +71,15 @@ export function nextCron(cron, tz, from) {
 /** 一分钟的键（同一分钟只触发一次）。 */
 export const minuteKey = (date) => Math.floor((date instanceof Date ? date.getTime() : Number(date)) / 60000);
 
+/** 往回找最近一次该触发的时刻（不含 from 这一分钟），最多找 maxMinutes 分钟；没有返回 null。 */
+export function prevCron(cron, tz, from, maxMinutes) {
+  const c = typeof cron === "string" ? parseCron(cron) : cron;
+  if (!c) return null;
+  const base = Math.floor((from instanceof Date ? from.getTime() : Number(from)) / 60000) * 60000;
+  for (let k = 1; k <= (maxMinutes || 60); k++) { const d = new Date(base - k * 60000); if (cronMatches(c, d, tz)) return d; }
+  return null;
+}
+
 /**
  * 定时推送前要提前多久开始抓取和编版面（毫秒；0 = 不用提前）。
  * 平时按最近几份模型版面耗时的中位数；一轮预算里写得完就不提前。

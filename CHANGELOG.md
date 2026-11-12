@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.32 (2026-11-12)
+
+- **A missed slot is caught up.** When the plugin pushes on its own clock it fires only in the exact minute of a slot; if the host is restarting, the plugin is being upgraded or the computer is asleep at that minute, the round was lost until the next slot two hours later. It happened in real use: today's 09:00 round (Beijing time) did not run because the host was down for those minutes. Each clock check now looks back: if a slot was missed within the last 75 minutes, no round has run since, and no push is being written, it runs once. A slot is caught up at most once; beyond 75 minutes it waits for the next one. This applies to direct pushes only (rounds triggered by the host's scheduled task are the host's business).
+
 ## 1.1.31 (2026-11-12)
 
 More problems found from real results:

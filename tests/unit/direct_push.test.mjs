@@ -207,3 +207,37 @@ test("手机上回复序号：能直接发时插件自己发（不让模型转�
   assert.equal(bad.error, "not_a_reply");
   b.dispose();
 });
+
+test("补跑：重启后发现 75 分钟内错过了一个整点、之后没跑过一轮，就补跑一次；跑过的不补", async (t) => {
+  // 时间表：十分钟前那一分钟（每小时一次）——现在不是整点，但刚错过一个
+  const past = new Date(Date.now() - 10 * 60000);
+  const minute = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Shanghai", minute: "2-digit" }).format(past));
+  const cron = minute + " * * * *";
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  const a = await mount({ phone: true });
+  await a.tool("newswire_schedule_setup").execute({ cron });
+  await a.call("/api/newswire/push");
+  a.sent.length = 0;
+  t.mock.timers.tick(30000);
+  await wait(300);
+  assert.equal(a.sent.length, 1, "补跑了一轮（测试里没有抓取子进程，发出来的是「本轮失败」）");
+  assert.match(a.sent[0].text, /本轮失败/);
+  t.mock.timers.tick(30000);
+  await wait(200);
+  assert.equal(a.sent.length, 1, "同一个整点只补一次");
+  a.dispose();
+
+  // 那个整点之后已经跑过一轮：不补
+  const b = await mount({ phone: true });
+  await b.tool("newswire_schedule_setup").execute({ cron });
+  await b.call("/api/newswire/push");
+  const db = openDb(path.join(b.dir, "news.sqlite"));
+  db.prepare("INSERT INTO runs (run_id, started_at, mode) VALUES ('cycle-x', datetime('now', '-5 minutes'), 'cycle')").run();
+  db.close();
+  b.sent.length = 0;
+  t.mock.timers.tick(30000);
+  await wait(300);
+  assert.equal(b.sent.length, 0);
+  b.dispose();
+  t.mock.timers.reset();
+});

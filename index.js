@@ -16,7 +16,7 @@ import { analysisMaterials, analyzeStory, autoAnalyzeTargets, saveAnalysis, sear
 import { linkAll, repairAliasLinks, repairThemeLinks, synthTargets, synthesize } from "./host/tracking.mjs";
 import { PRIORITY, createQueue } from "./host/queue.mjs";
 import { prune } from "./host/retention.mjs";
-import { prewarmLead, cronMatches, minuteKey, nextCron, parseCron } from "./host/clock.mjs";
+import { prevCron, prewarmLead, cronMatches, minuteKey, nextCron, parseCron } from "./host/clock.mjs";
 import { REPLY_HELP, composeDetail, composeExpand, numberPicks, parseReply, storyOfNumber, trackedIn } from "./host/reply.mjs";
 import { applyDailyCap, loadPush, noteInterest, rulesFor, sectionPenalties } from "./host/push.mjs";
 import path from "node:path";
@@ -897,7 +897,7 @@ export function apply(ctx, config) {
   // 暂停本插件建的定时任务，按它们的 cron 自己到点跑；直接推送断了 3 分钟以上（或改回「经定时任务」）就恢复那些任务。
   // 任务的时间仍以宿主里的任务为准（面板改节奏照样改那个任务），这里每 5 分钟重读一次。
   const clockKey = "direct_clock";
-  const clock = { tasks: [], at: 0, offSince: 0, fired: new Set(), startedAt: Date.now() };
+  const clock = { tasks: [], at: 0, offSince: 0, fired: new Set(), caught: new Set(), startedAt: Date.now() };
   // 工具区里定义的函数（日报）由那里登记进来
   const hooks = { dailyRun: null };
   function readTaken() { try { const r = withDb(p, (db) => (db ? db.prepare("SELECT value FROM kv WHERE key = ?").get(clockKey) : null)); return r ? JSON.parse(r.value) : []; } catch { return []; } }
@@ -959,7 +959,24 @@ export function apply(ctx, config) {
       clock.fired.add(k);
       void background(fireTask(t), "direct " + t.kind);
     }
+    // 补跑：宿主重启、电脑睡眠时错过了整点（75 分钟以内），而那之后还没跑过一轮——补上，不等下一个整点
+    for (const t of clock.tasks) {
+      if (t.kind !== "cycle" || cronMatches(t.cron, now, t.tz)) continue;
+      const prev = prevCron(t.cron, t.tz, now, CATCHUP_MINUTES);
+      if (!prev) continue;
+      const k = t.id + "@" + minuteKey(prev);
+      if (clock.fired.has(k) || clock.caught.has(k)) continue;
+      clock.caught.add(k);
+      if (clock.caught.size > 50) clock.caught.delete(clock.caught.values().next().value);
+      const since = new Date(prev.getTime() - 2 * 60000).toISOString().replace("T", " ").slice(0, 19);
+      const ran = withDb(p, (db) => (db ? db.prepare("SELECT 1 FROM runs WHERE mode = 'cycle' AND started_at >= ? LIMIT 1").get(since) : null));
+      if (ran || readPending(t.pack) || busyWith()) continue;
+      ctx.logger?.info?.("dsh-newswire: 补跑错过的 " + bjHhmm(prev.toISOString().replace("T", " ").slice(0, 19)) + " 这一轮");
+      void background(fireTask(t), "direct catch-up");
+    }
   }
+  /** 错过整点多久以内补跑（分钟）。超过就等下一个整点。 */
+  const CATCHUP_MINUTES = 75;
   /** 到点：要闻按一轮跑（写完再推的由版面写完时直接发），日报写好直接发。 */
   async function fireTask(t) {
     if (t.kind === "daily") {

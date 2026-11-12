@@ -43,3 +43,15 @@ test("提前量：平时按中位数，一轮写得完就不提前；隔夜按�
   assert.equal(prewarmLead({ ms: [70 * M], budgetMs: 9 * M, gapHours: 9 }), 60 * M, "最多一小时");
   assert.equal(prewarmLead({ ms: [], budgetMs: 9 * M, gapHours: 0 }), 20 * M, "没有记录按 15 分钟估");
 });
+
+test("往回找错过的整点：75 分钟内有就返回那一刻，没有返回 null", async () => {
+  const { prevCron } = await import("../../host/clock.mjs");
+  const cron = "0 7-21/2 * * *";
+  const at = (s) => new Date(s);
+  // 北京时间 09:23 → 错过的是 09:00（UTC 01:00）
+  assert.equal(prevCron(cron, "Asia/Shanghai", at("2026-11-12T01:23:30Z"), 75).toISOString(), "2026-11-12T01:00:00.000Z");
+  assert.equal(prevCron(cron, "Asia/Shanghai", at("2026-11-12T02:20:00Z"), 75), null, "10:20 离 09:00 超过 75 分钟：等 11 点");
+  assert.equal(prevCron(cron, "Asia/Shanghai", at("2026-11-12T01:00:20Z"), 75), null, "正在整点这一分钟：不算错过");
+  assert.equal(prevCron(cron, "Asia/Shanghai", at("2026-11-11T15:30:00Z"), 75), null, "夜里 23:30：21 点之后没有整点");
+  assert.equal(prevCron("bad", "Asia/Shanghai", at("2026-11-12T01:23:00Z"), 75), null);
+});
