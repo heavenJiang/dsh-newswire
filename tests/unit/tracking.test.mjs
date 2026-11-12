@@ -179,3 +179,22 @@ test("主线的检索关键词：从名字里拆，泛词和太常见的词不�
   assert.deepEqual(linkAll(db, [])[id], ["dc3"]);
   db.close();
 });
+
+test("别名挂故事线：大故事线里只有一篇顺带提到的不挂；标题里有、或三成以上报道提到的才挂；已挂错的一次性摘掉", async () => {
+  const { repairAliasLinks } = await import("../../host/tracking.mjs");
+  const db = db0();
+  const big = (sid, title, n, mention) => {
+    story(db, sid, title, { msAgo: 3600000 });
+    for (let i = 0; i < n - 1; i++) { const aid = sid + "-x" + i; db.prepare("INSERT INTO articles (id, url, title, source_id, first_seen_at, published_at) VALUES (?,?,?, 'cls', datetime('now', '-1 hour'), datetime('now', '-1 hour'))").run(aid, "https://x/" + aid, i < mention ? "英伟达等参与私募" + i : "别的报道" + i); db.prepare("INSERT INTO story_items (article_id, story_id) VALUES (?,?)").run(aid, sid); }
+  };
+  big("ipo", "Anthropic路演11月19日上市", 20, 1);
+  big("nv", "芯片股普跌", 10, 4);
+  story(db, "nt", "英伟达回应质疑", { msAgo: 3600000 });
+  const id = addTracker(db, { name: "英伟达风波", kind: "theme", entities: {}, stories: [], backfillDays: 2 });
+  const linked = db.prepare("SELECT story_id FROM tracker_stories WHERE tracker_id = ? ORDER BY story_id").all(id).map((x) => x.story_id);
+  assert.deepEqual(linked, ["nt", "nv"], "标题里有的、四成报道提到的挂上；20 篇里只有 1 篇提到的不挂");
+  db.prepare("INSERT INTO tracker_stories (tracker_id, story_id, linked_at, how) VALUES (?, 'ipo', datetime('now'), 'alias')").run(id);
+  assert.equal(repairAliasLinks(db), 1);
+  assert.deepEqual(db.prepare("SELECT story_id FROM tracker_stories WHERE tracker_id = ? ORDER BY story_id").all(id).map((x) => x.story_id), ["nt", "nv"]);
+  db.close();
+});

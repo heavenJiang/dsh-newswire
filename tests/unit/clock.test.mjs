@@ -32,3 +32,14 @@ test("下一次：不含当前这一分钟，跨天", () => {
   assert.equal(nextCron("0 8,12,18 * * *", "Asia/Shanghai", bj("2026-11-11T19:30:00")).toISOString(), "2026-11-12T00:00:00.000Z");
   assert.equal(nextCron("bad", "Asia/Shanghai", Date.now()), null);
 });
+
+test("提前量：平时按中位数，一轮写得完就不提前；隔夜按最慢的那份、至少 25 分钟、最多一小时", async () => {
+  const { prewarmLead } = await import("../../host/clock.mjs");
+  const M = 60000;
+  assert.equal(prewarmLead({ ms: [3 * M, 4 * M, 5 * M], budgetMs: 9 * M, gapHours: 2 }), 0, "4+3 分钟在预算内");
+  assert.equal(prewarmLead({ ms: [5 * M, 6.5 * M, 21 * M], budgetMs: 9 * M, gapHours: 2 }), 11.5 * M, "中位数 6.5 + 5");
+  assert.equal(prewarmLead({ ms: [5 * M, 6.5 * M, 21 * M], budgetMs: 9 * M, gapHours: 9 }), 26 * M, "隔夜：最慢的 21 + 5");
+  assert.equal(prewarmLead({ ms: [3 * M], budgetMs: 9 * M, gapHours: 9 }), 25 * M, "隔夜至少 25 分钟");
+  assert.equal(prewarmLead({ ms: [70 * M], budgetMs: 9 * M, gapHours: 9 }), 60 * M, "最多一小时");
+  assert.equal(prewarmLead({ ms: [], budgetMs: 9 * M, gapHours: 0 }), 20 * M, "没有记录按 15 分钟估");
+});

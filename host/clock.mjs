@@ -70,3 +70,20 @@ export function nextCron(cron, tz, from) {
 
 /** 一分钟的键（同一分钟只触发一次）。 */
 export const minuteKey = (date) => Math.floor((date instanceof Date ? date.getTime() : Number(date)) / 60000);
+
+/**
+ * 定时推送前要提前多久开始抓取和编版面（毫秒；0 = 不用提前）。
+ * 平时按最近几份模型版面耗时的中位数；一轮预算里写得完就不提前。
+ * 隔夜（距上一份模型版面 5 小时以上）积下的新闻是平时的好几倍：按最近几份里最慢的那份算，至少提前 25 分钟——
+ * 不然早上 7 点的那条要到 7 点一刻才到。
+ * @param o { ms: 最近几份模型版面的耗时, readingMs: 模型读页面的耗时（不限档）, budgetMs: 一轮的时间预算, gapHours: 距上一份模型版面多久 }
+ */
+export function prewarmLead(o) {
+  const ms = (o.ms || []).filter((x) => Number.isFinite(x) && x > 0).sort((a, b) => a - b);
+  const reading = o.readingMs || 0;
+  const MIN = 60000;
+  if (o.gapHours >= 5) return Math.min(60 * MIN, Math.max(25 * MIN, (ms.length ? ms[ms.length - 1] : 20 * MIN) + reading + 5 * MIN));
+  const typical = ms.length ? ms[Math.floor(ms.length / 2)] : 15 * MIN;
+  if (typical + reading + 3 * MIN <= (o.budgetMs || 0)) return 0;
+  return Math.min(60 * MIN, Math.max(8 * MIN, typical + reading + 5 * MIN));
+}

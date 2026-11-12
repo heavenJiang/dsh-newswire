@@ -13,10 +13,10 @@ import { translateTitles } from "./host/translate.mjs";
 import { DEPTHS, depthOf, depthParams, makeGate, recordCall } from "./host/runtime.mjs";
 import { detailMaterials, latestDetail, saveDetail, writeDetail } from "./host/detail.mjs";
 import { analysisMaterials, analyzeStory, autoAnalyzeTargets, saveAnalysis, searchQuery, webMaterials } from "./host/analysis.mjs";
-import { linkAll, repairThemeLinks, synthTargets, synthesize } from "./host/tracking.mjs";
+import { linkAll, repairAliasLinks, repairThemeLinks, synthTargets, synthesize } from "./host/tracking.mjs";
 import { PRIORITY, createQueue } from "./host/queue.mjs";
 import { prune } from "./host/retention.mjs";
-import { cronMatches, minuteKey, nextCron, parseCron } from "./host/clock.mjs";
+import { prewarmLead, cronMatches, minuteKey, nextCron, parseCron } from "./host/clock.mjs";
 import { REPLY_HELP, composeDetail, composeExpand, numberPicks, parseReply, storyOfNumber, trackedIn } from "./host/reply.mjs";
 import { applyDailyCap, loadPush, noteInterest, rulesFor, sectionPenalties } from "./host/push.mjs";
 import path from "node:path";
@@ -875,6 +875,9 @@ export function apply(ctx, config) {
   function maintenanceTick() {
     if (modelState.busy || busyWith()) return;
     // 一次性修复：摘掉以前按过宽的规则挂到主线对象上的故事线（见 repairThemeLinks）
+    if (!kvGet("tracker_links_v3")) {
+      try { const n = withDb(p, (db) => (db ? repairAliasLinks(db) : null)); if (n != null) kvSet("tracker_links_v3", { at: new Date().toISOString(), removed: n }); } catch { /* 下一分钟再试 */ }
+    }
     if (!kvGet("tracker_links_v2")) {
       try { const n = withDb(p, (db) => (db ? repairThemeLinks(db) : null)); if (n != null) kvSet("tracker_links_v2", { at: new Date().toISOString(), removed: n }); } catch { /* 下一分钟再试 */ }
     }
@@ -1158,13 +1161,11 @@ export function apply(ctx, config) {
   // 到点的那一轮只补这几分钟的增量。提前量按最近几份模型版面的实际耗时估。
   const prewarm = { running: false, done: new Map(), tasks: [], tasksAt: 0 };
   function prewarmLeadMs() {
-    const ms = (withDb(p, (db) => (db ? db.prepare("SELECT ms FROM editions WHERE mode = 'llm' AND ms IS NOT NULL ORDER BY id DESC LIMIT 5").all() : [])) || []).map((r) => r.ms).sort((a, b) => a - b);
-    const typical = ms.length ? ms[Math.floor(ms.length / 2)] : 15 * 60000;
+    const rows = withDb(p, (db) => (db ? { ms: db.prepare("SELECT ms FROM editions WHERE mode = 'llm' AND ms IS NOT NULL ORDER BY id DESC LIMIT 5").all().map((r) => r.ms), last: db.prepare("SELECT MAX(created_at) t FROM editions WHERE mode = 'llm'").get() } : null)) || { ms: [], last: null };
+    const gapHours = rows.last && rows.last.t ? (Date.now() - Date.parse(rows.last.t.replace(" ", "T") + "Z")) / 3600000 : 0;
     // 「不限」档还要先让模型读页面：按上一次读的实际耗时算进去
-    const reading = depthParams(prefs()).modelRead ? Math.min(25 * 60000, (modelState.read && modelState.read.ms) || 10 * 60000) : 0;
-    // 抓取约 2 分钟：模型在一轮预算里读得完、写得完就不用提前
-    if (typical + reading + 3 * 60000 <= cfg.cycleBudgetMs) return 0;
-    return Math.min(60 * 60000, Math.max(8 * 60000, typical + reading + 5 * 60000));
+    const readingMs = depthParams(prefs()).modelRead ? Math.min(25 * 60000, (modelState.read && modelState.read.ms) || 10 * 60000) : 0;
+    return prewarmLead({ ms: rows.ms, readingMs, budgetMs: cfg.cycleBudgetMs, gapHours });
   }
   async function prewarmTick() {
     if (prewarm.running || !optional.schedule || !(modeNow() === "llm" && llmReady())) return;

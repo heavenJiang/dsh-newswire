@@ -119,8 +119,17 @@ export function linkStories(db, id, o) {
   const found = new Map();
   for (const a of aliases) {
     for (const r of db.prepare("SELECT DISTINCT e.story_id FROM story_entities e JOIN stories s ON s.story_id = e.story_id WHERE lower(e.name) = lower(?) AND s.updated_at >= ?").all(a, since)) found.set(r.story_id, "entity");
-    for (const r of db.prepare(`SELECT DISTINCT si.story_id FROM story_items si JOIN articles a ON a.id = si.article_id
-      WHERE a.first_seen_at >= ? AND (a.title LIKE ? OR COALESCE(a.title_zh, '') LIKE ?) LIMIT 400`).all(since, "%" + a + "%", "%" + a + "%")) if (!found.has(r.story_id)) found.set(r.story_id, "alias");
+    // 别名出现在故事线的标题里，或出现在它相当一部分报道的标题里（至少三成；只有一两篇报道的，一篇就算）。
+    // 原来只要有一篇报道的标题提到就挂：几十篇报道的大故事线里总有一篇顺带提到某家公司，于是 Anthropic 上市挂到了「英伟达风波」下面
+    for (const r of db.prepare(`SELECT si.story_id, COUNT(*) hits,
+        (SELECT COUNT(*) FROM story_items x WHERE x.story_id = si.story_id) total,
+        (SELECT title FROM stories st WHERE st.story_id = si.story_id) story_title
+      FROM story_items si JOIN articles a ON a.id = si.article_id
+      WHERE a.first_seen_at >= ? AND (a.title LIKE ? OR COALESCE(a.title_zh, '') LIKE ?) GROUP BY si.story_id LIMIT 400`).all(since, "%" + a + "%", "%" + a + "%")) {
+      const inTitle = String(r.story_title || "").toLowerCase().includes(a.toLowerCase());
+      if (!inTitle && !(r.total <= 2 || r.hits / r.total >= 0.3)) continue;
+      if (!found.has(r.story_id)) found.set(r.story_id, "alias");
+    }
   }
   if (t.kind === "theme" && o && Array.isArray(o.themes)) {
     const mine = new Set(db.prepare("SELECT story_id FROM tracker_stories WHERE tracker_id = ? AND how != 'banned'").all(id).map((r) => r.story_id));
@@ -148,6 +157,28 @@ export function linkStories(db, id, o) {
   const added = [];
   for (const [sid, how] of found) if (Number(ins.run(id, sid, nowSql(), how).changes)) added.push(sid);
   return added;
+}
+
+/**
+ * 一次性修复（1.1.31）：按别名挂上的故事线里，只是某一篇报道顺带提到别名的（标题里没有、提到它的报道不到三成）摘掉。
+ * @returns 摘掉的条数
+ */
+export function repairAliasLinks(db) {
+  let removed = 0;
+  const hitQ = (n) => "SELECT COUNT(*) n FROM story_items si JOIN articles a ON a.id = si.article_id WHERE si.story_id = ? AND (" + Array.from({ length: n }, () => "a.title LIKE ? OR COALESCE(a.title_zh, '') LIKE ?").join(" OR ") + ")";
+  for (const t of db.prepare("SELECT id, aliases FROM trackers").all()) {
+    const aliases = parseJ(t.aliases, []).filter(usable);
+    if (!aliases.length) continue;
+    const rows = db.prepare(`SELECT ts.story_id, s.title, (SELECT COUNT(*) FROM story_items x WHERE x.story_id = ts.story_id) total
+      FROM tracker_stories ts JOIN stories s ON s.story_id = ts.story_id WHERE ts.tracker_id = ? AND ts.how = 'alias'`).all(t.id);
+    for (const r of rows) {
+      if (r.total <= 2 || aliases.some((a) => String(r.title || "").toLowerCase().includes(a.toLowerCase()))) continue;
+      const hits = db.prepare(hitQ(aliases.length)).get(r.story_id, ...aliases.flatMap((a) => ["%" + a + "%", "%" + a + "%"])).n;
+      if (hits / r.total >= 0.3) continue;
+      removed += Number(db.prepare("DELETE FROM tracker_stories WHERE tracker_id = ? AND story_id = ? AND how = 'alias'").run(t.id, r.story_id).changes) || 0;
+    }
+  }
+  return removed;
 }
 
 // ------------------------------------------------------------------ 主线的检索关键词

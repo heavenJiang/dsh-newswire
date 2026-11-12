@@ -2,6 +2,12 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.31 (2026-11-12)
+
+More problems found from real results:
+- **The morning push is on time.** This morning's 7:00 push arrived at 7:16: 136 items had piled up overnight and that edition took 21 minutes, while the head start came from the median of ordinary editions and was only 11 minutes. When the last model edition is 5 or more hours old, the head start now follows the slowest of the recent editions, at least 25 minutes and at most an hour.
+- **Alias linking is stricter.** A storyline used to be linked to a tracker if a single report's title mentioned an alias, and a storyline with dozens of reports nearly always has one that mentions some company in passing: "Anthropic roadshow" (93 reports) and "US October CPI" (33) ended up under an Nvidia theme, so the front page's tracking strip showed an off-topic latest item. The alias must now be in the storyline's headline, or in at least 30% of its report titles (one is enough for a storyline of one or two reports). A one-time cleanup after upgrading removes links made the old way; on a copy of real data it removed 9.
+
 ## 1.1.30 (2026-11-12)
 
 What the first scheduled direct push showed in real use:
