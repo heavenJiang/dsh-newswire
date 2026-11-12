@@ -25,7 +25,7 @@ export function registerTools(app) {
     const f = v.active || v.last;
     if (!f) return "";
     const min = (ms) => (ms >= 60000 ? Math.round(ms / 60000) + " 分钟" : Math.max(1, Math.round(ms / 1000)) + " 秒");
-    const lines = f.steps.map((s) => ({ done: "✓", running: "▶", pending: "·", skipped: "–", failed: "✕" }[s.status] || "·") + " " + s.label + (s.total ? " " + s.done + "/" + s.total : "") + (s.detail && s.status !== "pending" ? "：" + s.detail : ""));
+    const lines = f.steps.map((s) => (s.warn && s.status === "done" ? "!" : { done: "✓", running: "▶", pending: "·", skipped: "–", failed: "✕" }[s.status] || "·") + " " + s.label + (s.total ? " " + s.done + "/" + s.total : "") + (s.detail && s.status !== "pending" ? "：" + s.detail : ""));
     const head = v.active
       ? "本轮流程（" + f.label + "，已用 " + min(f.ms) + (f.eta_ms ? "，预计还要约 " + min(f.eta_ms) : "") + "，进度 " + f.pct + "%）："
       : "上一轮流程（" + f.label + "，" + ({ done: "已完成", failed: "失败", stalled: "中断", replaced: "被新一轮取代" }[f.outcome] || f.outcome) + "，用时 " + min(f.ms) + (f.note ? "，" + f.note : "") + "）：";

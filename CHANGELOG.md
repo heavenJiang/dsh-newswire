@@ -2,6 +2,13 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.34 (2026-11-12)
+
+Two real rounds on a local model, on a copy of the data, and what they showed:
+- **"Done but incomplete" is no longer a green check.** In one round, 4 writing batches timed out and only 11 of 23 stories were written, yet the chart showed a green check. Such a step now gets an amber mark with how many were written, how many batches failed and why (timeout, over the time budget, malformed model output), and that those stories use program copy until the next round; the round reads "Done, 1 step incomplete". Grouping batches that failed and a failed front-page plan are shown the same way.
+- **Grouping shows which batch is running.** One batch takes three or four minutes on a local model, and the count used to sit at 0/4.
+- With the flow line showing, the note above the edition no longer repeats the written count.
+
 ## 1.1.33 (2026-11-12)
 
 - **See which step a round is on.** A round on a local model takes ten to twenty minutes, and the panel used to say only "laying out". A round is now a flow chart of three phases and 12 steps:

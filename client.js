@@ -96,12 +96,12 @@ window.__ModuleLoader__.load({
         'fw.ph.fetch': '抓取', 'fw.ph.edition': '编版面', 'fw.ph.push': '推送', 'fw.done': '已完成', 'fw.failed': '失败', 'fw.stalled': '中断', 'fw.replaced': '被新一轮取代', 'fw.skipped': '跳过', 'fw.about': '约 {d}', 'fw.now': '进行中',
         'fw.k.cycle': '定时一轮', 'fw.k.manual': '手动抓取', 'fw.k.prewarm': '推送前预编排', 'fw.k.refresh': '重新编排', 'fw.k.deliver': '推送',
         'fw.s.prep': '准备通道', 'fw.s.sources': '抓取各源', 'fw.s.clean': '清洗与拆条', 'fw.s.events': '分类与聚类', 'fw.s.bodies': '补正文', 'fw.s.translate': '译外文标题', 'fw.s.group': '归并故事线', 'fw.s.plan': '统筹头版', 'fw.s.write': '写稿', 'fw.s.check': '逐句核对', 'fw.s.save': '组版存档', 'fw.s.push': '发到手机',
-        'fw.instant': '不到 1 秒', 'fw.sec': '{n} 秒', 'fw.min': '{n} 分钟', 'fw.minsec': '{m} 分 {s} 秒', 'fw.hour': '{h} 小时 {m} 分',
+        'fw.partial': '已完成，{n} 步没做全', 'fw.instant': '不到 1 秒', 'fw.sec': '{n} 秒', 'fw.min': '{n} 分钟', 'fw.minsec': '{m} 分 {s} 秒', 'fw.hour': '{h} 小时 {m} 分',
         'ts.title': '追踪动态', 'ts.fresh': '+{n}', 'ts.all': '全部追踪 ›', 'dt.since': '比上一篇（{t}）新增 {n} 条，已标「新」', 'dt.new': '新', 'sb.thin': '「{s}」近 24 小时的 {n} 条故事线里有 {k} 条只有一家在报（多为 {top}）：多家印证、各方说法用不上，可以给这个版块再开一两个来源。',
         'rd.retitled': '事情有了变化，标题已更新。原标题：{t}', 'sb.cooling': '「{s}」连续 {n} 轮抓取失败（{r}），已降频：平时跳过，下次 {t} 再试一次，抓到了就恢复。一直抓不到可以把它关掉。', 'ph.title': '推送链路', 'ph.fix': '怎么修：', 'mq.running': '模型正在跑：', 'mq.waiting': '排队：', 'mq.secs': '{n} 秒', 'mq.hint': '读者点的（详细报道、影响分析、问答）排在版面和后台任务前面',
         'ps.save': '保存', 'ps.saved': '已保存。', 'ps.noSvc': '当前宿主没有定时任务服务，只能保存偏好。', 'ps.noTask': '还没有安排定时推送：在对话里说「每 2 小时推送要闻」即可。', 'ps.task': '定时任务：{s}，下一次 {n}', 'ps.learned': '根据你对推送的反馈，这些版块的门槛已自动提高：{s}',
         'ps.log': '推送记录', 'ps.up': '有用', 'ps.down': '没用', 'ps.none': '还没有推送过。',
-        'ed.partial': '模型已归并好版面，正在逐篇写稿（已写 {w}/{n} 篇，头版先写）；没写到的暂用程序稿，写完自动替换',
+        'ed.partialShort': '版面里还没写到的报道先用程序稿，写完自动替换', 'ed.partial': '模型已归并好版面，正在逐篇写稿（已写 {w}/{n} 篇，头版先写）；没写到的暂用程序稿，写完自动替换',
         'rd.ticks': '行情速览',
         'sb.title': '源的取舍', 'sb.hint': '近 {d} 天每个源带来了什么。开：正常上版与推送；试用：照常抓取、为别家报道提供印证，但不能单独让一件事上版或推送；关：不抓取。', 'sb.sum': '开 {on} · 试用 {trial} · 关 {off}', 'sb.applyAll': '按建议调整（{n} 个）', 'sb.applied': '已按建议调整 {n} 个源，下一轮抓取生效',
         'sb.on': '开', 'sb.trial': '试用', 'sb.off': '关', 'sb.suggest': '建议：{s}', 'sb.advanced': '高级：编辑源配置（地址、类型、通道、权重……）', 'sb.foot': '统计每天随新数据更新；关掉的源没有新数据，评估停在关掉前。不确定的源先「试用」：它只能为别家印证，不会让版面变乱，几天后再看数据决定。',
@@ -218,12 +218,12 @@ window.__ModuleLoader__.load({
         'fw.ph.fetch': 'Fetch', 'fw.ph.edition': 'Edition', 'fw.ph.push': 'Push', 'fw.done': 'Done', 'fw.failed': 'Failed', 'fw.stalled': 'Interrupted', 'fw.replaced': 'Superseded', 'fw.skipped': 'skipped', 'fw.about': '~{d}', 'fw.now': 'running',
         'fw.k.cycle': 'Scheduled round', 'fw.k.manual': 'Manual fetch', 'fw.k.prewarm': 'Pre-push warm-up', 'fw.k.refresh': 'Re-layout', 'fw.k.deliver': 'Push',
         'fw.s.prep': 'Prepare', 'fw.s.sources': 'Fetch sources', 'fw.s.clean': 'Clean & split', 'fw.s.events': 'Classify & cluster', 'fw.s.bodies': 'Fill bodies', 'fw.s.translate': 'Translate titles', 'fw.s.group': 'Group storylines', 'fw.s.plan': 'Front page', 'fw.s.write': 'Write', 'fw.s.check': 'Fact check', 'fw.s.save': 'Lay out & save', 'fw.s.push': 'Send to phone',
-        'fw.instant': '<1s', 'fw.sec': '{n}s', 'fw.min': '{n} min', 'fw.minsec': '{m}m {s}s', 'fw.hour': '{h}h {m}m',
+        'fw.partial': 'Done, {n} step(s) incomplete', 'fw.instant': '<1s', 'fw.sec': '{n}s', 'fw.min': '{n} min', 'fw.minsec': '{m}m {s}s', 'fw.hour': '{h}h {m}m',
         'ts.title': 'Tracking', 'ts.fresh': '+{n}', 'ts.all': 'All trackers ›', 'dt.since': '{n} new since the previous report ({t}), marked "new"', 'dt.new': 'new', 'sb.thin': '{k} of the {n} storylines in "{s}" over the last 24 hours have a single outlet (mostly {top}): corroboration and differing views cannot work there. Consider turning on one or two more sources for this section.',
         'rd.retitled': 'The story moved on, so the headline was updated. It was: {t}', 'sb.cooling': '"{s}" failed {n} rounds in a row ({r}) and is now throttled: skipped in normal rounds, retried at {t}, and back to normal once a fetch works. Turn it off if it never recovers.', 'ph.title': 'Push path', 'ph.fix': 'Fix: ', 'mq.running': 'Model is running: ', 'mq.waiting': 'Waiting: ', 'mq.secs': '{n}s', 'mq.hint': 'What you ask for (detailed report, impact analysis, Q&A) goes ahead of editions and background work',
         'ps.save': 'Save', 'ps.saved': 'Saved.', 'ps.noSvc': 'This host has no schedule service; only the preferences are saved.', 'ps.noTask': 'No scheduled push yet: say "push the news every 2 hours" in the chat.', 'ps.task': 'Scheduled task: {s}, next {n}', 'ps.learned': 'From your feedback, these sections now have a higher bar: {s}',
         'ps.log': 'Push history', 'ps.up': 'Useful', 'ps.down': 'Not useful', 'ps.none': 'Nothing pushed yet.',
-        'ed.partial': 'The model has laid out the edition and is writing stories ({w}/{n} done, front page first); the rest show program copy until replaced',
+        'ed.partialShort': 'Stories not yet written show program copy until they are replaced', 'ed.partial': 'The model has laid out the edition and is writing stories ({w}/{n} done, front page first); the rest show program copy until replaced',
         'rd.ticks': 'Markets',
         'sb.title': 'Choosing sources', 'sb.hint': 'What each source brought in the last {d} days. On: in the edition and pushes; Trial: fetched and used to corroborate other outlets, but cannot put a story on the board or in a push alone; Off: not fetched.', 'sb.sum': '{on} on · {trial} on trial · {off} off', 'sb.applyAll': 'Apply suggestions ({n})', 'sb.applied': '{n} sources changed; takes effect next round',
         'sb.on': 'On', 'sb.trial': 'Trial', 'sb.off': 'Off', 'sb.suggest': 'Suggested: {s}', 'sb.advanced': 'Advanced: edit source config (URL, type, channels, weight…)', 'sb.foot': 'Stats update with new data; a source that is off has no new data, so its numbers stop where it was turned off. Not sure? Put it on trial: it only corroborates, so it cannot clutter the edition; decide after a few days.',
@@ -1032,7 +1032,7 @@ window.__ModuleLoader__.load({
       var notes = []
       if (hist.id && ed) notes.push(h('div', { key: 'h', className: 'nw-callout nw-warnbox' }, t('hs.viewing', { t: when(ed.created_at) }), ' ', h('button', { className: 'nw-mini', onClick: function () { setIn(setHist, { id: null }) } }, t('hs.latest'))))
       var cs = (c && c.stats) || {}
-      if (e.busy || (!hist.id && (cs.preview || cs.partial))) notes.push(h('div', { key: 'b', className: 'nw-working' }, h('span', { className: 'nw-pulse' }), cs.partial ? t('ed.partial', { w: cs.written || 0, n: cs.to_write || 0 }) : cs.preview ? t('ed.preview') : t('ed.busy')))
+      if (e.busy || (!hist.id && (cs.preview || cs.partial))) notes.push(h('div', { key: 'b', className: 'nw-working' }, h('span', { className: 'nw-pulse' }), cs.partial ? (e.model && e.model.flow ? t('ed.partialShort') : t('ed.partial', { w: cs.written || 0, n: cs.to_write || 0 })) : cs.preview ? t('ed.preview') : t('ed.busy')))
       if (!hist.id) notes.push(h(FlowPanel, { key: 'flow', onDone: function () { load() } }))
       if (e.model && e.model.queue && !e.model.flow && !hist.id) notes.push(h(QueueLine, { key: 'q', queue: e.model.queue }))
       if (newer && !hist.id) notes.push(h('div', { key: 'nw', className: 'nw-callout nw-newer' }, t('ed.newer', { t: hhmm(newer.created_at) }), ' ', h('button', { className: 'nw-mini', onClick: function () { setNewer(null); load() } }, t('ed.newerGo'))))
@@ -1471,8 +1471,8 @@ window.__ModuleLoader__.load({
       var meta = s.status === 'running' ? (s.total ? s.done + '/' + s.total : t('fw.now')) + (s.ms ? ' · ' + dur(s.ms) : '')
         : s.status === 'done' || s.status === 'failed' ? (s.total ? s.done + '/' + s.total + ' · ' : '') + dur(s.ms)
         : s.status === 'skipped' ? t('fw.skipped') : s.est ? t('fw.about', { d: dur(s.est) }) : ''
-      return h('li', { className: 'nw-fs nw-fs-' + s.status },
-        h('span', { className: 'nw-fs-dot' }, FL_MARK[s.status] || ''),
+      return h('li', { className: 'nw-fs nw-fs-' + s.status + (s.warn && s.status === 'done' ? ' nw-fs-warn' : '') },
+        h('span', { className: 'nw-fs-dot' }, s.warn && s.status === 'done' ? '!' : FL_MARK[s.status] || ''),
         h('div', { className: 'nw-fs-body' },
           h('div', { className: 'nw-fs-row' }, h('span', { className: 'nw-fs-name' }, t('fw.s.' + s.id) !== 'fw.s.' + s.id ? t('fw.s.' + s.id) : s.label), h('span', { className: 'nw-fs-meta' }, meta)),
           s.detail && s.status !== 'pending' ? h('div', { className: 'nw-fs-detail' }, s.detail) : null,
@@ -1489,7 +1489,7 @@ window.__ModuleLoader__.load({
         var ss = f.steps.filter(function (s) { return s.phase === ph })
         if (ss.some(function (s) { return s.status === 'failed' })) return 'failed'
         if (ss.some(function (s) { return s.status === 'running' })) return 'running'
-        if (ss.every(function (s) { return s.status === 'done' || s.status === 'skipped' })) return ss.every(function (s) { return s.status === 'skipped' }) ? 'skipped' : 'done'
+        if (ss.every(function (s) { return s.status === 'done' || s.status === 'skipped' })) return ss.every(function (s) { return s.status === 'skipped' }) ? 'skipped' : ss.some(function (s) { return s.warn }) ? 'warn' : 'done'
         return 'pending'
       }
       var phaseMs = function (ph) { return f.steps.filter(function (s) { return s.phase === ph }).reduce(function (n, s) { return n + (s.ms || 0) }, 0) }
@@ -1509,12 +1509,12 @@ window.__ModuleLoader__.load({
       var cur = f.current ? f.steps.find(function (s) { return s.id === f.current }) : null
       var running = !f.ended
       var st = running ? (cur ? t('fw.ph.' + cur.phase) + ' › ' + t('fw.s.' + cur.id) + (cur.total ? ' ' + cur.done + '/' + cur.total : '') : t('fw.now'))
-        : f.outcome === 'done' ? t('fw.done') : t('fw.' + f.outcome) !== 'fw.' + f.outcome ? t('fw.' + f.outcome) : f.outcome
+        : f.outcome === 'done' ? (f.steps.some(function (s) { return s.warn }) ? t('fw.partial', { n: f.steps.filter(function (s) { return s.warn }).length }) : t('fw.done')) : t('fw.' + f.outcome) !== 'fw.' + f.outcome ? t('fw.' + f.outcome) : f.outcome
       return h('div', { className: 'nw-fh' },
         h('div', { className: 'nw-fh-row' },
-          running ? h('span', { className: 'nw-pulse' }) : h('span', { className: 'nw-fh-end nw-fh-' + f.outcome }, f.outcome === 'done' ? '✓' : '!'),
+          running ? h('span', { className: 'nw-pulse' }) : h('span', { className: 'nw-fh-end nw-fh-' + f.outcome + (f.outcome === 'done' && f.steps.some(function (s) { return s.warn }) ? ' nw-fh-warn' : '') }, f.outcome === 'done' && !f.steps.some(function (s) { return s.warn }) ? '✓' : '!'),
           h('b', null, t('fw.k.' + f.kind)),
-          h('span', { className: 'nw-fh-st' }, st),
+          h('span', { className: 'nw-fh-st' + (!running && (f.outcome !== 'done' || f.steps.some(function (s) { return s.warn })) ? ' nw-fh-st-warn' : '') }, st),
           h('span', { className: 'nw-muted nw-fh-time' }, [t('fw.started', { t: hhmm(f.started) }), running ? t('fw.spent', { d: dur(f.ms) }) : t('fw.took', { d: dur(f.ms) }), running ? (f.eta_ms ? t('fw.eta', { d: dur(f.eta_ms) }) : t('fw.etaNone')) : ''].filter(Boolean).join(' · ')),
           props.toggle || null),
         running ? h('div', { className: 'nw-track nw-fh-track' }, h('span', { className: 'nw-fill', style: { width: (f.pct || 2) + '%' } })) : null,
@@ -2741,22 +2741,23 @@ window.__ModuleLoader__.load({
       '.nw-working{display:flex;align-items:center;gap:8px;font-size:12px;color:' + C.l2 + '} .nw-queue{flex-wrap:wrap}',
       '.nw-flow{display:flex;flex-direction:column;gap:12px;border:1px solid ' + C.line1 + ';border-radius:12px;padding:12px 14px;background:' + C.bg + '} .nw-flow-on{border-color:' + C.accent + '}',
       '.nw-fh{display:flex;flex-direction:column;gap:6px} .nw-fh-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px} .nw-fh-st{color:' + C.accent + ';font-weight:600} .nw-fh-time{font-size:12px}',
-      '.nw-fh-toggle{margin-left:auto} .nw-fh-end{display:inline-flex;width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center;font-size:10px;color:#fff;background:' + C.ok + '} .nw-fh-failed,.nw-fh-stalled{background:' + C.err + '} .nw-fh-replaced{background:' + C.idle + '}',
+      '.nw-fh-toggle{margin-left:auto} .nw-fh-end{display:inline-flex;width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center;font-size:10px;color:#fff;background:' + C.ok + '} .nw-fh-failed,.nw-fh-stalled{background:' + C.err + '} .nw-fh-replaced{background:' + C.idle + '} .nw-fh-end.nw-fh-warn{background:' + C.warn + '} .nw-fh-st-warn{color:' + C.warn + '}',
       '.nw-fh-track{height:4px} .nw-fh-detail{font-size:12px;color:' + C.l2 + '}',
       '.nw-fc{display:grid;align-items:start;gap:0} .nw-fc-n3{grid-template-columns:minmax(0,1fr) 22px minmax(0,1.25fr) 22px minmax(0,0.8fr)} .nw-fc-n2{grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr)} .nw-fc-n1{grid-template-columns:minmax(0,560px)}',
-      '.nw-fc-phase{border:1px solid ' + C.line1 + ';border-radius:10px;padding:10px 12px;min-width:0;background:' + C.bg + '} .nw-fc-running{border-color:' + C.accent + ';box-shadow:0 0 0 3px ' + C.accentBg + '} .nw-fc-done{border-color:' + C.ok + '} .nw-fc-failed{border-color:' + C.err + '} .nw-fc-skipped{opacity:.6}',
+      '.nw-fc-phase{border:1px solid ' + C.line1 + ';border-radius:10px;padding:10px 12px;min-width:0;background:' + C.bg + '} .nw-fc-running{border-color:' + C.accent + ';box-shadow:0 0 0 3px ' + C.accentBg + '} .nw-fc-done{border-color:' + C.ok + '} .nw-fc-failed{border-color:' + C.err + '} .nw-fc-warn{border-color:' + C.warn + '} .nw-fc-skipped{opacity:.6}',
       '.nw-fc-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px} .nw-fc-name{font-weight:600;font-size:13px} .nw-fc-ms{font-size:11px;color:' + C.l3 + '}',
       '.nw-fc-arrow{align-self:center;height:2px;background:' + C.line + ';position:relative;margin:0 3px} .nw-fc-arrow::after{content:"";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left-color:' + C.line + ';border-right:0}',
-      '.nw-fc-arrow-done{background:' + C.ok + '} .nw-fc-arrow-done::after{border-left-color:' + C.ok + '}',
+      '.nw-fc-arrow-done,.nw-fc-arrow-warn{background:' + C.ok + '} .nw-fc-arrow-done::after,.nw-fc-arrow-warn::after{border-left-color:' + C.ok + '}',
       '.nw-fs-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}',
       '.nw-fs{display:flex;gap:10px;position:relative;padding-bottom:10px} .nw-fs:last-child{padding-bottom:0} .nw-fs::before{content:"";position:absolute;left:8px;top:18px;bottom:0;width:2px;background:' + C.line1 + '} .nw-fs:last-child::before{display:none} .nw-fs-done::before{background:' + C.ok + '}',
       '.nw-fs-dot{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid ' + C.idle + ';background:' + C.bg + ';display:inline-flex;align-items:center;justify-content:center;font-size:10px;line-height:1;color:#fff;box-sizing:border-box;position:relative;z-index:1}',
       '.nw-fs-done .nw-fs-dot{background:' + C.ok + ';border-color:' + C.ok + '} .nw-fs-failed .nw-fs-dot{background:' + C.err + ';border-color:' + C.err + '} .nw-fs-skipped .nw-fs-dot{color:' + C.l3 + ';border-style:dashed}',
       '.nw-fs-running .nw-fs-dot{border-color:' + C.accent + ';background:' + C.accentBg + ';animation:nwring 1.4s ease-in-out infinite} @keyframes nwring{0%,100%{box-shadow:0 0 0 0 ' + C.accentBg + '}50%{box-shadow:0 0 0 5px ' + C.accentBg + '}}',
       '.nw-fs-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px} .nw-fs-row{display:flex;justify-content:space-between;gap:8px;font-size:13px;line-height:18px} .nw-fs-name{color:' + C.l1 + '} .nw-fs-pending .nw-fs-name,.nw-fs-skipped .nw-fs-name{color:' + C.l3 + '} .nw-fs-running .nw-fs-name{font-weight:600;color:' + C.accent + '}',
+      '.nw-fs-warn .nw-fs-dot{background:' + C.warn + ';border-color:' + C.warn + '} .nw-fs-warn .nw-fs-detail{color:' + C.warn + '}',
       '.nw-fs-meta{font-size:11px;color:' + C.l3 + ';white-space:nowrap;font-variant-numeric:tabular-nums} .nw-fs-detail{font-size:12px;color:' + C.l2 + ';line-height:1.5;overflow-wrap:anywhere} .nw-fs-track{height:3px;margin-top:2px}',
       '.nw-fs-srcs{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px} .nw-fs-src{font-size:11px;line-height:18px;padding:0 6px;border-radius:4px;background:' + C.bg2 + ';color:' + C.l3 + '} .nw-fs-src-ok{background:' + C.okBg + ';color:' + C.ok + '} .nw-fs-src-failed{background:' + C.warnBg + ';color:' + C.warn + '} .nw-fs-src-running{background:' + C.accentBg + ';color:' + C.accent + '}',
-      '@container (max-width: 760px){.nw-fc.nw-fc-n3,.nw-fc.nw-fc-n2,.nw-fc.nw-fc-n1{grid-template-columns:minmax(0,1fr)} .nw-fc-arrow{justify-self:center;width:2px;height:16px;margin:3px 0} .nw-fc-arrow::after{right:-4px;top:auto;bottom:-1px;border:5px solid transparent;border-top-color:inherit;border-bottom:0} .nw-fc-arrow::after{border-top-color:' + C.line + '} .nw-fc-arrow-done::after{border-top-color:' + C.ok + '}}',
+      '@container (max-width: 760px){.nw-fc.nw-fc-n3,.nw-fc.nw-fc-n2,.nw-fc.nw-fc-n1{grid-template-columns:minmax(0,1fr)} .nw-fc-arrow{justify-self:center;width:2px;height:16px;margin:3px 0} .nw-fc-arrow::after{right:-4px;top:auto;bottom:-1px;border:5px solid transparent;border-top-color:inherit;border-bottom:0} .nw-fc-arrow::after{border-top-color:' + C.line + '} .nw-fc-arrow-done::after,.nw-fc-arrow-warn::after{border-top-color:' + C.ok + '}}',
       '.nw-ts{display:flex;flex-direction:column;gap:8px} .nw-ts-h{font-size:12px;color:' + C.l2 + ';font-weight:600} .nw-ts-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}',
       '.nw-ts-item{display:flex;flex-direction:column;gap:3px;text-align:left;border:1px solid ' + C.line1 + ';background:' + C.bg + ';color:inherit;font:inherit;border-radius:10px;padding:10px 12px;cursor:pointer;min-width:0} .nw-ts-item:hover{border-color:' + C.accent + '}',
       '.nw-ts-name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px} .nw-ts-n{font-size:11px;font-weight:500;color:' + C.accent + '} .nw-ts-latest{font-size:13px;color:' + C.l1 + ';overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical} .nw-ts-state{font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}',

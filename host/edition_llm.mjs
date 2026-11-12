@@ -425,7 +425,7 @@ export async function llmEdition(db, model, o) {
   }
   };
   await Promise.all(Array.from({ length: Math.max(1, o.concurrency || 1) }, groupWorker));
-  if (queue.length === 0 && gCount.total) stage("group", "done", { done: gCount.total, total: gCount.total, detail: "归成 " + groups.length + " 条故事线" + (stats.fallbacks.some((x) => x.startsWith("group")) ? "（有批次没成，按规则归并）" : "") });
+  if (queue.length === 0 && gCount.total) { const gf = stats.fallbacks.filter((x) => x.startsWith("group")).length; stage("group", "done", { done: gCount.total - gf, total: gCount.total, warn: gf > 0, detail: "归成 " + groups.length + " 条故事线" + (gf ? "（" + gf + " 批没归并成，按规则归并）" : "") }); }
   for (const g of groups) if (!g.id) { g.id = storyIdFor(g.items[0].id); g.isNew = true; }
   if (!groups.length) return { fallback: "no_stories" };
   groups.sort((a, b) => b.importance - a.importance);
@@ -453,7 +453,7 @@ export async function llmEdition(db, model, o) {
     stats.plan_reused = true;
   } else {
     stage("plan", "start", { detail: "从 " + top.length + " 条故事线里排头版、写总括、挑值得关注的" });
-    try { plan = await call("plan", planPrompt(top, layout), 6000); stats.plan_at = new Date().toISOString(); stage("plan", "done", { detail: "头版 " + (Array.isArray(plan.front) ? plan.front.length : 0) + " 条" + (plan.headline ? "：" + String(plan.headline).slice(0, 30) : "") }); } catch { plan = {}; stats.fallbacks.push("plan"); stage("plan", "done", { detail: "模型没排成，按重要度排头版" }); }
+    try { plan = await call("plan", planPrompt(top, layout), 6000); stats.plan_at = new Date().toISOString(); stage("plan", "done", { detail: "头版 " + (Array.isArray(plan.front) ? plan.front.length : 0) + " 条" + (plan.headline ? "：" + String(plan.headline).slice(0, 30) : "") }); } catch { plan = {}; stats.fallbacks.push("plan"); stage("plan", "done", { warn: true, detail: "模型没排成，按重要度排头版" }); }
     for (const m of Array.isArray(plan.merge) ? plan.merge : []) {
       const ks = (Array.isArray(m) ? m : []).map(Number).filter((k) => k >= 1 && k <= top.length && !merged.has(k));
       if (ks.length < 2) continue;
@@ -642,7 +642,9 @@ export async function llmEdition(db, model, o) {
     Object.assign(s, { lead: copy.lead, lead_refs: copy.lead_refs, points: copy.points, views: copy.views, impact: copy.impact, by: s.by === "llm" ? "llm-group" : "rules" });
   }
   for (const s of stories) if (s.updated && !s.update_text) Object.assign(s, programUpdate(s._g.fresh));
-  stage("write", "done", { done: written.size, total: toWrite.length + (stats.cached || 0), detail: "写了 " + written.size + " 篇" + (stats.fallbacks.some((x) => x.startsWith("write")) ? "，有批次没写成，用程序稿" : "") + (stats.retitled ? "，" + stats.retitled + " 条换了标题" : "") });
+  const wf = stats.fallbacks.filter((x) => x.startsWith("write"));
+  const why = [...new Set(stats.errors.filter((e) => e.startsWith("write")).map((e) => (/timeout|aborted/i.test(e) ? "超时" : /budget/.test(e) ? "超出时间预算" : /bad_json/.test(e) ? "模型输出格式不对" : "出错")))].join("、");
+  stage("write", "done", { done: written.size, total: toWrite.length + (stats.cached || 0), warn: wf.length > 0, detail: "写了 " + written.size + " 篇" + (wf.length ? "；" + wf.length + " 批没写成（" + (why || "出错") + "），这几篇先用程序稿，下一轮再写" : "") + (stats.retitled ? "，" + stats.retitled + " 条换了标题" : "") });
   stage("check", "start", { detail: "逐句核对数字、专名、引语是否在原文里" });
   // 4. 核对：模型稿（新写的与沿用的）逐句核对，整理出处
   const allBodies = bodiesFor(db, stories.filter((s) => s.by === "llm" && !written.has(s.id)).flatMap((s) => s._g.items.map((it) => it.id)));
