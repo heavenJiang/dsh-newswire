@@ -82,7 +82,7 @@ window.__ModuleLoader__.load({
         'tl.round': '{t} 这一轮', 'tl.srcs': '源 {a}/{b}', 'tl.newItems': '新增 {n} 条', 'tl.newEvents': '新事件 {n} 件', 'tl.pushes': '推送 {n} 条',
         'it.kind.promo': '广告/引流', 'it.kind.ticker': '行情', 'it.kind.digest': '合集原稿', 'it.showFiltered': '显示已过滤的',
         'ia.title': '影响与走势', 'ia.horizon': '影响期：{h}', 'ia.spec': '模型推演，非事实，不构成投资建议', 'ia.conf': '把握{c}', 'ia.more': '看完整推演 ›', 'ia.follow': '关注这件事的进展', 'ia.following': '已关注，有进展会推给你',
-        'ia.busy': '模型正在分析影响与可能的走向（约 1–2 分钟）…', 'ia.run': '分析影响与走势', 'ia.rerun': '重新分析', 'ia.noModel': '需要 LLM 模式且模型可用', 'ia.impacts': '可能受影响的', 'ia.scenarios': '可能的走向', 'ia.signals': '信号：', 'ia.watch': '接下来留意',
+        'ia.busy': '模型正在分析影响与可能的走向（约 1–2 分钟）…', 'ia.run': '分析影响与走势', 'ia.rerun': '重新分析', 'ia.noModel': '需要 LLM 模式且模型可用', 'ia.impacts': '受影响的公司与环节', 'ia.deep': '深层影响', 'ia.china': '对中国的影响', 'ia.scenarios': '可能的走向', 'ia.signals': '信号：', 'ia.watch': '接下来留意',
         'ia.disclaimer': '由 {m} 依据这条故事线的报道推演（{t}），不是事实，不构成投资建议。', 'ia.dropped': '有 {n} 条推演与原文核对不上，已删去。', 'ia.newer': '分析之后又有 {n} 篇新报道，可以重新分析。',
         'fl.topHint': '{n} 篇 · 你关注的人、公司与话题',
         'rd.reposts': '另有 {n} 家转载', 'rd.repostsHint': '转载（几乎一字不差、不算独立印证）：{w}', 'sb.reposts': '转载别家 {n}',
@@ -204,7 +204,7 @@ window.__ModuleLoader__.load({
         'tl.round': 'Round at {t}', 'tl.srcs': 'sources {a}/{b}', 'tl.newItems': '{n} new items', 'tl.newEvents': '{n} new stories', 'tl.pushes': '{n} pushed',
         'it.kind.promo': 'ad/promo', 'it.kind.ticker': 'market', 'it.kind.digest': 'roundup', 'it.showFiltered': 'Show filtered',
         'ia.title': 'Impact & outlook', 'ia.horizon': 'horizon: {h}', 'ia.spec': 'model speculation, not fact or investment advice', 'ia.conf': '{c} confidence', 'ia.more': 'Full analysis ›', 'ia.follow': 'Follow this story', 'ia.following': 'Following; updates will be pushed',
-        'ia.busy': 'The model is analyzing impact and outlook (1–2 minutes)…', 'ia.run': 'Analyze impact & outlook', 'ia.rerun': 'Analyze again', 'ia.noModel': 'Needs LLM mode and an available model', 'ia.impacts': 'Likely affected', 'ia.scenarios': 'Possible paths', 'ia.signals': 'Signals: ', 'ia.watch': 'Watch next',
+        'ia.busy': 'The model is analyzing impact and outlook (1–2 minutes)…', 'ia.run': 'Analyze impact & outlook', 'ia.rerun': 'Analyze again', 'ia.noModel': 'Needs LLM mode and an available model', 'ia.impacts': 'Companies and segments affected', 'ia.deep': 'Deeper effects', 'ia.china': 'Impact on China', 'ia.scenarios': 'Possible paths', 'ia.signals': 'Signals: ', 'ia.watch': 'Watch next',
         'ia.disclaimer': 'Speculation by {m} from this storyline\'s reports ({t}); not fact, not investment advice.', 'ia.dropped': '{n} items did not match the sources and were removed.', 'ia.newer': '{n} new reports since this analysis; you can analyze again.',
         'fl.topHint': '{n} · people, companies and topics you follow',
         'rd.reposts': '{n} more reposted', 'rd.repostsHint': 'Reposts (near-identical, not independent corroboration): {w}', 'sb.reposts': 'reposts {n}',
@@ -755,7 +755,7 @@ window.__ModuleLoader__.load({
       return h('ul', { className: 'nw-imp-list' }, (props.impacts || []).map(function (x, i) {
         var d = DIR[x.direction] || DIR['不确定']
         return h('li', { key: i }, h('span', { className: 'nw-imp-dir ' + d[1], title: x.direction }, d[0]),
-          h('span', null, h('b', null, x.target + (x.ticker ? '（' + x.ticker + '）' : '')), h('span', { className: 'nw-muted nw-xs' }, ' ' + x.area + (x.confidence ? ' · ' + t('ia.conf', { c: x.confidence }) : '')), h('br'), x.why))
+          h('span', null, h('b', null, x.target + (x.ticker ? '（' + (x.market && x.market !== '其他' ? x.market + ' ' : '') + x.ticker + '）' : '')), h('span', { className: 'nw-muted nw-xs' }, ' ' + x.area + (x.product ? ' · ' + x.product : '') + (x.confidence ? ' · ' + t('ia.conf', { c: x.confidence }) : '')), h('br'), x.why))
       }))
     }
     function ImpactBlock(props) {
@@ -766,6 +766,7 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'nw-impact' },
         h('div', { className: 'nw-impact-h' }, h('b', null, t('ia.title')), h('span', { className: 'nw-muted nw-xs' }, ' ' + t('ia.horizon', { h: a.horizon || '短期' }) + ' · ' + t('ia.spec'))),
         a.summary ? h('p', { className: 'nw-rs-p nw-impact-sum' }, a.summary) : null,
+        a.china ? h('p', { className: 'nw-rs-p nw-xs' }, h('b', null, t('ia.china') + '：'), a.china) : null,
         h(ImpactList, { impacts: a.impacts }),
         h('div', { className: 'nw-impact-acts' },
           props.onOpen ? h('button', { className: 'nw-link-btn', onClick: props.onOpen }, t('ia.more')) : null,
@@ -777,6 +778,8 @@ window.__ModuleLoader__.load({
         h('h4', null, t('ia.title') + ' · ' + t('ia.horizon', { h: a.horizon || '短期' })),
         h('p', { className: 'nw-muted nw-xs' }, t('ia.disclaimer', { m: a.model || '', t: when(a.created_at) }) + (a.dropped ? ' ' + t('ia.dropped', { n: a.dropped }) : '')),
         a.summary ? h('p', { className: 'nw-rs-lead' }, a.summary) : null,
+        (a.deep || []).length ? [h('div', { key: 'kd', className: 'nw-rs-k' }, t('ia.deep')), h('ul', { key: 'd', className: 'nw-rs-points' }, a.deep.map(function (x, i) { return h('li', { key: i }, x.title ? h('b', null, x.title + '：') : null, x.text) }))] : null,
+        a.china ? [h('div', { key: 'kc', className: 'nw-rs-k' }, t('ia.china')), h('p', { key: 'c', className: 'nw-rs-p' }, a.china)] : null,
         (a.impacts || []).length ? [h('div', { key: 'k', className: 'nw-rs-k' }, t('ia.impacts')), h(ImpactList, { key: 'l', impacts: a.impacts })] : null,
         (a.scenarios || []).length ? [h('div', { key: 'k2', className: 'nw-rs-k' }, t('ia.scenarios')),
           h('ul', { key: 's', className: 'nw-imp-list' }, a.scenarios.map(function (x, i) {

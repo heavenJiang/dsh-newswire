@@ -246,12 +246,12 @@ export function registerTools(app) {
 
   tool({
     name: "newswire_analyze",
-    description: "Analyze a storyline's potential impact and likely evolution with the model (LLM mode): who is affected (markets, companies with tickers, industries, policy) and in which direction, 2–3 scenarios with likelihood and signals to watch, and what to watch next. Grounded in the storyline's own reports; invented numbers are dropped. It is speculation, not fact or investment advice — say so. story_id comes from newswire_edition; with refresh=false (default) the latest stored analysis is returned if one exists.",
+    description: "Analyze a storyline's potential impact and likely evolution with the model (LLM mode), in depth: second- and third-order effects, impact on the industry chain and on China (domestic substitution, capacity, policy response), named companies with tickers and the products affected, each bullish or bearish with the transmission logic, 2–3 scenarios with likelihood and signals to watch, and what to watch next. Grounded in the storyline's own reports; invented numbers are dropped. It is speculation, not fact or investment advice — say so. story_id comes from newswire_edition; with refresh=false (default) the latest stored analysis is returned if one exists.",
     parameters: { type: "object", additionalProperties: false, required: ["story_id"], properties: { story_id: { type: "string" }, refresh: { type: "boolean" } } },
     timeoutMs: 300000,
     output: {
       schema: { type: "object", additionalProperties: true, required: ["ok"], properties: { ok: { type: "boolean" } } },
-      render: (_a, v) => [{ type: "text", text: !v.ok ? "分析失败：" + v.error : [v.analysis.summary].concat((v.analysis.impacts || []).map((x) => "· " + x.area + "｜" + x.target + (x.ticker ? "（" + x.ticker + "）" : "") + "｜" + x.direction + "：" + x.why), (v.analysis.scenarios || []).map((x) => "→ " + x.name + "（可能性" + x.likelihood + "）：" + x.what + "；信号：" + x.signals)).join("\n") + "\n（模型推演，非事实，不构成投资建议）" }],
+      render: (_a, v) => [{ type: "text", text: !v.ok ? "分析失败：" + v.error : [v.analysis.summary].concat((v.analysis.deep || []).map((x) => "◇ " + (x.title ? x.title + "：" : "") + x.text), v.analysis.china ? ["对中国：" + v.analysis.china] : [], (v.analysis.impacts || []).map((x) => "· " + x.area + "｜" + x.target + (x.ticker ? "（" + (x.market ? x.market + " " : "") + x.ticker + "）" : "") + (x.product ? "｜" + x.product : "") + "｜" + x.direction + "：" + x.why), (v.analysis.scenarios || []).map((x) => "→ " + x.name + "（可能性" + x.likelihood + "）：" + x.what + "；信号：" + x.signals)).join("\n") + "\n（模型推演，非事实，不构成投资建议）" }],
     },
     async execute(args) {
       const id = String((args && args.story_id) || "");

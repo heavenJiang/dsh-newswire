@@ -69,3 +69,34 @@ test("什么都没核对过的分析不存；自动分析只挑头版里重要�
   assert.match(analysisPrompt({ title: "t" }, []), /不要编造数字/);
   db.close();
 });
+
+test("深度分析：要求往下推、讲产业链与中国、点名公司产品；材料外的公司名可以用，编的数字仍丢；深层影响与对中国的影响存下来", async () => {
+  const { db } = tmpDb();
+  const mats = analysisMaterials(db, "st1", null);
+  const p = analysisPrompt({ title: "t" }, mats);
+  assert.match(p, /往下推两三层/);
+  assert.match(p, /对中国的影响/);
+  assert.match(p, /不要因为话题敏感/);
+  assert.match(p, /不限于材料里出现的公司/);
+  const { m } = fake({
+    summary: "海湾供应风险抬升，国内炼化和航运被迫调整采购。",
+    deep: [{ title: "采购转向", text: "中东原油风险溢价上升，国内炼厂会增加俄油和巴西油的采购比例。" }, { title: "编数字", text: "进口成本上升40%" }],
+    china: "中国是沙特原油最大买家，炼化企业成本上升，战略储备的作用凸显。",
+    impacts: [
+      { area: "公司", target: "中国石化", ticker: "600028", market: "A股", product: "炼化", direction: "利空", why: "原油成本上升挤压炼化利润", confidence: "中" },
+      { area: "公司", target: "COSCO Shipping", ticker: "1919.hk", market: "港股", product: "油轮运输", direction: "利好", why: "绕行与风险溢价推高油运价格", confidence: "中" },
+    ],
+    scenarios: [], watch: [], horizon: "中期",
+  });
+  const a = await analyzeStory(m, { title: "胡塞袭击利雅得 阿美大楼受损" }, mats, {});
+  assert.equal(a.v, 2);
+  assert.deepEqual(a.deep.map((x) => x.title), ["采购转向"], "编的「40%」丢掉");
+  assert.match(a.china, /最大买家/);
+  assert.deepEqual(a.impacts.map((x) => x.target), ["中国石化", "COSCO Shipping"], "材料里没有的外文公司名照样保留");
+  assert.equal(a.impacts[1].ticker, "1919.HK");
+  assert.equal(a.impacts[1].market, "港股");
+  assert.equal(a.impacts[0].product, "炼化");
+  saveAnalysis(db, "st1", a, { model: "f/m" });
+  assert.match(analysisBrief(db, ["st1"]).st1.china, /最大买家/);
+  db.close();
+});

@@ -1,7 +1,9 @@
 /**
  * 影响与走势：重要新闻的潜在影响与可能的演变，由模型推演，用户据此决定是否关注后续。
  *
- * 只给模型这条故事线自己的报道（标题与正文）；具体数字只能来自材料，每条再核对数字与外文专名，编出来的整条丢掉。
+ * 只给模型这条故事线自己的报道（标题与正文）。读者要的是有深度的判断：不停在表面的直接后果，往下推两三层，
+ * 重点讲对产业链和对中国的影响，点名具体公司（含股票代码）和产品、说清利好还是利空——公司、产品、产业链知识可以用模型自己的，
+ * 不限于材料里出现的；只有具体数字必须来自材料，每条核对数字，编出来的整条丢掉（外文专名不再要求出现在材料里）。
  * 这是推演，不是事实，也不构成投资建议——面板与消息都这样标明。
  * 存 story_analyses（每次分析一行）；故事线有了新报道才值得重新分析。
  */
@@ -12,7 +14,8 @@ import { builtinProfiles, promptOf } from "./profiles.mjs";
 const clip = (s, n) => { const t = String(s || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 const str = (v, n) => (typeof v === "string" && v.trim() ? clip(v, n) : "");
 const parseJ = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
-const AREAS = ["市场", "公司", "行业", "科技", "政策", "地缘", "民生", "能源", "金融"];
+const AREAS = ["公司", "产业链", "中国", "市场", "行业", "科技", "政策", "地缘", "民生", "能源", "金融"];
+const MARKETS = ["A股", "港股", "美股", "其他"];
 const DIRS = ["利好", "利空", "不确定"];
 const LEVELS = ["高", "中", "低"];
 
@@ -28,17 +31,26 @@ function hintOf(story) {
 }
 
 export function analysisPrompt(story, mats) {
-  return "任务：分析一件正在发生的新闻的潜在影响和可能的演变。依据材料与常识推演；具体数字只能用材料里出现过的，不要编造数字；没有把握的写「不确定」或「低」。" +
+  return "任务：你是资深的产业与市场分析师，深入分析这条新闻的影响和可能的演变，写给关心产业和投资的中国读者。" +
+    "\n要求：" +
+    "\n1. 不要停在新闻表面的直接后果（比如「这条路线断了」「某公司受影响」），要往下推两三层：它会迫使谁改变做法、资金和订单会流向哪里、产业格局会不会因此重塑、长期会催生或淘汰什么。" +
+    "\n2. 重点讲两件事：对产业的影响（按这条新闻所在的产业，分到产业链的具体环节，如设计、制造、设备、材料、封测、算力、云、终端、应用）；对中国的影响（中国企业、国产替代、国内产能与产业布局、政策可能的应对、中国市场与消费者）。" +
+    "\n3. 点名具体的公司和产品：A股、港股、美股都可以，写股票代码；说清是利好还是利空、通过什么传导、影响的是哪项产品或业务。可以用你掌握的行业知识和公司情况，不限于材料里出现的公司。" +
+    "\n4. 直接给出你的判断，不要因为话题敏感、涉及政策或怕说错而回避、含糊其辞、只写「不确定」；有分歧的就写清两种可能和各自成立的条件，把握程度用 confidence 标。" +
+    "\n5. 具体数字（金额、比例、股价、产量）只能用材料里出现过的，不要编造数字；没有数字就用定性的说法。" +
     (hintOf(story) ? "\n" + hintOf(story) : "") +
-    "\n- summary：一句话说这件事意味着什么（不超过60字）" +
-    "\n- impacts：最多 4 条，谁会受影响。area 取 " + AREAS.join("/") + "；target 写受影响的对象（公司、资产、行业或地区）；ticker 若是上市公司写股票代码（不确定就留空）；direction 取 " + DIRS.join("/") + "；why 写传导逻辑（不超过60字）；confidence 取 " + LEVELS.join("/") +
-    "\n- scenarios：2 到 3 种可能的走向。name 如 基准/升级/缓和；likelihood 取 " + LEVELS.join("/") + "；what 写会怎样发展（不超过60字）；signals 写看到什么说明正往这个方向走（不超过40字）" +
+    "\n\n输出字段：" +
+    "\n- summary：核心判断，这件事真正意味着什么（不超过100字）" +
+    "\n- deep：深层影响 2 到 4 条，每条 {title: 一句话结论（不超过20字）, text: 推演过程（不超过160字）}，写表面之下的二阶、三阶影响" +
+    "\n- china：对中国的影响（不超过220字），讲产业、企业、国产替代、政策应对；和中国关系不大就写清楚为什么、可以短" +
+    "\n- impacts：受影响的公司、产业链环节和市场，4 到 10 条，最重要的在前。area 取 " + AREAS.join("/") + "；target 写公司名、产业链环节或资产；ticker 只在 target 是一家上市公司时写它的股票代码（如 688981、0981.HK、NVDA），产业链环节、行业、资产留空——环节里的代表公司另列一条公司；market 取 " + MARKETS.join("/") + "（不是上市公司留空）；product 写受影响的产品或业务（没有就留空）；direction 取 " + DIRS.join("/") + "；why 写传导逻辑（不超过100字）；confidence 取 " + LEVELS.join("/") +
+    "\n- scenarios：2 到 3 种可能的走向。name 如 基准/升级/缓和；likelihood 取 " + LEVELS.join("/") + "；what 写会怎样发展（不超过80字）；signals 写看到什么说明正往这个方向走（不超过40字）" +
     "\n- watch：接下来值得留意的 1 到 3 个节点或数据（每条不超过30字）" +
     "\n- horizon：影响主要在 短期（几天）/中期（几周）/长期（几个月以上）" +
-    '\n只输出一个 JSON 对象：{"summary":"","impacts":[{"area":"","target":"","ticker":"","direction":"","why":"","confidence":""}],"scenarios":[{"name":"","likelihood":"","what":"","signals":""}],"watch":[""],"horizon":""}' +
+    '\n只输出一个 JSON 对象：{"summary":"","deep":[{"title":"","text":""}],"china":"","impacts":[{"area":"","target":"","ticker":"","market":"","product":"","direction":"","why":"","confidence":""}],"scenarios":[{"name":"","likelihood":"","what":"","signals":""}],"watch":[""],"horizon":""}' +
     "\n\n新闻：" + story.title + (story.lead ? "\n导语：" + story.lead : "") +
     (mats.some((m) => m.web) ? "\n来源标「网页搜索」的是搜索结果摘要，只用来了解背景和前因，不是这件事的报道，不要把它说的当成这件事的事实。" : "") +
-    "\n\n报道材料（编号｜来源｜时间｜标题｜内容）：\n" + mats.map((m, i) => "[" + (i + 1) + "] " + m.source + "｜" + String(m.t || "").slice(0, 16) + "｜" + m.title + "｜" + clip(m.text, 600)).join("\n");
+    "\n\n报道材料（编号｜来源｜时间｜标题｜内容）：\n" + mats.map((m, i) => "[" + (i + 1) + "] " + m.source + "｜" + String(m.t || "").slice(0, 16) + "｜" + m.title + "｜" + clip(m.text, m.web ? 600 : 1500)).join("\n");
 }
 
 /** 网页搜索结果 → 分析材料（标明是搜索结果，不是这件事的报道）。 */
@@ -64,27 +76,31 @@ export function analysisMaterials(db, storyId, bodiesFor) {
 /** 跑一次分析并核对。@returns 分析内容（已核对），或抛错 */
 export async function analyzeStory(model, story, mats, o) {
   if (!mats.length) throw new Error("no_materials");
-  const j = parseJsonLoose(await model.complete(analysisPrompt(story, mats), { step: "analyze", maxTokens: 8000, timeoutMs: (o && o.timeoutMs) || 240000 }));
+  const j = parseJsonLoose(await model.complete(analysisPrompt(story, mats), { step: "analyze", maxTokens: 12000, timeoutMs: (o && o.timeoutMs) || 300000 }));
   if (!j) throw new Error("bad_json");
   const src = mats.map((m) => m.title + "｜" + m.text).concat([story.title, story.lead || ""]);
   let dropped = 0;
-  const ok = (text) => { if (!text) return false; if (checkText(text, src).ok) return true; dropped++; return false; };
+  // 只核对数字：公司、产品、外文专名可以来自模型的行业知识；数字（金额、比例、股价）必须在材料里
+  const ok = (text) => { if (!text) return false; const r = checkText(text, src); if (r.ok || !r.missing.some((x) => /\d/.test(x))) return true; dropped++; return false; };
   const out = {
-    v: 1,
-    summary: ok(str(j.summary, 80)) ? str(j.summary, 80) : "",
-    impacts: (Array.isArray(j.impacts) ? j.impacts : []).slice(0, 4).map((x) => ({
-      area: AREAS.includes(x && x.area) ? x.area : "市场", target: str(x && x.target, 30), ticker: /^[A-Z0-9.]{1,10}$/.test(String((x && x.ticker) || "").trim()) ? String(x.ticker).trim() : "",
-      direction: DIRS.includes(x && x.direction) ? x.direction : "不确定", why: str(x && x.why, 80), confidence: LEVELS.includes(x && x.confidence) ? x.confidence : "低",
+    v: 2,
+    summary: ok(str(j.summary, 120)) ? str(j.summary, 120) : "",
+    deep: (Array.isArray(j.deep) ? j.deep : []).slice(0, 4).map((x) => ({ title: str(x && x.title, 30), text: str(x && x.text, 200) })).filter((x) => x.text && ok(x.title + "：" + x.text)),
+    china: ok(str(j.china, 260)) ? str(j.china, 260) : "",
+    impacts: (Array.isArray(j.impacts) ? j.impacts : []).slice(0, 10).map((x) => ({
+      area: AREAS.includes(x && x.area) ? x.area : "市场", target: str(x && x.target, 30), ticker: ["产业链", "行业"].includes(x && x.area) ? "" : /^[A-Za-z0-9.]{1,12}$/.test(String((x && x.ticker) || "").trim()) ? String(x.ticker).trim().toUpperCase() : "",
+      market: !["产业链", "行业"].includes(x && x.area) && MARKETS.includes(x && x.market) ? x.market : "", product: str(x && x.product, 30),
+      direction: DIRS.includes(x && x.direction) ? x.direction : "不确定", why: str(x && x.why, 120), confidence: LEVELS.includes(x && x.confidence) ? x.confidence : "低",
     })).filter((x) => x.target && x.why && ok(x.target + "：" + x.why)),
     scenarios: (Array.isArray(j.scenarios) ? j.scenarios : []).slice(0, 3).map((x) => ({
-      name: str(x && x.name, 10) || "可能", likelihood: LEVELS.includes(x && x.likelihood) ? x.likelihood : "低", what: str(x && x.what, 80), signals: str(x && x.signals, 60),
+      name: str(x && x.name, 10) || "可能", likelihood: LEVELS.includes(x && x.likelihood) ? x.likelihood : "低", what: str(x && x.what, 100), signals: str(x && x.signals, 60),
     })).filter((x) => x.what && ok(x.what + "。" + x.signals)),
     watch: (Array.isArray(j.watch) ? j.watch : []).slice(0, 3).map((x) => str(x, 40)).filter((x) => ok(x)),
     horizon: /长期/.test(String(j.horizon || "")) ? "长期" : /中期/.test(String(j.horizon || "")) ? "中期" : "短期",
     materials: mats.map((m) => ({ id: m.id, title: m.title, source: m.source, t: m.t, url: m.url })),
     dropped,
   };
-  if (!out.summary && !out.impacts.length && !out.scenarios.length) throw new Error("nothing_verified");
+  if (!out.summary && !out.impacts.length && !out.scenarios.length && !out.deep.length) throw new Error("nothing_verified");
   return out;
 }
 
@@ -109,7 +125,7 @@ export function analysisBrief(db, ids) {
   const out = {};
   for (const r of db.prepare("SELECT story_id, content, created_at FROM story_analyses WHERE id IN (SELECT MAX(id) FROM story_analyses WHERE story_id IN (" + ids.map(() => "?").join(",") + ") GROUP BY story_id)").all(...ids)) {
     const c = parseJ(r.content, {});
-    out[r.story_id] = { summary: c.summary || "", impacts: (c.impacts || []).slice(0, 4), horizon: c.horizon, created_at: r.created_at };
+    out[r.story_id] = { summary: c.summary || "", china: c.china || "", impacts: (c.impacts || []).slice(0, 4), horizon: c.horizon, created_at: r.created_at };
   }
   return out;
 }
