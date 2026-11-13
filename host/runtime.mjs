@@ -6,11 +6,12 @@
  * 速度自适应：并发数由实测决定（服务端真能并行就 3，本地单卡就 1）。
  * 账本：每次调用的步骤、耗时、输入 / 输出 / 缓存命中 token 都记下；可设每天的 token 预算，用完了模型步骤退回程序结果。
  */
+// maxStories：每份版面最多交给模型写几篇；0 = 不按篇数限，在一轮的时间预算里能写多少写多少（深度、不限档）
 export const DEPTHS = {
   lean: { maxItems: 100, maxStories: 8, autoAnalyze: 0, translate: 30, track: 1, trackGapH: 12, label: "节省" },
   balanced: { maxItems: 150, maxStories: 16, autoAnalyze: 2, translate: 60, track: 2, trackGapH: 8, label: "均衡" },
-  deep: { maxItems: 220, maxStories: 24, autoAnalyze: 4, translate: 120, track: 4, trackGapH: 6, label: "深度" },
-  full: { maxItems: 400, maxStories: 40, autoAnalyze: 8, translate: 300, track: 8, trackGapH: 4, modelRead: true, unlimited: true, label: "不限" },
+  deep: { maxItems: 220, maxStories: 0, autoAnalyze: 4, translate: 120, track: 4, trackGapH: 6, label: "深度" },
+  full: { maxItems: 400, maxStories: 0, autoAnalyze: 8, translate: 300, track: 8, trackGapH: 4, modelRead: true, unlimited: true, label: "不限" },
 };
 export const depthOf = (prefs) => (DEPTHS[prefs && prefs.depth] ? prefs.depth : "balanced");
 export const depthParams = (prefs) => DEPTHS[depthOf(prefs)];

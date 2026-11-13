@@ -558,7 +558,9 @@ export async function llmEdition(db, model, o) {
   }
   // 头版先写（读者最先看到），再按重要度
   const frontRank = new Map((parts.front || []).map((id, i) => [id, i]));
-  toWrite.sort((a, b) => (frontRank.has(a.id) ? frontRank.get(a.id) : 99) - (frontRank.has(b.id) ? frontRank.get(b.id) : 99) || b.importance - a.importance).splice(o.maxStories || 16);
+  toWrite.sort((a, b) => (frontRank.has(a.id) ? frontRank.get(a.id) : 99) - (frontRank.has(b.id) ? frontRank.get(b.id) : 99) || b.importance - a.importance);
+  // 篇数上限：只有省 token 的档位（节省、均衡）设；深度、不限档不按篇数卡，按剩余时间写（见下面的 worker），写不下的下一轮接着写
+  if (o.maxStories > 0) toWrite.splice(o.maxStories);
   // 边写边出：归并与统筹完成就先出一版（没写的用程序稿），之后每写完一批更新一次
   const progress = (bodiesNow) => {
     if (!o.onProgress) return;
@@ -658,11 +660,17 @@ export async function llmEdition(db, model, o) {
   const groupsOf3 = [];
   // 一批里的报道用同一个读法（提示词的固定部分相同，生产环境的前缀缓存才命中）；按写稿顺序取，同读法的往前凑
   for (const b of batchByProfile(toWrite, 3)) groupsOf3.push(b);
+  // 按时间写：开写一批前估一下这批要多久（已写完的批里最慢的，再留 15 秒；第一批照常写，单次调用自己有剩余时间的保护），剩余时间不够就停，
+  // 剩下的这一轮用程序稿（原文），没有模型稿的下一轮会再排进来——不按篇数一刀切，也不开一批注定超时的
+  const batchMs = [];
+  const writeTimed = async (g) => { const t = Date.now(); await writeBatch(g); batchMs.push(Date.now() - t); };
+  const needMs = () => (batchMs.length ? Math.max(...batchMs) + 15000 : 0);
+  stats.write_later = 0;
   let conc = Math.max(1, o.concurrency || 1);
   let next = 0;
   if (o.probe && groupsOf3.length >= 2) {
     const t = Date.now();
-    const d = await Promise.all([0, 1].map(async (k) => { const s0 = Date.now(); await writeBatch(groupsOf3[k]); return Date.now() - s0; }));
+    const d = await Promise.all([0, 1].map(async (k) => { const s0 = Date.now(); await writeTimed(groupsOf3[k]); return Date.now() - s0; }));
     const eff = (d[0] + d[1]) / Math.max(1, Date.now() - t);
     conc = eff >= 1.6 ? 3 : 1;
     stats.probe = { efficiency: Math.round(eff * 100) / 100, concurrency: conc };
@@ -672,9 +680,10 @@ export async function llmEdition(db, model, o) {
   }
   const worker = async () => {
     while (next < groupsOf3.length) {
+      if (left() < needMs()) { const rest = groupsOf3.slice(next); next = groupsOf3.length; stats.write_later += rest.reduce((n, g) => n + g.length, 0); break; }
       const k = next++;
       if (k > 0 && conc === 1) progress(bodies);
-      await writeBatch(groupsOf3[k]);
+      await writeTimed(groupsOf3[k]);
       if (conc > 1) progress(bodies);
     }
   };
@@ -689,7 +698,7 @@ export async function llmEdition(db, model, o) {
   for (const s of stories) if (s.updated && !s.update_text) Object.assign(s, programUpdate(s._g.fresh));
   const wf = stats.fallbacks.filter((x) => x.startsWith("write"));
   const why = [...new Set(stats.errors.filter((e) => e.startsWith("write")).map((e) => (/timeout|aborted/i.test(e) ? "超时" : /budget/.test(e) ? "超出时间预算" : /bad_json/.test(e) ? "模型输出格式不对" : "出错")))].join("、");
-  stage("write", "done", { done: written.size, total: toWrite.length + (stats.cached || 0), warn: wf.length > 0, detail: "写了 " + written.size + " 篇" + (wf.length ? "；" + wf.length + " 批没写成（" + (why || "出错") + "），这几篇先用程序稿，下一轮再写" : "") + (stats.retitled ? "，" + stats.retitled + " 条换了标题" : "") });
+  stage("write", "done", { done: written.size, total: toWrite.length + (stats.cached || 0), warn: wf.length > 0, detail: "写了 " + written.size + " 篇" + (wf.length ? "；" + wf.length + " 批没写成（" + (why || "出错") + "），这几篇先用程序稿，下一轮再写" : "") + (stats.write_later ? "；" + stats.write_later + " 篇这一轮时间不够，先用原文，下一轮接着写" : "") + (stats.retitled ? "，" + stats.retitled + " 条换了标题" : "") });
   stage("check", "start", { detail: "逐句核对数字、专名、引语是否在原文里" });
   // 4. 核对：模型稿（新写的与沿用的）逐句核对，整理出处
   const allBodies = bodiesFor(db, stories.filter((s) => s.by === "llm" && !written.has(s.id)).flatMap((s) => s._g.items.map((it) => it.id)));
