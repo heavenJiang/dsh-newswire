@@ -34,6 +34,8 @@ export const DEFAULT_LAYOUT = {
   front: { count: 3 },
   sections: [{ id: "politics", max: 4 }, { id: "macro", max: 3 }, { id: "markets", max: 3 }, { id: "industry", max: 4 }, { id: "tech", max: 8 }, { id: "study", max: 4 }, { id: "society", max: 2 }],
   story: { lead_chars: 120, points: 3, point_chars: 40, views: 3, impact_chars: 60, rich_items: 4, rich_points: 6, rich_point_chars: 60, rich_materials: 10,
+    // 报道篇数不到 rich_items、但原文本身够长（材料合起来不少于 rich_chars 字）的，同样按材料多的要求写：原文长的不论是不是重点都写全。设 0 关闭
+    rich_chars: 600,
     // 省模型时间：已有模型稿、不在头版的故事线，新报道不到 rewrite_min 篇也不到原有篇数的 rewrite_ratio 时先沿用旧稿（标出新增了什么），攒够了再重写；
     // 只有一篇、原文不超过 brief_chars 字的快讯不交给模型改写（程序稿就是原文）。rewrite_min 设 0、brief_chars 设 0 各自关闭
     rewrite_min: 2, rewrite_ratio: 0.25, brief_chars: 160 },
@@ -71,6 +73,7 @@ export function normalizeLayout(raw) {
       views: num(st.views, 0, 6, D.story.views), impact_chars: num(st.impact_chars, 0, 200, D.story.impact_chars),
       rich_items: num(st.rich_items, 0, 50, D.story.rich_items), rich_points: num(st.rich_points, 1, 8, D.story.rich_points),
       rich_point_chars: num(st.rich_point_chars, 10, 120, D.story.rich_point_chars), rich_materials: num(st.rich_materials, 1, 16, D.story.rich_materials),
+      rich_chars: num(st.rich_chars, 0, 6000, D.story.rich_chars),
       rewrite_min: num(st.rewrite_min, 0, 20, D.story.rewrite_min), rewrite_ratio: num(st.rewrite_ratio, 0, 1, D.story.rewrite_ratio), brief_chars: num(st.brief_chars, 0, 600, D.story.brief_chars),
     },
     plan: { reuse_hours: num(r.plan && r.plan.reuse_hours, 0, 24, D.plan.reuse_hours), reuse_changes: num(r.plan && r.plan.reuse_changes, 0, 50, D.plan.reuse_changes) },
@@ -335,15 +338,19 @@ export const ORIGIN_MARK = "【原文（";
 /** 材料够「多」：报道篇数到了 rich_items，多读几篇后的材料合起来也够长（一两句的快讯凑不出细节）。 */
 const RICH_MIN_CHARS = 800;
 /**
- * 材料多的报道：要点放宽（条数、字数），写稿时多读几篇。只有一两篇报道的照旧。
+ * 材料多的报道：要点放宽（条数、字数），写稿时多读几篇。
+ * 两种情况算多：报道篇数到了 rich_items 且材料合起来不少于 800 字；或者篇数不够、但原文本身长（不少于 rich_chars 字）——
+ * 后者多是只有一两家报道的非重点新闻，原文写得详细，稿子也要和重点新闻一样写全，不能只剩一句导语。
  * @returns null 或 { materials, points, point_chars }
  */
 export function richSpec(items, bodies, S, profile) {
   const P = profile.blocks.find((b) => b.kind === "points");
-  if (!P || !S.rich_items || items.length < S.rich_items) return null;
+  if (!P || !S.rich_items) return null;
+  const many = items.length >= S.rich_items;
+  if (!many && !(S.rich_chars > 0)) return null;
   const materials = Math.max(profile.content.materials, S.rich_materials);
   const len = pickMaterials(items, materials).reduce((n, it) => n + materialText(it, bodies, profile.content).length, 0);
-  if (len < RICH_MIN_CHARS) return null;
+  if (len < (many ? RICH_MIN_CHARS : S.rich_chars)) return null;
   const points = Math.max(P.max || S.points, S.rich_points), point_chars = Math.max(P.chars || S.point_chars, S.rich_point_chars);
   return { materials, points, point_chars };
 }
@@ -504,13 +511,16 @@ export function deferRewrite(row, s, S) {
 /**
  * 一句话快讯：故事线只有一篇报道，原文完整且不超过 brief_chars 字，不算重要，读法不是要长材料的那种。
  * 这种稿子模型写出来就是把原文换个说法，不值一次调用。
+ * 原文按摘要、抓到的正文（bodies：bodiesFor 的结果）和读回的一手原文里最长的算——很多源的摘要是空的、正文另存，
+ * 只看摘要就等于只看标题，几千字的长文会被当成快讯、版面上只剩截断的原文。没抓全的（截断、只有标题）也要写（会去抓正文）。
  */
-export function isBriefWire(g, s, S, profile) {
+export function isBriefWire(g, s, S, profile, bodies) {
   if (!(S && S.brief_chars > 0) || g.items.length !== 1 || s.importance >= 60) return false;
   if (profile && profile.content && profile.content.body_chars >= 2000) return false;
   const it = g.items[0];
-  const text = String(it.summary || "").replace(/\s+/g, " ").trim();
-  if (it.completeness && it.completeness !== "full" && text && text !== String(it.title || "").trim()) return false;
+  if (it.completeness && it.completeness !== "full") return false;
+  const flat = (x) => String(x || "").replace(/\s+/g, " ").trim();
+  const text = [it.summary, bodies && bodies.get && bodies.get(it.id), it.origin_text].map(flat).sort((a, b) => b.length - a.length)[0];
   return Math.max(text.length, String(it.title || "").length) <= S.brief_chars;
 }
 /** 稿件可以沿用：模型写的，且写稿后没有新报道加入。 */

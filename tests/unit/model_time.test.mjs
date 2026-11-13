@@ -71,6 +71,10 @@ test("判断：先不重写（新报道少、不重要、有模型稿）；一�
   assert.equal(isBriefWire(it(LONG), { importance: 40 }, S, null), false, "原文长的要写");
   assert.equal(isBriefWire(it("短。"), { importance: 65 }, S, null), false, "重要的要写");
   assert.equal(isBriefWire(it("短。", { completeness: "partial" }), { importance: 40 }, S, null), false, "摘要被截断的要写（会去抓正文）");
+  assert.equal(isBriefWire(it("", { completeness: "title_only" }), { importance: 40 }, S, null), false, "只有标题的要写（会去抓正文），不按标题长短当快讯");
+  assert.equal(isBriefWire(it("", { id: "x1" }), { importance: 40 }, S, null, new Map([["x1", LONG]])), false, "摘要为空、正文另存的长文要写");
+  assert.equal(isBriefWire(it("短。", { origin_text: LONG }), { importance: 40 }, S, null), false, "读回的一手原文长的要写");
+  assert.equal(isBriefWire(it("", { id: "x2" }), { importance: 40 }, S, null, new Map([["x2", "央行今日开展 500 亿元逆回购。"]])), true, "正文本身就短的仍是快讯");
   assert.equal(isBriefWire({ items: [it("短。").items[0], it("短。").items[0]] }, { importance: 40 }, S, null), false, "两篇以上的要写");
   assert.equal(isBriefWire(it("短。"), { importance: 40 }, S, { content: { body_chars: 3000 } }), false, "要长材料的读法照样写");
 });

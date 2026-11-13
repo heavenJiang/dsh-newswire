@@ -2,6 +2,14 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.38 (2026-11-12)
+
+Reader request: rewritten summaries should run a little longer, like the key stories; other stories with a long original get the same treatment as key stories; non-key stories should not be judged, or shown, by the title alone.
+- **Fix: long articles treated as one-line flashes by their title.** The "one-line flash" check (single report, short original, not important: shown as the original, not rewritten) only looked at the list summary. Many sources (10jqka, Hacker News, aggregated wires) leave the summary empty and store the fetched body separately, so the check fell back to the title's length, and 1,500 to 20,000-character articles were shown as their truncated (often English) original. It now takes the longest of summary, fetched body and read-back original; items that are truncated or title-only go to the writer (their body is fetched first). In the 00:49 edition, 8 of the 14 placed "flashes" were such long articles; 6 genuine one-liners remain.
+- **A long original is written in full, key or not.** Stories with four or more reports and enough material already got the "rich" spec (up to 6 points of up to 60 characters, more materials read). Now a story with fewer reports whose material is long (600 characters or more, `story.rich_chars` in the layout, 0 turns it off) gets the same. In the 00:49 edition, non-key stories with the rich spec go from 5 to 36 of 100.
+- **Non-key stories show their content.** Section stories were cut by importance: below 45 only the title, 45 to 59 the title and two clamped lines. Every section story now shows like a key story (lead, points, more for views and impact); weight still shows through the Key mark and the order. The Following section stays compact.
+- Write-cache version bumped, so cached copies follow the new rules.
+
 ## 1.1.37 (2026-11-12)
 
 Reader request: for new tech, especially AI and large models (company news, new papers, newly released models), skip multi-source corroboration and get first-hand information.

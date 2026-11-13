@@ -39,7 +39,12 @@ test("材料多的报道：要点放宽、多读几篇；一两篇报道或材�
   const long = (i) => ({ id: "m" + i, grp: "g" + i, title: "标题" + i, summary: "这是一段足够长的报道内容，".repeat(20), published_at: "2026-11-10 0" + i + ":00:00" });
   const r = richSpec([1, 2, 3, 4].map(long), new Map(), layout.story, wire);
   assert.deepEqual(r, { materials: 10, points: 6, point_chars: 60 });
-  assert.equal(richSpec([1, 2, 3].map(long), new Map(), layout.story, wire), null, "篇数不够");
+  assert.equal(richSpec([1, 2, 3].map(long), new Map(), Object.assign({}, layout.story, { rich_chars: 0 }), wire), null, "篇数不够、rich_chars 为 0 关闭按长度放宽");
+  // 篇数不够但原文长：和重点新闻一样写全（非重点新闻多半只有一两家报道）
+  const body = "这家公司在发布会上公布了新产品的价格、出货时间和产能安排，并回应了市场对毛利率的担忧。".repeat(20);
+  assert.deepEqual(richSpec([long(1)], new Map([["m1", body]]), layout.story, wire), { materials: 10, points: 6, point_chars: 60 }, "单篇长文");
+  assert.equal(richSpec([long(1)], new Map(), layout.story, wire), null, "单篇只有摘要，不够长");
+  assert.equal(richSpec([1, 2].map((i) => ({ id: "s" + i, grp: "g", title: "短讯" + i, summary: "一句话。" })), new Map(), layout.story, wire), null, "两句快讯");
   assert.equal(richSpec([1, 2, 3, 4].map((i) => ({ id: "s" + i, grp: "g", title: "短讯" + i, summary: "一句话。" })), new Map(), layout.story, wire), null, "合起来太短");
   assert.equal(richSpec([1, 2, 3, 4].map(long), new Map(), Object.assign({}, layout.story, { rich_items: 0 }), wire), null, "rich_items 为 0 关闭");
 

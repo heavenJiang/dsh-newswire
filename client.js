@@ -1161,8 +1161,8 @@ window.__ModuleLoader__.load({
         return h('section', { key: sec.id, className: 'nw-sec nw-c-' + String(sec.id).split('.')[0] + (fol ? ' nw-sec-fol' : '') },
           h('h2', { className: 'nw-sec-h' }, h('span', null, fol ? '★ ' + t('fl.section') : sec.name), h('span', { className: 'nw-sec-n' }, sec.stories.length)),
           // 关注版块条目多且常常是同一话题：只放标题和导语
-          // 按分量分档，让重的显出来：60 以上整篇（要点、各方说法），45–59 只留标题和两行导语，45 以下只留标题一行
-          sec.stories.map(function (id) { var x = st[id]; var im = x.importance || 0; return story(id, im < 45 ? 'mini' : fol || im < 60 || (ed.mode === 'llm' && x.by !== 'llm') ? 'brief' : 'normal') }))
+          // 各版块的报道和重点一样整篇显示（导语、要点，展开看各方说法与影响）：不按重要度降成只有标题或两行导语，轻重由「重点」标记和排序体现
+          sec.stories.map(function (id) { return story(id, fol ? 'brief' : 'normal') }))
       }))
 
       var about = h('section', { className: 'nw-rail-box nw-about' },

@@ -243,7 +243,7 @@ export function parseCopy(w, blocks, S, ids, rich) {
 /** 模型服务断连一类的错误：值得等一会儿重试。 */
 const CONN_ERR = /connection error|econnreset|econnrefused|fetch failed|socket hang up|network|terminated/i;
 /** 写稿缓存的版本：写稿提示词或写法改了就加一，旧缓存自然失效。 */
-const WRITE_V = 2;
+const WRITE_V = 3;
 /** 一篇稿的材料指纹：材料、上次导语、读者报错、写法、重点领域标记与提示词版本都一样，才算同一份稿。 */
 export function writeFingerprint(entry, layout) {
   const p = entry.profile || storyProfile(layout, entry.story, entry.items);
@@ -543,6 +543,8 @@ export async function llmEdition(db, model, o) {
   const SW = layout.story;
   stats.deferred = 0;
   stats.brief = 0;
+  // 快讯判定要看正文（很多源摘要为空、正文另存）：只有一篇的故事线先取正文
+  const briefBodies = bodiesFor(db, stories.filter((s) => s._g.items.length === 1).map((s) => s._g.items[0].id));
   for (const s of stories) {
     const g = s._g;
     // 有读者报错未处理的，重写
@@ -551,7 +553,7 @@ export async function llmEdition(db, model, o) {
     // 小进展：已有模型稿、不在头版、不算重要、新报道还少——先沿用旧稿（「进展」一行由程序标出新增了什么），攒够了再重写
     else if (!g.absorbed && !fb.errors.has(s.id) && !frontSet.has(s.id) && deferRewrite(g.row, s, SW)) { Object.assign(s, copyOf(g.row.copy), { by: "llm", reused: true, deferred: s._total - g.row.copy.items }); reused++; stats.deferred++; }
     // 一句话快讯：只有一篇、原文很短，模型改写出来还是那句话——用程序稿（就是原文）
-    else if (!frontSet.has(s.id) && isBriefWire(g, s, SW, reg.get(s.profile))) stats.brief++;
+    else if (!frontSet.has(s.id) && isBriefWire(g, s, SW, reg.get(s.profile), briefBodies)) stats.brief++;
     else toWrite.push(s);
   }
   // 头版先写（读者最先看到），再按重要度
