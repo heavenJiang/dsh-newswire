@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.40 (2026-11-17)
+
+- **Back to top.** Reader request. Once the panel has scrolled down more than a screen, a "↑ Top" button appears at the bottom right of the panel (not of the browser window); it scrolls back to the top smoothly. It works on every tab.
+
 ## 1.1.39 (2026-11-17)
 
 Reader report: much of the edition still showed news from days ago; the Following block (and the other sections) should be collapsible.

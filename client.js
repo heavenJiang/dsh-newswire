@@ -125,7 +125,7 @@ window.__ModuleLoader__.load({
         'rd.about': '关于本期', 'rd.byModel': '由 {m} 阅读并编写', 'rd.byRules': '由程序按规则编排（节省 token 模式）', 'rd.read': '读入近 {h} 小时最重要的 {n} 条报道。', 'rd.checked': '模型写下的 {n} 句含数字或专名的话，{p} 句已与原文逐一核对。',
         'rd.past': '往期版面', 'rd.skim': '本期速览', 'rd.aboutDay': '关于这份回顾', 'rd.dayDek': '今天值得记住的 {n} 件事',
         'nav.panel': '见微知著', 'nav.logo': '见', 'rd.top': '头条', 'rd.stStories': ' 件事', 'rd.stOutlets': ' 家媒体', 'rd.stHours': ' 小时内', 'rd.stAi': '模型读完并核对', 'tab.news': '要闻', 'tab.timeline': '时间线', 'tab.items': '条目', 'tab.sources': '数据源', 'tab.runs': '运行',
-        'btn.run': '抓一轮', 'btn.running': '抓取中…', 'btn.push': '推送', 'btn.pushing': '推送中…', 'btn.pushHint': '把当前最新版面里还没推过的内容推到手机（抓一轮写完版面后也会自动推一条）', 'btn.reload': '刷新', 'btn.save': '保存数据源', 'btn.add': '新增源', 'btn.more': '加载更多',
+        'btn.run': '抓一轮', 'btn.running': '抓取中…', 'btn.toTop': '返回顶部', 'btn.push': '推送', 'btn.pushing': '推送中…', 'btn.pushHint': '把当前最新版面里还没推过的内容推到手机（抓一轮写完版面后也会自动推一条）', 'btn.reload': '刷新', 'btn.save': '保存数据源', 'btn.add': '新增源', 'btn.more': '加载更多',
         'btn.remove': '删除', 'btn.restore': '恢复', 'btn.test': '试抓', 'btn.testing': '试抓中…', 'btn.back': '← 返回', 'btn.today': '今天',
         'label.enabled': '启用', 'label.name': '名称', 'label.id': 'id', 'label.category': '分类', 'label.type': '类型', 'label.url': '地址',
         'label.channels': '通道', 'label.max': '首轮条数', 'label.note': '备注', 'label.adapter': '适配器', 'label.region': '地区', 'label.weight': '权重',
@@ -247,7 +247,7 @@ window.__ModuleLoader__.load({
         'rd.about': 'About this edition', 'rd.byModel': 'Read and written by {m}', 'rd.byRules': 'Laid out by rules (save-tokens mode)', 'rd.read': 'Read the {n} most important reports of the last {h} hours. ', 'rd.checked': '{p} of {n} model sentences with numbers or names were checked against the sources.',
         'rd.past': 'Past editions', 'rd.skim': 'In this edition', 'rd.aboutDay': 'About this recap', 'rd.dayDek': '{n} things worth remembering today',
         'nav.panel': 'Newswire', 'nav.logo': '见', 'rd.top': 'Top story', 'rd.stStories': ' stories', 'rd.stOutlets': ' outlets', 'rd.stHours': ' hours', 'rd.stAi': 'Read and checked by the model', 'tab.news': 'Top', 'tab.timeline': 'Timeline', 'tab.items': 'Items', 'tab.sources': 'Sources', 'tab.runs': 'Runs',
-        'btn.run': 'Fetch now', 'btn.running': 'Fetching…', 'btn.push': 'Push', 'btn.pushing': 'Pushing…', 'btn.pushHint': 'Push what is new in the latest edition to the phone (a fetch also pushes once its edition is written)', 'btn.reload': 'Reload', 'btn.save': 'Save sources', 'btn.add': 'Add source', 'btn.more': 'Load more',
+        'btn.run': 'Fetch now', 'btn.running': 'Fetching…', 'btn.toTop': 'Top', 'btn.push': 'Push', 'btn.pushing': 'Pushing…', 'btn.pushHint': 'Push what is new in the latest edition to the phone (a fetch also pushes once its edition is written)', 'btn.reload': 'Reload', 'btn.save': 'Save sources', 'btn.add': 'Add source', 'btn.more': 'Load more',
         'btn.remove': 'Remove', 'btn.restore': 'Restore', 'btn.test': 'Test', 'btn.testing': 'Testing…', 'btn.back': '← Back', 'btn.today': 'Today',
         'label.enabled': 'On', 'label.name': 'Name', 'label.id': 'id', 'label.category': 'Category', 'label.type': 'Type', 'label.url': 'URL',
         'label.channels': 'Channels', 'label.max': 'First round', 'label.note': 'Note', 'label.adapter': 'Adapter', 'label.region': 'Region', 'label.weight': 'Weight',
@@ -1859,6 +1859,22 @@ window.__ModuleLoader__.load({
     }
     var HIDE = { display: 'none' }
 
+    /** 返回顶部：往下翻过一屏多才出现，点一下平滑滚回顶上。滚动发生在面板自己的滚动框里，在 document 上捕获滚动事件。 */
+    function ToTop() {
+      var vPair = useState(false)
+      var shown = vPair[0]
+      var setShown = vPair[1]
+      useEffect(function () {
+        var raf = 0
+        function check() { raf = 0; var b = scrollBox(); setShown(Boolean(b && b.scrollTop > 800)) }
+        function onScroll() { if (!raf) raf = requestAnimationFrame(check) }
+        document.addEventListener('scroll', onScroll, true)
+        return function () { document.removeEventListener('scroll', onScroll, true); if (raf) cancelAnimationFrame(raf) }
+      }, [])
+      if (!shown) return null
+      return h('div', { className: 'nw-totop-wrap' }, h('button', { className: 'nw-totop', title: t('btn.toTop'), 'aria-label': t('btn.toTop'), onClick: function () { var b = scrollBox(); if (b) { if (b.scrollTo) b.scrollTo({ top: 0, behavior: 'smooth' }); else b.scrollTop = 0 } } }, '↑ ' + t('btn.toTop')))
+    }
+
     function NewsTab(props) {
       var fPair = useState({ hours: Number(store('hours')) || 24, cred: 'any', label: '', region: '', query: '', limit: 60, pack: store('pack') || '' })
       var f = fPair[0]
@@ -2679,7 +2695,7 @@ window.__ModuleLoader__.load({
           tab === 'timeline' ? h(TimelineTab, common) : null,
           tab === 'items' ? h(ItemsTab, Object.assign({ sources: data.sources }, common)) : null,
           tab === 'sources' ? h(SourcesTab, { sources: data.sources, reload: reload, names: names }) : null,
-          tab === 'runs' ? h(RunsTab, Object.assign({ schedule: data.schedule, digest: data.digest }, common)) : null)))
+          tab === 'runs' ? h(RunsTab, Object.assign({ schedule: data.schedule, digest: data.digest }, common)) : null)), h(ToTop))
     }
 
     function PanelIcon() {
@@ -2701,6 +2717,7 @@ window.__ModuleLoader__.load({
     }
     var CSS = [
       // 主面板是纵向弹性容器：滚动层占满剩余高度；顶部让出宿主窗口顶条（macOS 桌面版 48px，其它为 0）
+      '.nw-totop-wrap{position:sticky;bottom:20px;height:0;z-index:30;pointer-events:none} .nw-totop{position:absolute;right:20px;bottom:0;pointer-events:auto;white-space:nowrap;border:1px solid ' + C.line + ';background:' + C.bg + ';color:' + C.l1 + ';border-radius:999px;padding:8px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.12)} .nw-totop:hover{color:' + C.accent + ';border-color:' + C.accent + '}',
       '.nw-scroll{flex:1;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;padding-top:var(--dsh-frame-top-clearance,0px);box-sizing:border-box}',
       '.nw-root{container-type:inline-size;display:flex;flex-direction:column;gap:12px;width:100%;max-width:1240px;margin:0 auto;padding:16px clamp(12px,3cqi,24px) 28px;color:' + C.l1 + ';box-sizing:border-box;min-width:0}',
       '.nw-root *{box-sizing:border-box} .nw-root{color-scheme:light} body[data-ds-dark-theme] .nw-root{color-scheme:dark}',
