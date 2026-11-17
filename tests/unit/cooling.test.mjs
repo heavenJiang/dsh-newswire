@@ -29,3 +29,19 @@ test("降频：连续失败不到 3 轮不动；到了 3 轮就跳过，6 小时
   assert.equal(coolingOf(db, "x", { now }), null, "试成功：恢复");
   db.close();
 });
+
+test("降频：本机浏览器不可用造成的失败不算源坏了", () => {
+  const db = openDb(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "nw-cool2-")), "n.sqlite"));
+  const now = Date.parse("2026-11-17T08:00:00Z");
+  const at = (h) => new Date(now - h * 3600000).toISOString().replace("T", " ").slice(0, 19);
+  let k = 0;
+  const round = (src, hoursAgo, status, note) => { const id = "r" + (++k); db.prepare("INSERT INTO runs (run_id, started_at, mode) VALUES (?,?, 'cycle')").run(id, at(hoursAgo)); db.prepare("INSERT INTO continuity (run_id, source_id, status, note) VALUES (?,?,?,?)").run(id, src, status, note || null); };
+  round("cls", 20, "connected");
+  round("cls", 8, "failed", "browse:browser_unavailable"); round("cls", 4, "failed", "browse:browser_unavailable"); round("cls", 1, "failed", "browse:browser_unavailable");
+  assert.equal(coolingOf(db, "cls", { now }), null, "三轮都是浏览器没连上：照常抓");
+  round("cls", 0.5, "failed", "browse:timeout"); round("cls", 0.4, "failed", "browse:timeout");
+  assert.equal(coolingOf(db, "cls", { now }), null, "真失败只有两轮");
+  round("cls", 0.3, "failed", "browse:timeout");
+  assert.equal(coolingOf(db, "cls", { now }).fails, 3, "真失败三轮：降频");
+  db.close();
+});

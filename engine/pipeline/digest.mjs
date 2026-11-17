@@ -66,7 +66,7 @@ export function writeDigest(db, o) {
       L.push("### " + nm + "（" + list.length + (list.length > perSource ? "，显示最近 " + perSource : "") + "）");
       for (const r of list.slice(0, perSource)) {
         const s = (r.summary || "").replace(/\s+/g, " ").slice(0, 170);
-        const tm = r.time_confidence === "fetched" ? "~" + zh(r.last_seen_at) : r.time_confidence === "url_date" ? zh(r.published_at).slice(0, 5) : zh(r.published_at || r.last_seen_at);
+        const tm = r.time_confidence === "fetched" ? "~" + zh(r.first_seen_at) : r.time_confidence === "url_date" ? zh(r.published_at).slice(0, 5) : zh(r.published_at || r.first_seen_at);
         L.push("- " + tm + " " + r.title + " " + signalTag(obs.get(r.id)) + " ｜ " + s + " ｜ " + r.url);
       }
     }

@@ -36,3 +36,22 @@ test("24 hours means reports published (or first fetched) in the last 24 hours, 
   assert.equal(rows[0].latest_at, "2026-11-17 04:00:00");
   assert.equal(rows[0].first_seen_at, "2026-11-11 03:00:00");
 });
+
+test("a later page time cannot push the publish time past the first fetch", async () => {
+  const { toRecord } = await import("../../engine/pipeline/normalize.mjs");
+  const { upsertArticle } = await import("../../engine/store/db.mjs");
+  const db = openDb(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "nw-pub-")), "n.sqlite"));
+  const SRC = { id: "tf", name: "深潮", url: "https://www.techflowpost.com/", category: "tech", region: "cn", lang: "zh" };
+  const r1 = toRecord({ title: "以太坊基金会异议风波", link: "https://www.techflowpost.com/article/35275" }, SRC, { index: 0, nowMs: Date.parse("2026-11-11T02:15:50Z") });
+  upsertArticle(db, r1, { nowIso: "2026-11-11 02:15:50" });
+  // 两天后同一篇又在首页上，页面文字里推出了一个「时间」（页面当时的时刻）
+  const r2 = Object.assign({}, r1, { published_at: "2026-11-13 03:25:43", time_confidence: "page_text" });
+  upsertArticle(db, r2, { nowIso: "2026-11-13 03:25:43" });
+  const a = db.prepare("SELECT published_at, time_confidence, first_seen_at, last_seen_at FROM articles WHERE id = ?").get(r1.id);
+  assert.equal(a.published_at, r1.published_at);
+  assert.equal(a.first_seen_at, "2026-11-11 02:15:50");
+  // 不晚于第一次抓到的页面时间照常升级
+  const r3 = Object.assign({}, r1, { published_at: "2026-11-11 01:00:00", time_confidence: "page_text" });
+  upsertArticle(db, r3, { nowIso: "2026-11-13 07:00:00" });
+  assert.equal(db.prepare("SELECT published_at FROM articles WHERE id = ?").get(r1.id).published_at, "2026-11-11 01:00:00");
+});

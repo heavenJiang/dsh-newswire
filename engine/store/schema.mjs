@@ -270,7 +270,13 @@ const V29 = [
   "ALTER TABLE articles ADD COLUMN origin_text TEXT",
   "ALTER TABLE articles ADD COLUMN origin_at TEXT",
 ];
-export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26, V27, V28, V29];
+// v30：时间口径——事件的 last_seen_at 改为最新成员第一次抓到的时间（以前取成员最后一次在列表里见到，旧文章挂在首页上就一直刷新）；
+// 发布时间晚于第一次抓到 10 分钟以上的（合并时被后来的页面时刻抬上去的）退回第一次抓到的时间
+const V30 = [
+  "UPDATE events SET last_seen_at = (SELECT MAX(a.first_seen_at) FROM event_members m JOIN articles a ON a.id = m.article_id WHERE m.event_id = events.event_id) WHERE EXISTS (SELECT 1 FROM event_members m WHERE m.event_id = events.event_id)",
+  "UPDATE articles SET published_at = first_seen_at, time_confidence = 'fetched' WHERE published_at IS NOT NULL AND first_seen_at IS NOT NULL AND published_at > datetime(first_seen_at, '+10 minutes')",
+];
+export const MIGRATIONS = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26, V27, V28, V29, V30];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
 export function migrate(db) {

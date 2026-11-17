@@ -235,7 +235,9 @@ export function scoreEvent(db, eid, o) {
   const labels = labelRows.filter((r) => !r.label.startsWith("region:") && r.r === 1).slice(0, 3).map((r) => r.label);
   const regions = labelRows.filter((r) => r.label.startsWith("region:")).map((r) => r.label.slice(7));
   const first = Math.min(...members.map((m) => m.t || Infinity));
-  const lastSeen = members.map((m) => m.last_seen_at).sort().pop();
+  // 事件的「最后活动」= 最新一篇成员第一次被抓到的时间。不用成员的 last_seen_at：旧文章每轮还挂在对方首页上就会刷新它，
+  // 事件因此一直算「近 48 小时」——一直能吸收新报道（11-07 的油轮事件吞了 11-16 的新油轮新闻），在事件列表、版面里也一直算新的
+  const lastSeen = members.map((m) => m.first_seen_at).filter(Boolean).sort().pop() || members.map((m) => m.last_seen_at).sort().pop();
   db.prepare(`UPDATE events SET title=?, lead_article_id=?, first_seen_at=?, last_seen_at=?, member_count=?, source_count=?, outlets=?, region_mix=?, importance=?, credibility=?, labels=?, regions=?, entities=?, factors=?, dispute=?, version=version+1, updated_run=?, updated_at=? WHERE event_id=?`)
     .run(title, lead.article_id, Number.isFinite(first) ? new Date(first).toISOString().replace("T", " ").slice(0, 19) : null, lastSeen, members.length, n,
       JSON.stringify(outs.map((x) => ({ grp: x.grp, source_id: x.source_id, name: x.name, t: x.t ? new Date(x.t).toISOString().replace("T", " ").slice(0, 19) : null })).concat([...reposters.values()].filter((r) => !outlets.has(r.grp)).map((r) => ({ grp: r.grp, source_id: r.source_id, name: r.name, repost_of: r.of })), [...community.values()])),
@@ -266,9 +268,9 @@ export function processEvents(db, o) {
  * 推送记录保留（事件 id 由首条成员决定，重算后大多不变）。
  */
 export function reprocess(db, o) {
-  const rows = db.prepare("SELECT a.id, a.title, a.title_zh, a.link_to, a.summary, a.category, a.source_id, a.published_at, a.time_confidence, a.first_seen_at FROM articles a WHERE a.last_seen_at >= ? AND COALESCE(a.kind, 'news') NOT IN ('promo', 'digest', 'ticker')").all(o.sinceIso);
+  const rows = db.prepare("SELECT a.id, a.title, a.title_zh, a.link_to, a.summary, a.category, a.source_id, a.published_at, a.time_confidence, a.first_seen_at FROM articles a WHERE a.first_seen_at >= ? AND COALESCE(a.kind, 'news') NOT IN ('promo', 'digest', 'ticker')").all(o.sinceIso);
   // 广告与合集不进事件：先把它们从事件里摘掉（规则或读者刚把它们判出来时）
-  const off = db.prepare("SELECT a.id FROM articles a JOIN event_members m ON m.article_id = a.id WHERE a.last_seen_at >= ? AND NOT (COALESCE(a.kind, 'news') NOT IN ('promo', 'digest', 'ticker'))").all(o.sinceIso).map((r) => r.id);
+  const off = db.prepare("SELECT a.id FROM articles a JOIN event_members m ON m.article_id = a.id WHERE a.first_seen_at >= ? AND NOT (COALESCE(a.kind, 'news') NOT IN ('promo', 'digest', 'ticker'))").all(o.sinceIso).map((r) => r.id);
   db.exec("BEGIN");
   try {
     const classes = labelArticles(db, o.tax, rows, o.sources);

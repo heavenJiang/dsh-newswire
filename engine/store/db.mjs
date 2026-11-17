@@ -42,8 +42,9 @@ export function upsertArticle(db, r, ctx) {
       summary = CASE WHEN LENGTH(excluded.summary) > LENGTH(COALESCE(articles.summary, '')) THEN excluded.summary ELSE articles.summary END,
       content = CASE WHEN LENGTH(excluded.content) > LENGTH(COALESCE(articles.content, '')) THEN excluded.content ELSE articles.content END,
       comments = CASE WHEN LENGTH(COALESCE(excluded.comments, '')) > LENGTH(COALESCE(articles.comments, '')) THEN excluded.comments ELSE articles.comments END,
-      published_at = CASE WHEN ${RANK("excluded.time_confidence")} > ${RANK("COALESCE(articles.time_confidence, 'fetched')")} THEN excluded.published_at ELSE articles.published_at END,
-      time_confidence = CASE WHEN ${RANK("excluded.time_confidence")} > ${RANK("COALESCE(articles.time_confidence, 'fetched')")} THEN excluded.time_confidence ELSE articles.time_confidence END,
+      -- 后来某轮从页面文字推出的时间不能晚于第一次抓到（那多半是页面当时的时刻，不是发布时间）
+      published_at = CASE WHEN ${RANK("excluded.time_confidence")} > ${RANK("COALESCE(articles.time_confidence, 'fetched')")} AND (excluded.published_at IS NULL OR articles.first_seen_at IS NULL OR excluded.published_at <= datetime(articles.first_seen_at, '+10 minutes')) THEN excluded.published_at ELSE articles.published_at END,
+      time_confidence = CASE WHEN ${RANK("excluded.time_confidence")} > ${RANK("COALESCE(articles.time_confidence, 'fetched')")} AND (excluded.published_at IS NULL OR articles.first_seen_at IS NULL OR excluded.published_at <= datetime(articles.first_seen_at, '+10 minutes')) THEN excluded.time_confidence ELSE articles.time_confidence END,
       paywalled = excluded.paywalled,
       text_len = MAX(COALESCE(articles.text_len, 0), excluded.text_len),
       training_ready = MAX(COALESCE(articles.training_ready, 0), excluded.training_ready),

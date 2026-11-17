@@ -13,11 +13,15 @@ const toMs = (t) => Date.parse(String(t || "").replace(" ", "T") + "Z");
 export function coolingOf(db, sourceId, o) {
   const C = Object.assign({}, COOLING, o || {});
   const now = (o && o.now) || Date.now();
-  const rows = db.prepare(`SELECT c.status, c.note, r.started_at FROM continuity c JOIN runs r ON r.run_id = c.run_id
+  let rows = db.prepare(`SELECT c.status, c.note, r.started_at FROM continuity c JOIN runs r ON r.run_id = c.run_id
     WHERE c.source_id = ? ORDER BY r.started_at DESC LIMIT 30`).all(sourceId);
+  // 本机浏览器不可用（browse 没开、扩展没连上、CLI 升级后对不上）造成的失败不算源坏了：跳过这几轮，不计入连续失败
+  const env = (r) => r.status === "failed" && /browser_unavailable|relay_down|extension_disconnected|browse_cli_unreachable|browse_not_found|no_browser_target/.test(String(r.note || ""));
+  const real = rows.filter((r) => !env(r));
   let fails = 0;
-  for (const r of rows) { if (r.status !== "failed") break; fails++; }
+  for (const r of real) { if (r.status !== "failed") break; fails++; }
   if (fails < C.fails) return null;
+  rows = real;
   const last = rows[0].started_at;
   const next = toMs(last) + C.probeHours * 3600000;
   return { fails, since: rows[fails - 1].started_at, last, reason: String(rows[0].note || "").split(" -> ").pop() || "", probe_due: now >= next, next_probe: new Date(next).toISOString().replace("T", " ").slice(0, 19) };

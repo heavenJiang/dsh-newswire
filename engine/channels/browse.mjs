@@ -266,7 +266,9 @@ const RAW_HTML_BODY = [
 
 const CLS_BODY = [
   "await page.goto('https://www.cls.cn/telegraph', { waitUntil: 'domcontentloaded', timeout: 35000 });",
-  "function signOf(p) { const qs = Object.keys(p).sort().map((k) => k + '=' + p[k]).join('&'); return crypto.createHash('md5').update(crypto.createHash('sha1').update(qs).digest('hex')).digest('hex'); }",
+  "function sha1hex(s) { const b = []; for (let i = 0; i < s.length; i++) { let c = s.charCodeAt(i); if (c < 128) b.push(c); else if (c < 2048) b.push(192 | c >> 6, 128 | c & 63); else b.push(224 | c >> 12, 128 | c >> 6 & 63, 128 | c & 63); } const l = b.length * 8; b.push(128); while (b.length % 64 !== 56) b.push(0); for (let i = 7; i >= 0; i--) b.push(i > 3 ? 0 : (l >>> (i * 8)) & 255); let h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0; const w = new Array(80); for (let o = 0; o < b.length; o += 64) { for (let i = 0; i < 16; i++) w[i] = (b[o + 4 * i] << 24) | (b[o + 4 * i + 1] << 16) | (b[o + 4 * i + 2] << 8) | b[o + 4 * i + 3]; for (let i = 16; i < 80; i++) { const x = w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]; w[i] = (x << 1) | (x >>> 31); } let a = h0, bb = h1, c = h2, d = h3, e = h4; for (let i = 0; i < 80; i++) { const f = i < 20 ? (bb & c) | (~bb & d) : i < 40 ? bb ^ c ^ d : i < 60 ? (bb & c) | (bb & d) | (c & d) : bb ^ c ^ d; const k = i < 20 ? 0x5A827999 : i < 40 ? 0x6ED9EBA1 : i < 60 ? 0x8F1BBCDC : 0xCA62C1D6; const t = (((a << 5) | (a >>> 27)) + f + e + k + w[i]) | 0; e = d; d = c; c = (bb << 30) | (bb >>> 2); bb = a; a = t; } h0 = (h0 + a) | 0; h1 = (h1 + bb) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0; h4 = (h4 + e) | 0; } return [h0, h1, h2, h3, h4].map((x) => (x >>> 0).toString(16).padStart(8, '0')).join(''); }",
+  "function md5hex(s) { const b = []; for (let i = 0; i < s.length; i++) { let c = s.charCodeAt(i); if (c < 128) b.push(c); else if (c < 2048) b.push(192 | c >> 6, 128 | c & 63); else b.push(224 | c >> 12, 128 | c >> 6 & 63, 128 | c & 63); } const l = b.length * 8; b.push(128); while (b.length % 64 !== 56) b.push(0); for (let i = 0; i < 8; i++) b.push(i < 4 ? (l >>> (i * 8)) & 255 : 0); const K = [], S = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21]; for (let i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) | 0; let a0 = 0x67452301, b0 = 0xefcdab89 | 0, c0 = 0x98badcfe | 0, d0 = 0x10325476; for (let o = 0; o < b.length; o += 64) { const M = []; for (let i = 0; i < 16; i++) M[i] = b[o + 4 * i] | (b[o + 4 * i + 1] << 8) | (b[o + 4 * i + 2] << 16) | (b[o + 4 * i + 3] << 24); let A = a0, B = b0, C = c0, D = d0; for (let i = 0; i < 64; i++) { let F, g; if (i < 16) { F = (B & C) | (~B & D); g = i; } else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) % 16; } else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) % 16; } else { F = C ^ (B | ~D); g = (7 * i) % 16; } F = (F + A + K[i] + M[g]) | 0; A = D; D = C; C = B; B = (B + ((F << S[i]) | (F >>> (32 - S[i])))) | 0; } a0 = (a0 + A) | 0; b0 = (b0 + B) | 0; c0 = (c0 + C) | 0; d0 = (d0 + D) | 0; } return [a0, b0, c0, d0].map((x) => { let h = ''; for (let i = 0; i < 4; i++) h += ((x >>> (i * 8)) & 255).toString(16).padStart(2, '0'); return h; }).join(''); }",
+  "function signOf(p) { const qs = Object.keys(p).sort().map((k) => k + '=' + p[k]).join('&'); return md5hex(sha1hex(qs)); }",
   "// 有断点时翻到上一轮最新那条之前 5 分钟（留重叠，判衔接用）；没有断点按时间窗",
   "const CUT = UNTIL ? UNTIL - 300 : Math.floor(Date.now() / 1000) - SINCE * 3600;",
   "const items = new Map(); let lastTime = Math.floor(Date.now() / 1000); let pages = 0; let stop = 'page limit';",
@@ -303,36 +305,82 @@ export function renderJob(mode, url, max, opts) {
   return "'use strict';\n" + src.join("\n");
 }
 
+/**
+ * browse CLI 有两代：0.0.x 有会话（session new / execute --session --json --timeout-ms），status 的 relay 带 running；
+ * 0.1.x 没有会话，execute --file 每次在后台开一个标签页、只打印返回值，status 的 relay 改成 pid / endpoint（没有 running）。
+ * 按 status 的形状认是哪一代（没认出来前按 0.0.x）。
+ */
+let GEN = "";
+export function browseGen() { return GEN; }
+/** 测试用：直接指定是哪一代。 */
+export function setBrowseGen(g) { GEN = g; }
+
+/** 看 status --json 的 relay：0.0.x 用 running，0.1.x 有 pid / endpoint 就是在跑。 */
+export function relayRunning(relay) {
+  if (!relay) return false;
+  if ("running" in relay) return Boolean(relay.running);
+  return Boolean(relay.pid || relay.endpoint);
+}
+
 export async function browseStatus() {
   if (!BIN) return { ok: false, reason: "browse_not_found", detail: "未找到 browse CLI（插件配置 browseBin 或把 browse 放进 PATH）" };
   try {
     const { stdout } = await exec(BIN, ["status", "--json"], { timeout: 30000 });
     const j = JSON.parse(stdout.slice(stdout.indexOf("{")));
+    if (j.relay) GEN = "running" in j.relay ? "0.0" : "0.1";
     const b = (j.extension && j.extension.browsers && j.extension.browsers[0]) || null;
-    const ok = Boolean(j.relay && j.relay.running && j.extension && j.extension.connected && b);
+    const relay = relayRunning(j.relay);
+    const ok = Boolean(relay && j.extension && j.extension.connected && b);
     let reason = "";
-    if (!ok) reason = !j.relay || !j.relay.running ? "relay_down" : !j.extension || !j.extension.connected ? "extension_disconnected" : "no_browser_target";
-    return { ok, reason, browser: b ? b.id : null, relay: !!(j.relay && j.relay.running), extension: !!(j.extension && j.extension.connected) };
+    if (!ok) reason = !relay ? "relay_down" : !j.extension || !j.extension.connected ? "extension_disconnected" : "no_browser_target";
+    return { ok, reason, browser: b ? b.id : null, relay, extension: !!(j.extension && j.extension.connected), gen: GEN };
   } catch (e) {
     return { ok: false, reason: "browse_cli_unreachable", detail: String(e.message).slice(0, 200) };
   }
 }
 
 export async function ensureSession() {
+  if (GEN === "0.1") return { ok: true }; // 0.1.x 没有会话：每次 execute 自己开、自己关标签页
   try { await exec(BIN, ["session", "new", SESSION], { timeout: 30000 }); return { ok: true }; }
   catch (e) { return { ok: false, detail: String(e.message).slice(0, 200) }; }
 }
 
+/** 0.1.x：脚本包在 try/finally 里，跑完（或出错）都关掉自己开的标签页。 */
+export function wrapJob01(src) {
+  return "try {\n" + String(src).replace(/^'use strict';\n/, "") + "\n} finally { try { await page.close(); } catch (e) {} }\n";
+}
+/** 0.1.x 的输出：可能先有一行「tab: <id>」，然后是返回值（JSON），空行后是「Page: …」等附注。转成 0.0.x 的 { ok, value } 形状。 */
+export function parseExec01(stdout) {
+  const text = String(stdout || "").replace(/^tab: [^\n]*\n+/, "");
+  const main = text.split(/\n\n(?=[A-Z][a-z]+:)/)[0].trim();
+  let value;
+  try { value = JSON.parse(main); } catch { value = main; }
+  return { ok: true, value };
+}
+
 export async function browseFetch(mode, url, max, opts) {
+  if (!GEN && BIN) { try { await browseStatus(); } catch { /* 认不出就按 0.0.x */ } }
   const token = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const src = renderJob(mode, url, max, Object.assign({}, opts, { token }));
   const f = path.join(TMP, "job-" + token + ".mjs");
-  writeFileSync(f, src);
+  writeFileSync(f, GEN === "0.1" ? wrapJob01(src) : src);
   const t0 = Date.now();
   const ms = (opts && opts.timeoutMs) || 60000;
   try {
-    const { stdout } = await exec(BIN, ["execute", "--session", SESSION, "--json", "--timeout-ms", String(ms), "--file", f], { timeout: ms + 40000, maxBuffer: 60 * 1024 * 1024 });
-    const j = JSON.parse(stdout.slice(stdout.indexOf("{")));
+    let j;
+    if (GEN === "0.1") {
+      try {
+        const { stdout } = await exec(BIN, ["execute", "--file", f, "--timeoutMs", String(ms)], { timeout: ms + 40000, maxBuffer: 60 * 1024 * 1024 });
+        j = parseExec01(stdout);
+      } catch (e) {
+        // 脚本出错：退出码非零，错误在标准输出第一行
+        const msg = String((e && e.stdout) || "").trim().split("\n")[0] || String(e && e.message);
+        return { ok: false, latency_ms: Date.now() - t0, error: msg.slice(0, 400) };
+      }
+    } else {
+      const { stdout } = await exec(BIN, ["execute", "--session", SESSION, "--json", "--timeout-ms", String(ms), "--file", f], { timeout: ms + 40000, maxBuffer: 60 * 1024 * 1024 });
+      j = JSON.parse(stdout.slice(stdout.indexOf("{")));
+    }
     const latency = Date.now() - t0;
     if (!j.ok) return { ok: false, latency_ms: latency, error: (j.error && j.error.message) || "execute_failed", aftermath: j.aftermath };
     let data = null;

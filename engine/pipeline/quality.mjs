@@ -120,7 +120,7 @@ export function assess(r, noise) {
 export function reassess(db, o) {
   const rows = o.ids
     ? db.prepare("SELECT * FROM articles WHERE id IN (" + o.ids.map(() => "?").join(",") + ") AND COALESCE(kind_by, '') NOT IN ('reader', 'llm')").all(...o.ids)
-    : db.prepare("SELECT * FROM articles WHERE last_seen_at >= ? AND COALESCE(kind, '') != 'digest_item' AND COALESCE(kind_by, '') NOT IN ('reader', 'llm')").all(o.sinceIso);
+    : db.prepare("SELECT * FROM articles WHERE first_seen_at >= ? AND COALESCE(kind, '') != 'digest_item' AND COALESCE(kind_by, '') NOT IN ('reader', 'llm')").all(o.sinceIso);
   const up = db.prepare("UPDATE articles SET kind = ?, kind_by = ?, kind_note = ?, completeness = ? WHERE id = ?");
   const has = db.prepare("SELECT 1 FROM articles WHERE id = ?");
   const obs = db.prepare("SELECT run_id, seen_at, channel FROM observations WHERE article_id = ? ORDER BY seen_at LIMIT 1");
