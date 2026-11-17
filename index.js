@@ -16,7 +16,8 @@ import { analysisMaterials, analyzeStory, autoAnalyzeTargets, saveAnalysis, sear
 import { linkAll, repairAliasLinks, repairThemeLinks, synthTargets, synthesize } from "./host/tracking.mjs";
 import { PRIORITY, createQueue } from "./host/queue.mjs";
 import { prune } from "./host/retention.mjs";
-import { createProgress, applyEngineProgress } from "./host/progress.mjs";
+import { STEPS, createProgress, applyEngineProgress } from "./host/progress.mjs";
+import { stopper } from "./host/stop.mjs";
 import { prevCron, prewarmLead, cronMatches, minuteKey, nextCron, parseCron } from "./host/clock.mjs";
 import { REPLY_HELP, composeDetail, composeExpand, numberPicks, parseReply, storyOfNumber, trackedIn } from "./host/reply.mjs";
 import { applyDailyCap, loadPush, noteInterest, rulesFor, sectionPenalties } from "./host/push.mjs";
@@ -182,6 +183,7 @@ export function apply(ctx, config) {
   const queue = createQueue({ slots: () => Number(prefs().concurrency) || 2 });
   const model = createModel({
     slot: (step) => queue.acquire(step),
+    stopSignal: () => stopper.signal(),
     getLlm: () => optional.llm,
     getDefault: () => optional.defaultModel,
     pinned: () => { const x = prefs(); return x.provider && x.model ? { provider: x.provider, model: x.model } : null; },
@@ -206,6 +208,8 @@ export function apply(ctx, config) {
         const j = engineJson(res.stdout) || {};
         const st = j.stats || {};
         if (st.sources != null) pg.update("sources", { detail: st.ok + "/" + st.sources + " 个源成功，新增 " + (st.fresh ?? 0) + " 条" + (st.dup ? "（重复 " + st.dup + " 条）" : "") });
+      } else if (res.stage === "stopped") {
+        markRunStopped(flagRunId(flags));
       } else {
         const cur = (pg.view().active || {}).current || "sources";
         pg.fail(cur, "抓取失败（" + res.stage + "）");
@@ -246,7 +250,44 @@ export function apply(ctx, config) {
     return holder ? holder.run_id || holder.mode || "另一个进程" : null;
   }
 
-  async function guardedRun(args, runId, kind) {
+  // ---------------------------------------------------------------- 停止
+  const STEP_LABEL = Object.fromEntries(STEPS.map((x) => [x.id, x.label]));
+  const flagRunId = (flags) => { const i = flags.indexOf("--run-id"); return i >= 0 ? flags[i + 1] : null; };
+  /** 引擎被终止时 runs 里那一行没收尾：记上结束时间和 stopped。 */
+  function markRunStopped(runId) {
+    if (!runId) return;
+    try { withDb(p, (db) => { if (db) db.prepare("UPDATE runs SET finished_at = ?, notes = TRIM(COALESCE(notes, '') || ' stopped') WHERE run_id = ? AND finished_at IS NULL").run(nowIsoUtc(), runId); }); } catch { /* 留着没收尾也只是显示 */ }
+  }
+  /** 一轮被停下时的返回：不推送（消息为空，定时任务里的模型不会转发）。 */
+  function stoppedOut(runId) {
+    pg.finish("stopped", "已手动停止");
+    return { ok: false, stopped: true, run_id: runId || null, message: "", note: "这一轮已手动停止，不推送" };
+  }
+  /**
+   * 面板上的「停止」（或工具 newswire_stop）：停下正在跑的一轮。引擎子进程被终止，正在跑和排队的模型调用退出，
+   * 不再拿程序编排兜底存版面，这一轮不推送（还没写好的待推送记录作废）。下一个定时点照常跑。
+   */
+  function stopRun(reason) {
+    const flow = pg.view().active;
+    const editing = Boolean(modelState.busy && String(modelState.busy).startsWith("edition"));
+    if (!inflight.current && !flow && !editing && !composing.size && !triggering.size) {
+      const ext = readLock(p.data);
+      return ext ? { ok: false, error: "other_process", holder: ext.run_id || ext.mode || null, note: "正在跑的是另一个进程（命令行直跑），这里停不了" } : { ok: false, error: "nothing_running", note: "现在没有在跑的一轮" };
+    }
+    const runId = inflight.current || (flow && flow.id) || null;
+    const step = flow ? flow.current : null;
+    const at = stopper.stop(reason || "手动停止");
+    const cleared = [];
+    for (const pack of new Set(Object.keys(packSchedule(p, "core").packs).concat("core"))) {
+      const pend = readPending(pack);
+      if (pend && (!pend.ready || (runId && pend.run_id === runId))) { clearPending(pack); cleared.push(pack); }
+    }
+    pg.finish("stopped", "已手动停止" + (step ? "（停在「" + (STEP_LABEL[step] || step) + "」）" : ""));
+    return { ok: true, run_id: runId, step, at: at.at, cleared_pending: cleared, note: "已停止" + (cleared.length ? "，这一轮不推送" : "") };
+  }
+
+  function guardedRun(args, runId, kind) { return stopper.run(() => guardedRunNow(args, runId, kind)); }
+  async function guardedRunNow(args, runId, kind) {
     const busy = busyWith();
     if (busy) return { ok: false, stage: "run_in_progress", tail: "已有一轮在跑：" + busy, run_id: busy };
     inflight.current = runId;
@@ -280,6 +321,7 @@ export function apply(ctx, config) {
     modelState.busy = "read";
     try {
       for (const src of targets) {
+        if (stopper.stopped()) break;
         // 估一个源要多久（已读源的平均耗时，至少 40 秒）：来不及就留给程序
         const per = rs.read ? Math.max(40000, (Date.now() - t0) / rs.read) : 40000;
         if (Date.now() + per > deadline) { rs.skipped = targets.length - rs.read; break; }
@@ -346,7 +388,8 @@ export function apply(ctx, config) {
    */
   function makeEdition(o) {
     const pack = o.pack && !String(o.pack).includes(",") ? String(o.pack) : "all";
-    return queue.run({ kind: "edition", label: "版面" + (pack === "all" ? "" : "（" + pack + "）"), priority: Number.isInteger(o.priority) ? o.priority : PRIORITY.push }, () => makeEditionNow(o));
+    // 所在的一轮已被停下：不再编
+    return stopper.run(() => (stopper.stopped() ? null : queue.run({ kind: "edition", label: "版面" + (pack === "all" ? "" : "（" + pack + "）"), priority: Number.isInteger(o.priority) ? o.priority : PRIORITY.push }, () => makeEditionNow(o))));
   }
   async function makeEditionNow(o) {
     const db = openIfExists(p.db);
@@ -410,6 +453,8 @@ export function apply(ctx, config) {
           if (ed && tr) ed.stats = Object.assign({}, ed.stats, { translate: tr });
         } catch (err) { error = errText(err); ed = null; }
       }
+      // 停下了：不拿程序编排兜底、不存半成品
+      if (stopper.stopped()) { progressCleanup(); return null; }
       if (!ed) {
         if (useLlm) pg.update("save", { detail: "模型编排没成（" + (error || "未知原因") + "），改用程序编排" });
         pg.start("save", { detail: "按版式组版" });
@@ -432,6 +477,7 @@ export function apply(ctx, config) {
       delete out._items;
       return out;
     } catch (err) {
+      if (stopper.stopped()) { progressCleanup(); return null; }
       if (useLlm) modelState.last = { at: new Date().toISOString(), run_id: o.runId || null, pack, error: errText(err), ms: Date.now() - t0 };
       pg.fail((pg.view().active || {}).current || "save", "编版面出错：" + errText(err));
       pg.finish("failed", errText(err));
@@ -766,7 +812,8 @@ export function apply(ctx, config) {
    * 抓取按剩余时间限时；版面在预算内编不完就不等了，发模型已经写好的那份（预编排的或边写边出的进度版），
    * 没写完的继续在后台写，下一轮再推。模型慢时 prewarmTick 会在定时推送前提前抓取和编排，到点只补增量。
    */
-  async function runCycle(args) {
+  function runCycle(args) { return stopper.run(() => runCycleNow(args)); }
+  async function runCycleNow(args) {
     const deadline = Date.now() + cfg.cycleBudgetMs;
     const left = () => deadline - Date.now();
     // 「写完再推」：到点只抓取、在后台编版面，写完后插件再触发一次同一个定时任务，那一次只推送
@@ -794,6 +841,7 @@ export function apply(ctx, config) {
       try {
         res = await (args && args.dry_run === true ? (f, t) => runEngine(ctx, cfg, p, f, t) : engineWithProgress)(cycleFlags(p, cfg, Object.assign({}, args, { defer_push: !(args && args.dry_run === true) }), runId).concat(pf ? ["--prefetched", pf.dir] : []), Math.max(60000, Math.min(cfg.timeoutMs, left() - 120000)));
       } finally { if (pf) await rm(pf.dir, { recursive: true, force: true }).catch(() => {}); }
+      if (stopper.stopped()) return stoppedOut(runId);
       const out = engineJson(res.stdout);
       if (out && out.run_id && deferring && out.parts) {
         const pend = { source: "cycle", pack: packKey, ed_pack: out.pack || (args && args.pack) || "all", run_id: out.run_id, at: new Date().toISOString(), parts: out.parts, rules: out.rules || null, lookback: out.lookback_hours || 6, want_llm: modeNow() === "llm" && model.available(), ready: false, edition_id: null };
@@ -807,13 +855,15 @@ export function apply(ctx, config) {
         const pack = out.pack || (args && args.pack) || "all";
         const fresh = (async () => {
           // 预编排或手动抓取后的模型编排还在跑：等它写完再在它的基础上补增量
-          while (modelState.busy && left() > 90000) await sleep(2000);
+          while (modelState.busy && left() > 90000 && !stopper.stopped()) await sleep(2000);
           if (modelState.busy) return null;
           return makeEdition({ pack, runId: out.run_id, wantLlm, minHours: out.lookback_hours });
         })();
         let timer = null;
         const got = await Promise.race([fresh, new Promise((r) => { timer = setTimeout(() => r("timeout"), Math.max(5000, left() - 45000)); })]);
         clearTimeout(timer);
+        // 等版面时被停下：不推（也不拿旧版面推）
+        if (stopper.stopped()) return stoppedOut(out.run_id);
         let ed = got && got !== "timeout" ? got : null;
         if (!ed) {
           ed = latestContent(pack);
@@ -863,13 +913,16 @@ export function apply(ctx, config) {
     withDb(p, (db) => { if (db) db.prepare("DELETE FROM kv WHERE key = ?").run(pendingKey(pack)); });
   }
   /** 在后台编本轮版面（前一份还在写就等它），写完记下来并触发推送。 */
-  async function composeThenDeliver(pend) {
+  function composeThenDeliver(pend) { return stopper.run(() => composeThenDeliverNow(pend)); }
+  async function composeThenDeliverNow(pend) {
     composing.add(pend.pack);
     try {
       const t0 = Date.now();
-      while (modelState.busy && Date.now() - t0 < PENDING_MAX_MS - 15 * 60000) await sleep(5000);
+      while (modelState.busy && Date.now() - t0 < PENDING_MAX_MS - 15 * 60000 && !stopper.stopped()) await sleep(5000);
       let ed = null;
       if (!modelState.busy) { try { ed = await makeEdition({ pack: pend.ed_pack, runId: pend.run_id, wantLlm: pend.want_llm, minHours: pend.lookback }); } catch { ed = null; } }
+      // 停下了：这一轮不推，待推送记录作废
+      if (stopper.stopped()) { const cur = readPending(pend.pack); if (cur && cur.run_id === pend.run_id) clearPending(pend.pack); return; }
       if (!ed) {
         ed = latestContent(pend.ed_pack);
         if (ed) pend.note = "本轮版面没编出来，按 " + bjHhmm(ed.created_at) + " 的版面推送";
@@ -1071,6 +1124,7 @@ export function apply(ctx, config) {
       return;
     }
     const out = await runCycle({ pack: t.pack, _direct: true });
+    if (out && out.stopped) return;
     // 「写完再推」的由版面写完时 deliver 发；没有消息的（抓不了、出错）在 runCycle 里已经收尾
     if (!out || out.deferred || !out.message) return;
     pg.attach("deliver", { runId: out.run_id || null });
@@ -1094,7 +1148,8 @@ export function apply(ctx, config) {
   }
 
   /** 推送写好的这一轮：能直接发就直接发（不经过模型）；发不出去时把拼好的消息留给定时任务转发。 */
-  async function deliver(pack) {
+  function deliver(pack) { return stopper.run(() => (stopper.stopped() ? false : deliverNow(pack))); }
+  async function deliverNow(pack) {
     const pend0 = readPending(pack);
     pg.attach("deliver", { runId: (pend0 && pend0.run_id) || null });
     pg.start("push", { detail: "挑要推的、拼消息" });
@@ -1121,6 +1176,7 @@ export function apply(ctx, config) {
   }
   async function triggerOnce(pack) {
     for (let i = 0; i < 15; i++) {
+      if (stopper.stopped()) return false;
       const svc = optional.schedule;
       if (!svc) return false;
       try {
@@ -1320,7 +1376,7 @@ export function apply(ctx, config) {
         prewarm.done.set(key, at);
         const runId = newRunId("prep");
         const res = await guardedRun({ packs: pack, read_budget_ms: Math.max(4 * 60000, until - 12 * 60000) }, runId, "prewarm");
-        if (res.ok) await makeEdition({ pack, runId: res.run_id || runId, wantLlm: true, priority: PRIORITY.background });
+        if (res.ok && res.stage !== "stopped") await makeEdition({ pack, runId: res.run_id || runId, wantLlm: true, priority: PRIORITY.background });
         prewarm.tasksAt = 0;
         return;
       }
@@ -1350,7 +1406,7 @@ export function apply(ctx, config) {
     // 路由和工具各在一个文件里（host/routes.mjs、host/tools.mjs）：状态都在上面，经 app 传过去
     const app = {
       afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
-      guardedRun, handleReply, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
+      guardedRun, handleReply, stopRun, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
       pushHealth, pushNow, queue, readTaken, reflowWithFeedback, runAnalysis, runCycle, runDetail, runSynthesis, startDetail, syncSourceState,
       syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
       route, tool, disposers,

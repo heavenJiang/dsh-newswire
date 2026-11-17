@@ -265,6 +265,7 @@ The panel follows the harness's light and dark themes and works at phone width.
 | `newswire_schedule_setup` | Create, show, pause, resume or delete the push or digest schedule; `pack` picks the pack |
 | `newswire_cycle` | The scheduled round: fetch → group and score → fetch bodies → pick → return the message |
 | `newswire_run` | Fetch one round without pushing |
+| `newswire_stop` | Stop the round that is running: the engine is terminated, its model calls are cancelled, nothing is pushed |
 | `newswire_events` / `newswire_event` | Query events; one event's reports, score history, pushes and disputes |
 | `newswire_items` | Stored items by category, source, label, full-text query and time window |
 | `newswire_snapshot` | The latest round at a glance: data time, hot terms, failures with fixes, top events |

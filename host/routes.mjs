@@ -28,7 +28,7 @@ import { DAILY_CRON, SCHEDULE_CRON, bodyOf, clampNum, dailyPrompt, draftSource, 
 export function registerRoutes(app) {
   const {
     afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
-    guardedRun, handleReply, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
+    guardedRun, handleReply, stopRun, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
     pushHealth, pushNow, queue, readTaken, reflowWithFeedback, route, runAnalysis, runDetail, runSynthesis, startDetail, syncSourceState,
     syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
   } = app;
@@ -605,6 +605,17 @@ export function registerRoutes(app) {
       });
       const run = withDb(p, (db) => (db ? db.prepare("SELECT MAX(finished_at) t FROM runs WHERE mode IN ('cycle', 'fetch')").get() : null));
       return jsonResponse({ ok: true, items: out || [], fetched_at: run && run.t ? run.t : null }, 200);
+    },
+  });
+
+  // 停下正在跑的一轮（抓取、编版面、推送）；这一轮不推送
+  route({
+    path: "/api/newswire/stop",
+    methods: ["POST"],
+    fetch: async (request) => {
+      const body = await bodyOf(request);
+      const r = stopRun(strOrNull(body.reason) || "面板上点了停止");
+      return jsonResponse(Object.assign(r, pg.view()), 200);
     },
   });
 

@@ -15,7 +15,7 @@ import { CRED_TEXT, DISCLAIMER, SCHEDULE_TITLE, SOURCE_PROPS, TEST_TIMEOUT_MS, c
 export function registerTools(app) {
   const {
     afterManualFetch, applyPush, background, busyWith, cfg, ctx, dailyRun, disposers, dropTrackerFollows, editFollows, errText, guardedRun,
-    handleReply, latestThemes, llmReady, makeEdition, modeNow, modelState, modelView, newRunId, p, pushView, runAnalysis, runCycle, runSynthesis,
+    handleReply, stopRun, latestThemes, llmReady, makeEdition, modeNow, modelState, modelView, newRunId, p, pushView, runAnalysis, runCycle, runSynthesis,
     scheduleSetup, syncSourceState, syncTrackerFollows, taxEntities, taxRegions, tool, pg,
   } = app;
 
@@ -25,7 +25,7 @@ export function registerTools(app) {
     const f = v.active || v.last;
     if (!f) return "";
     const min = (ms) => (ms >= 60000 ? Math.round(ms / 60000) + " 分钟" : Math.max(1, Math.round(ms / 1000)) + " 秒");
-    const lines = f.steps.map((s) => (s.warn && s.status === "done" ? "!" : { done: "✓", running: "▶", pending: "·", skipped: "–", failed: "✕" }[s.status] || "·") + " " + s.label + (s.total ? " " + s.done + "/" + s.total : "") + (s.detail && s.status !== "pending" ? "：" + s.detail : ""));
+    const lines = f.steps.map((s) => (s.warn && s.status === "done" ? "!" : { done: "✓", running: "▶", pending: "·", skipped: "–", failed: "✕", stopped: "■" }[s.status] || "·") + " " + s.label + (s.total ? " " + s.done + "/" + s.total : "") + (s.detail && s.status !== "pending" ? "：" + s.detail : ""));
     const head = v.active
       ? "本轮流程（" + f.label + "，已用 " + min(f.ms) + (f.eta_ms ? "，预计还要约 " + min(f.eta_ms) : "") + "，进度 " + f.pct + "%）："
       : "上一轮流程（" + f.label + "，" + ({ done: "已完成", failed: "失败", stalled: "中断", replaced: "被新一轮取代" }[f.outcome] || f.outcome) + "，用时 " + min(f.ms) + (f.note ? "，" + f.note : "") + "）：";
@@ -68,6 +68,19 @@ export function registerTools(app) {
       if (res.ok && res.run_id) await afterManualFetch(res.run_id, (args && args.packs) || "all");
       const snap = await snapshotOf(cfg, p);
       return { ok: res.ok, stage: res.stage, run_id: res.run_id, tail: res.tail, snapshot: { window_hours: snap.window_hours, latest_run: snap.latest_run, categories: snap.categories, failed: snap.failed.map((f) => ({ source_id: f.source_id, error_kind: f.error_kind, hint: f.hint })), digest_path: snap.digest_path } };
+    },
+  });
+
+  tool({
+    name: "newswire_stop",
+    description: "Stop the round that is running now (fetch, edition, push): the engine process is terminated, running and queued model calls for it are cancelled, no fallback edition is saved and the round pushes nothing. The next scheduled round runs as usual. Use it only when the user asks to stop or cancel the current run.",
+    parameters: { type: "object", additionalProperties: false, properties: { reason: { type: "string", description: "Why, in a few words (shown in the run log)." } } },
+    output: {
+      schema: { type: "object", additionalProperties: true, properties: { ok: { type: "boolean" }, note: { type: "string" } } },
+      render: (_args, value) => [{ type: "text", text: String(value.note || (value.ok ? "已停止" : value.error || "")) }],
+    },
+    async execute(args) {
+      return stopRun((args && args.reason) || "对话里要求停止");
     },
   });
 

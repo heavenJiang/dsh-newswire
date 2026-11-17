@@ -62,7 +62,8 @@ export function createProgress(o) {
     if (!flow || flow.ended) return;
     const t = now();
     for (const s of flow.steps) {
-      if (s.status === "running") { s.status = outcome === "failed" ? "failed" : "done"; s.ended = t; }
+      // 手动停下的：正在跑的那一步记成「停止」（不算完成，也不记进耗时统计）
+      if (s.status === "running") { s.status = outcome === "failed" ? "failed" : outcome === "stopped" ? "stopped" : "done"; s.ended = t; }
       else if (s.status === "pending") s.status = "skipped";
     }
     flow.ended = t;

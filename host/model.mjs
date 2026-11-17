@@ -70,13 +70,31 @@ export function createModel(o) {
       // 每天的 token 预算用完了：模型步骤不再调用，退回程序结果
       const blocked = typeof o.gate === "function" ? o.gate(opt && opt.step) : null;
       if (blocked) throw new Error(blocked);
+      // 这一轮被停下（面板上点了「停止」）：不再调用；排队中的退出；正在跑的中断
+      const outer = typeof o.stopSignal === "function" ? o.stopSignal() : null;
+      const stopErr = () => (outer.reason && outer.reason.stopped ? outer.reason : Object.assign(new Error("stopped"), { stopped: true }));
+      if (outer && outer.aborted) throw stopErr();
       // 排队：本地模型一次跑不了几个请求，先领名额（读者点的排在后台任务前面）；等名额的时间不算进这次调用的超时
-      const release = typeof o.slot === "function" ? await o.slot(opt && opt.step) : null;
+      let release = null;
+      if (typeof o.slot === "function") {
+        const pending = o.slot(opt && opt.step);
+        if (outer) {
+          let onAbort = null;
+          const aborted = new Promise((r) => { onAbort = () => r(null); outer.addEventListener("abort", onAbort, { once: true }); });
+          release = await Promise.race([pending, aborted]);
+          outer.removeEventListener("abort", onAbort);
+          // 等名额时被停下：名额到手后立刻还回去
+          if (!release) { void pending.then((rel) => rel && rel()); throw stopErr(); }
+        } else release = await pending;
+      }
+      if (outer && outer.aborted) { if (release) release(); throw stopErr(); }
       const t0 = Date.now();
       let usage = null;
       let failure = null;
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(new Error("timeout")), (opt && opt.timeoutMs) || o.timeoutMs || 90000);
+      const onStop = () => ctl.abort(stopErr());
+      if (outer) outer.addEventListener("abort", onStop, { once: true });
       let text = "";
       try {
         for await (const chunk of llm.stream({
@@ -92,11 +110,13 @@ export function createModel(o) {
             if (k === "error" || k === "aborted") throw new Error((chunk.reason.failure && (chunk.reason.failure.message || chunk.reason.failure.code)) || k);
           }
         }
+        if (outer && outer.aborted) throw stopErr();
       } catch (e) {
-        failure = e;
-        throw e;
+        failure = outer && outer.aborted ? stopErr() : e;
+        throw failure;
       } finally {
         clearTimeout(timer);
+        if (outer) outer.removeEventListener("abort", onStop);
         if (release) release();
         // 记账：宿主给了 usage 就用它，否则按字数估（中文约 1.6 字一个 token）
         const rec = { step: (opt && opt.step) || "other", model: sel.provider + "/" + sel.model, ms: Date.now() - t0, ok: !failure && Boolean(text.trim()),

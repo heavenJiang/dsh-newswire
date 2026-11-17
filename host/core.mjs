@@ -2,6 +2,7 @@
  * 插件入口用到的模块级工具：默认设置与路径、读写源配置、引擎子进程、源的校验与规范化、定时任务的指令、面板响应的小函数。
  * 都不依赖某一次 apply() 的状态；路由（routes.mjs）、工具（tools.mjs）和入口（index.js）共用。
  */
+import { stopper } from "./stop.mjs";
 import os from "node:os";
 import path from "node:path";
 import { existsSync } from "node:fs";
@@ -252,6 +253,11 @@ export async function runEngine(ctx, cfg, p, flags, timeoutMs) {
   const limit = timeoutMs || cfg.timeoutMs;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new Error("超时 " + Math.round(limit / 1000) + "s")), limit);
+  // 这一轮被停下：终止子进程（引擎收到 SIGTERM 会释放锁再退出）
+  const outer = stopper.signal();
+  if (outer && outer.aborted) { clearTimeout(timer); return { ok: false, stage: "stopped", tail: "已停止", run_id: null, stdout: "" }; }
+  const onStop = () => controller.abort(outer.reason);
+  if (outer) outer.addEventListener("abort", onStop, { once: true });
   let handle;
   try {
     handle = ctx.subprocess.spawn({
@@ -269,13 +275,14 @@ export async function runEngine(ctx, cfg, p, flags, timeoutMs) {
     const outcome = await handle.done;
     const stdout = handle.collected?.stdout?.readFrom(0)?.text ?? "";
     const stderr = handle.collected?.stderr?.readFrom(0)?.text ?? "";
-    return { ok: outcome.exitCode === 0, exitCode: outcome.exitCode ?? null, stage: outcome.exitCode === 0 ? "done" : "engine_exit_" + String(outcome.exitCode), tail: tailOf([stdout, stderr], cfg.tailChars), run_id: runIdFrom(stdout + "\n" + stderr), stdout };
+    return { ok: outcome.exitCode === 0 && !(outer && outer.aborted), exitCode: outcome.exitCode ?? null, stage: outer && outer.aborted ? "stopped" : outcome.exitCode === 0 ? "done" : "engine_exit_" + String(outcome.exitCode), tail: tailOf([stdout, stderr], cfg.tailChars), run_id: runIdFrom(stdout + "\n" + stderr), stdout };
   } catch (error) {
     const stdout = handle.collected?.stdout?.readFrom(0)?.text ?? "";
     const stderr = handle.collected?.stderr?.readFrom(0)?.text ?? "";
-    return { ok: false, stage: controller.signal.aborted ? "timeout" : "spawn_error", tail: tailOf([String(error && error.message ? error.message : error), stdout, stderr], cfg.tailChars), run_id: runIdFrom(stdout + "\n" + stderr), stdout };
+    return { ok: false, stage: outer && outer.aborted ? "stopped" : controller.signal.aborted ? "timeout" : "spawn_error", tail: tailOf([String(error && error.message ? error.message : error), stdout, stderr], cfg.tailChars), run_id: runIdFrom(stdout + "\n" + stderr), stdout };
   } finally {
     clearTimeout(timer);
+    if (outer) outer.removeEventListener("abort", onStop);
     try {
       handle.terminate();
       await handle.waitForExit();

@@ -265,6 +265,7 @@ dsh plugin --profile web add github:heavenJiang/dsh-newswire
 | `newswire_schedule_setup` | 创建、查看、暂停、恢复、删除定时推送或日报任务；`pack` 选主题包 |
 | `newswire_cycle` | 定时任务用的整轮：抓取 → 归并打分 → 补正文 → 选重点 → 返回要发的文字 |
 | `newswire_run` | 只抓一轮，不推送 |
+| `newswire_stop` | 停下正在跑的一轮：终止引擎、取消它的模型调用，这一轮不推送 |
 | `newswire_events` / `newswire_event` | 按条件查事件；单个事件的各家报道、打分轨迹、推送记录、分歧 |
 | `newswire_items` | 按分类、来源、标签、全文检索、时间窗取已存新闻 |
 | `newswire_snapshot` | 最近一轮的概况：数据时间、热点词、失败与处理建议、重点事件 |
