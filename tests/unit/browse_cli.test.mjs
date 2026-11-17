@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { relayRunning, parseExec01, wrapJob01 } from "../../engine/channels/browse.mjs";
+import { relayRunning, parseExec01, wrapJob01, genOf } from "../../engine/channels/browse.mjs";
+
+test("browse generation comes from the version; 0.1.1 idle relay still writes running:false", () => {
+  assert.equal(genOf({ relay: { running: false, endpoint: "http://127.0.0.1:19988" }, setup: { version: "0.1.1" } }), "0.1");
+  assert.equal(genOf({ relay: { version: "0.1.1", pid: 1 } }), "0.1");
+  assert.equal(genOf({ relay: { running: true }, setup: { version: "0.0.17" } }), "0.0");
+  assert.equal(genOf({ relay: { running: false } }), "0.0");
+  assert.equal(genOf({ relay: { endpoint: "x", pid: 2 } }), "0.1");
+  assert.equal(genOf({}), "");
+});
 
 test("browse 0.1.x status has no relay.running: a relay with a pid or endpoint is running", () => {
   assert.equal(relayRunning({ running: true }), true); // 0.0.x

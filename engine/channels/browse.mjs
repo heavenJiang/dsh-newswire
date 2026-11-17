@@ -322,12 +322,41 @@ export function relayRunning(relay) {
   return Boolean(relay.pid || relay.endpoint);
 }
 
+/**
+ * 认代际：优先看版本号（setup.version / relay.version / autoUpdate.version），0.0.x 之外都按 0.1；
+ * 没有版本号再看 relay 的形状。0.1.1 的 relay 停着时也写 running:false，只看形状会把它认成 0.0。
+ */
+export function genOf(j) {
+  const v = (j && ((j.setup && j.setup.version) || (j.relay && j.relay.version) || (j.autoUpdate && j.autoUpdate.version))) || "";
+  if (v) return /^0\.0\./.test(v) ? "0.0" : "0.1";
+  if (j && j.relay) return "running" in j.relay && !j.relay.pid ? "0.0" : "0.1";
+  return "";
+}
+
+async function readStatus() {
+  const { stdout } = await exec(BIN, ["status", "--json"], { timeout: 30000 });
+  return JSON.parse(stdout.slice(stdout.indexOf("{")));
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 export async function browseStatus() {
   if (!BIN) return { ok: false, reason: "browse_not_found", detail: "未找到 browse CLI（插件配置 browseBin 或把 browse 放进 PATH）" };
   try {
-    const { stdout } = await exec(BIN, ["status", "--json"], { timeout: 30000 });
-    const j = JSON.parse(stdout.slice(stdout.indexOf("{")));
-    if (j.relay) GEN = "running" in j.relay ? "0.0" : "0.1";
+    let j = await readStatus();
+    GEN = genOf(j) || GEN;
+    // 0.1.x 的 relay 空闲 30 分钟自己退出，下一次 execute 才拉起来；扩展随后几秒内重连。
+    // 停着就用一个不开标签页的空脚本叫醒它，再等扩展连上（最多约 20 秒）。
+    if (GEN === "0.1") {
+      const up = (s) => relayRunning(s.relay) && s.extension && s.extension.connected && s.extension.browsers && s.extension.browsers.length;
+      if (!relayRunning(j.relay)) {
+        const f = path.join(TMP, "wake.mjs");
+        writeFileSync(f, "return 1;\n");
+        try { await exec(BIN, ["execute", "--file", f, "--timeoutMs", "15000"], { timeout: 30000 }); } catch { /* 下面看 status */ }
+        j = await readStatus();
+      }
+      for (let i = 0; i < 10 && !up(j) && relayRunning(j.relay); i++) { await sleep(2000); j = await readStatus(); }
+    }
     const b = (j.extension && j.extension.browsers && j.extension.browsers[0]) || null;
     const relay = relayRunning(j.relay);
     const ok = Boolean(relay && j.extension && j.extension.connected && b);

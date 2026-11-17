@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.44 (2026-11-17)
+
+- **Fix: no browser fetches since browse 0.1.1 (again).** Reader report: no browse calls on the deployed version. Since 11-16 23:00 UTC every browser source, 财联社 included, failed as "relay down" without browse being called at all. browse 0.1.x shuts its relay down after 30 idle minutes and starts it again only when something runs `execute`; while it is stopped, 0.1.1's `status --json` reports `relay.running: false` again. newswire read that shape as the old 0.0.x generation with a dead relay and skipped the browser, so the relay never came back. The generation now comes from the version in `status` (`setup.version`, `relay.version`), not the shape. On 0.1.x a stopped relay is woken with an empty script that opens no tab, then newswire waits up to about 20 seconds for the extension to reconnect (it took 1–5 seconds in tests). Checked from a stopped relay: relay started, extension reconnected, 财联社 fetched on a copy of the live config and data.
+
 ## 1.1.43 (2026-11-17)
 
 - **Fix: the event detail beside the list could not be scrolled.** Reader report: in Events, a long impact analysis on the right was cut off and could not be scrolled. The right pane stuck to the top of the panel with no height limit, so anything below the visible area was out of reach while the list on the left was long. The pane (Events and Timeline) is now capped at the panel's visible height (measured from the panel's own scroll area, not the browser window, so a host toolbar does not cut it off) and scrolls by itself; at its end the wheel carries on to the page. Picking another event starts its detail from the top.
