@@ -1871,7 +1871,14 @@ window.__ModuleLoader__.load({
         function check() { raf = 0; var b = scrollBox(); setShown(Boolean(b && b.scrollTop > 800)) }
         function onScroll() { if (!raf) raf = requestAnimationFrame(check) }
         document.addEventListener('scroll', onScroll, true)
-        return function () { document.removeEventListener('scroll', onScroll, true); if (raf) cancelAnimationFrame(raf) }
+        // 面板实际可见的高度（宿主可能有顶栏，不等于窗口高度）记成 --nw-box-h：事件详情等右栏按它限高、自己滚动
+        var box = document.querySelector('.nw-scroll')
+        function size() { if (box) box.style.setProperty('--nw-box-h', box.clientHeight + 'px') }
+        size()
+        var ro = box && window.ResizeObserver ? new ResizeObserver(size) : null
+        if (ro) ro.observe(box)
+        else window.addEventListener('resize', size)
+        return function () { document.removeEventListener('scroll', onScroll, true); if (raf) cancelAnimationFrame(raf); if (ro) ro.disconnect(); else window.removeEventListener('resize', size) }
       }, [])
       if (!shown) return null
       return h('div', { className: 'nw-totop-wrap' }, h('button', { className: 'nw-totop', title: t('btn.toTop'), 'aria-label': t('btn.toTop'), onClick: function () { var b = scrollBox(); if (b) { if (b.scrollTo) b.scrollTo({ top: 0, behavior: 'smooth' }); else b.scrollTop = 0 } } }, '↑ ' + t('btn.toTop')))
@@ -1956,7 +1963,7 @@ window.__ModuleLoader__.load({
             d.events.map(function (e) { return h(EventCard, { key: e.event_id, ev: e, names: props.names, active: sel === e.event_id, onClick: function () { setSel(e.event_id) } }) }),
             d.events.length >= f.limit ? h('button', { className: 'nw-btn nw-ghost nw-more', onClick: function () { setF(Object.assign({}, f, { limit: f.limit + 60 })) } }, t('btn.more')) : null,
             h('div', { className: 'nw-foot' }, t('txt.disclaimer'))),
-          h('div', { className: 'nw-pane' }, h(EventDetail, { id: sel, names: props.names, model: model, onBack: back }))))
+          h('div', { className: 'nw-pane', key: 'pane-' + sel }, h(EventDetail, { id: sel, names: props.names, model: model, onBack: back }))))
     }
 
     // ------------------------------------------------------------------ 时间线
@@ -2023,7 +2030,7 @@ window.__ModuleLoader__.load({
               ? d.entries.map(function (e) { return h(EventCard, { key: e.event_id, ev: e, names: props.names, active: sel === e.event_id, onClick: function () { setSel(e.event_id) } }) })
               : d.entries.map(function (r) { return h(ItemRow, { key: r.id, row: { time: r.t, time_confidence: r.time_confidence, source: r.source_name || r.source_id, title: r.title, url: r.url, signals: { hot: r.hot, level: r.level, views: r.views, comments: r.comments, likes: r.likes } } }) }),
             d.phase === 'ready' && d.run_id && !d.entries.length ? Empty({ children: t('txt.noEvents') }) : null),
-          h('div', { className: 'nw-pane' }, s.kind === 'events' ? h(EventDetail, { id: sel, names: props.names, onBack: function () { setSel(null) } }) : null)))
+          h('div', { className: 'nw-pane', key: 'pane-' + (sel || '') }, s.kind === 'events' ? h(EventDetail, { id: sel, names: props.names, onBack: function () { setSel(null) } }) : null)))
     }
 
     // ------------------------------------------------------------------ 条目
@@ -2757,7 +2764,7 @@ window.__ModuleLoader__.load({
       '.nw-list{display:flex;flex-direction:column;gap:8px;min-width:0}',
       '.nw-pane{display:none;min-width:0}',
       '.nw-has-sel .nw-pane{display:block} .nw-has-sel .nw-list{display:none} .nw-has-sel > .nw-filters, .nw-has-sel > .nw-kw, .nw-has-sel > .nw-bars, .nw-has-sel > .nw-runline{display:none}',
-      '@container (min-width: 820px){.nw-split{grid-template-columns:minmax(0,5fr) minmax(0,6fr)} .nw-pane{display:block;position:sticky;top:8px} .nw-has-sel .nw-list{display:flex} .nw-back{display:none} .nw-has-sel > .nw-filters, .nw-has-sel > .nw-kw, .nw-has-sel > .nw-bars, .nw-has-sel > .nw-runline{display:flex}}',
+      '@container (min-width: 820px){.nw-split{grid-template-columns:minmax(0,5fr) minmax(0,6fr)} .nw-pane{display:block;position:sticky;top:8px;max-height:calc(var(--nw-box-h,100vh) - 16px - var(--dsh-frame-top-clearance,0px));overflow-y:auto;scrollbar-width:thin;border-radius:14px} .nw-has-sel .nw-list{display:flex} .nw-back{display:none} .nw-has-sel > .nw-filters, .nw-has-sel > .nw-kw, .nw-has-sel > .nw-bars, .nw-has-sel > .nw-runline{display:flex}}',
       '.nw-card{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;border:1px solid ' + C.line + ';border-left:3px solid ' + C.idle + ';background:' + C.bg + ';color:inherit;border-radius:10px;padding:10px 12px;cursor:pointer;font:inherit}',
       '.nw-card:hover{background:' + C.hover + '} .nw-card.nw-active{background:' + C.active + ';border-color:' + C.accent + '}',
       '.nw-card.nw-imp-hi{border-left-color:' + C.err + '} .nw-card.nw-imp-mid{border-left-color:' + C.warn + '}',

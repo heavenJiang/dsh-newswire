@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.43 (2026-11-17)
+
+- **Fix: the event detail beside the list could not be scrolled.** Reader report: in Events, a long impact analysis on the right was cut off and could not be scrolled. The right pane stuck to the top of the panel with no height limit, so anything below the visible area was out of reach while the list on the left was long. The pane (Events and Timeline) is now capped at the panel's visible height (measured from the panel's own scroll area, not the browser window, so a host toolbar does not cut it off) and scrolls by itself; at its end the wheel carries on to the page. Picking another event starts its detail from the top.
+
 ## 1.1.42 (2026-11-17)
 
 Reader request: check for other time problems like the 24-hour one. The search turned up one more of that kind, and on the way a much bigger fault: since browse auto-updated to 0.1.0 (11-16 17:18 UTC), no source that needs the browser had been fetched, including 财联社, the main source.
