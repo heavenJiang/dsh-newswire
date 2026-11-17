@@ -30,7 +30,7 @@ export function writeDigest(db, o) {
   const { runId, now, results, browse, windowHours, categories, outDir, perSource, tz, totals } = o;
   const failed = results.filter((x) => !x.ok);
   const winStart = new Date(now.getTime() - windowHours * 3600 * 1000).toISOString().replace("T", " ").slice(0, 19);
-  const rows = db.prepare("SELECT a.*, s.name AS source_name FROM articles a LEFT JOIN sources s ON s.id = a.source_id WHERE COALESCE(a.published_at, a.last_seen_at) >= ? AND a.source_id IN (SELECT DISTINCT source_id FROM fetch_attempts WHERE run_id = ? AND ok = 1) GROUP BY a.id ORDER BY a.category, COALESCE(a.published_at, a.last_seen_at) DESC").all(winStart, runId);
+  const rows = db.prepare("SELECT a.*, s.name AS source_name FROM articles a LEFT JOIN sources s ON s.id = a.source_id WHERE COALESCE(a.published_at, a.first_seen_at) >= ? AND a.source_id IN (SELECT DISTINCT source_id FROM fetch_attempts WHERE run_id = ? AND ok = 1) GROUP BY a.id ORDER BY a.category, COALESCE(a.published_at, a.first_seen_at) DESC").all(winStart, runId);
   const obs = new Map(db.prepare("SELECT article_id, hot, level, views, comments, likes FROM observations WHERE run_id = ?").all(runId).map((r) => [r.article_id, r]));
   const att = attemptsForRun(db, runId);
   const zh = (t) => { if (!t) return ""; const d = new Date(t.includes("T") ? t : t.replace(" ", "T") + "Z"); return isNaN(d.getTime()) ? "" : zdt(d, tz, false).slice(5, 16); };

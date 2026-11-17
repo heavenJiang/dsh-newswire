@@ -2,6 +2,13 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.41 (2026-11-17)
+
+Reader report: with 24 hours selected, Events and Items showed things from days ago.
+- **Fix: Items counted old articles as new.** Sources read from a homepage list (TechFlow, ChainCatcher, STCN and others; about a third of their items) carry no publish time, and the window fell back to the time the item was last seen in a list. An old article still linked from the homepage is "seen" again every round, so pieces from 11-11 and earlier sat in the 24-hour list with the latest fetch time. The window and the time shown now use the publish time, else the time the item was first fetched. The same fix applies to category and label counts and the per-round digest.
+- **Fix: Events in the window by their newest report, and the list says when.** An event's "last seen" came from the same refreshed list times, so an event stayed "in the last 24 hours" as long as one old member stayed on a homepage, and the list showed the event's start time (11-10, 11-08) under 24 hours. The window now goes by the newest report in the event (publish time, else first fetched). The row shows that time, and "started …" when the event began more than half a day earlier, e.g. "yesterday 22:50 · started 11-10 19:41". Paging and "most recent" order use the same time.
+- The Timeline was correct: each round lists what was first fetched in that round.
+
 ## 1.1.40 (2026-11-17)
 
 - **Back to top.** Reader request. Once the panel has scrolled down more than a screen, a "↑ Top" button appears at the bottom right of the panel (not of the browser window); it scrolls back to the top smoothly. It works on every tab.

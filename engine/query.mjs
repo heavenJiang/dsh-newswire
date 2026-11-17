@@ -25,7 +25,7 @@ export function recentRuns(db, limit) {
 
 export function countsByCategory(db, since) {
   if (!db) return [];
-  return db.prepare("SELECT category, COUNT(*) AS n FROM articles WHERE COALESCE(published_at, last_seen_at) >= ? GROUP BY category ORDER BY n DESC").all(since).map((r) => ({ category: r.category, n: r.n }));
+  return db.prepare("SELECT category, COUNT(*) AS n FROM articles WHERE COALESCE(published_at, first_seen_at) >= ? GROUP BY category ORDER BY n DESC").all(since).map((r) => ({ category: r.category, n: r.n }));
 }
 
 const KEY = ["关税", "制裁", "美联储", "降息", "加息", "CPI", "PPI", "央行", "外汇储备", "回购", "增资", "IPO", "AI", "算力", "机器人", "芯片", "数据中心", "中东", "伊朗", "以色列", "乌克兰", "俄罗斯", "选举", "黄金", "原油", "汇率", "并购", "重组", "银行", "新能源"];
@@ -33,7 +33,7 @@ const KEY = ["关税", "制裁", "美联储", "降息", "加息", "CPI", "PPI", 
 export function keywords(db, since, top) {
   if (!db) return [];
   const kc = {};
-  for (const r of db.prepare("SELECT title, summary FROM articles WHERE COALESCE(published_at, last_seen_at) >= ?").all(since)) {
+  for (const r of db.prepare("SELECT title, summary FROM articles WHERE COALESCE(published_at, first_seen_at) >= ?").all(since)) {
     const hay = (String(r.title || "") + " " + String(r.summary || "")).toLowerCase();
     for (const k of KEY) if (hay.includes(k.toLowerCase())) kc[k] = (kc[k] || 0) + 1;
   }
@@ -84,13 +84,13 @@ function ftsPhrase(q) { return '"' + String(q).replace(/"/g, '""') + '"'; }
  */
 export function itemRows(db, opts) {
   if (!db) return [];
-  const where = ["COALESCE(a.published_at, a.last_seen_at) >= ?"];
+  const where = ["COALESCE(a.published_at, a.first_seen_at) >= ?"];
   const args = [opts.since];
   if (opts.category) { where.push("a.category = ?"); args.push(opts.category); }
   if (opts.source) { where.push("a.source_id = ?"); args.push(opts.source); }
   if (opts.pack) { where.push("a.pack = ?"); args.push(opts.pack); }
   if (opts.label) { where.push("a.id IN (SELECT article_id FROM article_labels WHERE label = ? OR label LIKE ? || '.%')"); args.push(opts.label, opts.label); }
-  if (opts.before) { where.push("COALESCE(a.published_at, a.last_seen_at) < ?"); args.push(opts.before); }
+  if (opts.before) { where.push("COALESCE(a.published_at, a.first_seen_at) < ?"); args.push(opts.before); }
   if (opts.query) {
     const q = String(opts.query).trim();
     if ([...q].length >= 3) { where.push("a.rowid IN (SELECT rowid FROM articles_fts WHERE articles_fts MATCH ?)"); args.push(ftsPhrase(q)); }
@@ -100,7 +100,7 @@ export function itemRows(db, opts) {
   // 默认只看新闻（广告、行情跳动、合集原稿不进快讯流；想看可以打开「显示已过滤」）
   if (!opts.allKinds) where.push("COALESCE(a.kind, 'news') IN ('news', 'digest_item')");
   const limit = Math.min(Math.max(Number(opts.limit) || 30, 1), 400);
-  const sql = "SELECT a.id, a.title, a.title_zh, a.kind, a.url, a.source_id, s.name AS source_name, a.category, a.pack, a.time_confidence, COALESCE(a.published_at, a.last_seen_at) AS t, substr(CASE WHEN EXISTS (SELECT 1 FROM article_bodies b WHERE b.article_id = a.id AND b.ok = 1) THEN a.content ELSE COALESCE(NULLIF(a.summary, ''), a.content, '') END, 1, 260) AS summary, a.channel, a.paywalled, "
+  const sql = "SELECT a.id, a.title, a.title_zh, a.kind, a.url, a.source_id, s.name AS source_name, a.category, a.pack, a.time_confidence, COALESCE(a.published_at, a.first_seen_at) AS t, substr(CASE WHEN EXISTS (SELECT 1 FROM article_bodies b WHERE b.article_id = a.id AND b.ok = 1) THEN a.content ELSE COALESCE(NULLIF(a.summary, ''), a.content, '') END, 1, 260) AS summary, a.channel, a.paywalled, "
     + "o.views, o.comments, o.likes, o.shares, o.favorites, o.hot, o.level, o.rank, o.section "
     + "FROM articles a LEFT JOIN sources s ON s.id = a.source_id "
     + "LEFT JOIN observations o ON o.rowid = (SELECT rowid FROM observations WHERE article_id = a.id ORDER BY seen_at DESC LIMIT 1) "
@@ -156,7 +156,7 @@ function eventView(e) {
   return {
     event_id: e.event_id, title: e.title, importance: e.importance, credibility: e.credibility, source_count: e.source_count, member_count: e.member_count,
     region_mix: e.region_mix, labels: parseJ(e.labels, []), regions: parseJ(e.regions, []), outlets: parseJ(e.outlets, []),
-    first_seen_at: e.first_seen_at, last_seen_at: e.last_seen_at, factors: parseJ(e.factors, {}), dispute: parseJ(e.dispute, null),
+    first_seen_at: e.first_seen_at, last_seen_at: e.last_seen_at, latest_at: e.latest_at || null, factors: parseJ(e.factors, {}), dispute: parseJ(e.dispute, null),
     lead_url: e.lead_url || null, pushed: Boolean(e.pushed), pack: e.pack || null,
     notes: notesView(e.llm_notes),
   };
@@ -165,6 +165,8 @@ function eventView(e) {
 /** 事件列表：since / min_importance / credibility / label（前缀，如 macro）/ region / query / limit / before（游标：上一页最后一条的 last_seen_at）。 */
 export function eventRows(db, o) {
   if (!db) return [];
+  // 时间窗按事件里最新一篇报道的时间（发布时间，没有就用第一次抓到的时间）。不用 e.last_seen_at：
+  // 它取成员「最后一次在列表里见到」的时间，旧文章每轮还挂在对方首页上就会被刷新，几天前的事件因此一直算在「24 小时内」
   const where = ["e.last_seen_at >= ?"];
   const args = [o.since];
   if (o.pack) { where.push("e.pack = ?"); args.push(o.pack); }
@@ -174,10 +176,13 @@ export function eventRows(db, o) {
   if (o.label) { where.push("EXISTS (SELECT 1 FROM json_each(e.labels) j WHERE j.value = ? OR j.value LIKE ? || '.%')"); args.push(o.label, o.label); }
   if (o.region) { where.push("EXISTS (SELECT 1 FROM json_each(e.regions) j WHERE j.value = ?)"); args.push(o.region); }
   if (o.query) { where.push("(e.title LIKE ? OR EXISTS (SELECT 1 FROM event_members m JOIN articles a ON a.id = m.article_id WHERE m.event_id = e.event_id AND a.title LIKE ?))"); args.push("%" + o.query + "%", "%" + o.query + "%"); }
-  if (o.before) { where.push("e.last_seen_at < ?"); args.push(o.before); }
-  const order = o.order === "recent" ? "e.last_seen_at DESC" : "e.importance DESC, e.last_seen_at DESC";
+  const outer = ["x.latest_at >= ?"];
+  const outerArgs = [o.since];
+  if (o.before) { outer.push("x.latest_at < ?"); outerArgs.push(o.before); }
+  const order = o.order === "recent" ? "x.latest_at DESC" : "x.importance DESC, x.latest_at DESC";
   const limit = Math.min(Math.max(Number(o.limit) || 30, 1), 300);
-  return db.prepare("SELECT e.*, a.url AS lead_url, EXISTS (SELECT 1 FROM pushes p WHERE p.event_id = e.event_id) AS pushed FROM events e LEFT JOIN articles a ON a.id = e.lead_article_id WHERE " + where.join(" AND ") + " ORDER BY " + order + " LIMIT ?").all(...args, limit).map(eventView);
+  const latest = "(SELECT MAX(COALESCE(la.published_at, la.first_seen_at)) FROM event_members lm JOIN articles la ON la.id = lm.article_id WHERE lm.event_id = e.event_id)";
+  return db.prepare("SELECT x.* FROM (SELECT e.*, a.url AS lead_url, EXISTS (SELECT 1 FROM pushes p WHERE p.event_id = e.event_id) AS pushed, " + latest + " AS latest_at FROM events e LEFT JOIN articles a ON a.id = e.lead_article_id WHERE " + where.join(" AND ") + ") x WHERE " + outer.join(" AND ") + " ORDER BY " + order + " LIMIT ?").all(...args, ...outerArgs, limit).map(eventView);
 }
 
 /** 事件详情：成员（各源报道 + 最近热度信号 + 标签）、打分轨迹、推送记录。 */
@@ -203,7 +208,7 @@ export function eventDetail(db, id) {
 /** 标签分布（时间窗内条目）。 */
 export function labelCounts(db, since) {
   if (!db) return [];
-  return db.prepare("SELECT l.label, COUNT(*) n FROM article_labels l JOIN articles a ON a.id = l.article_id WHERE COALESCE(a.published_at, a.last_seen_at) >= ? GROUP BY l.label ORDER BY n DESC").all(since);
+  return db.prepare("SELECT l.label, COUNT(*) n FROM article_labels l JOIN articles a ON a.id = l.article_id WHERE COALESCE(a.published_at, a.first_seen_at) >= ? GROUP BY l.label ORDER BY n DESC").all(since);
 }
 
 // ------------------------------------------------------------------ 时间线

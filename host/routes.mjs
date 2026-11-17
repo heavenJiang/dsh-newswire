@@ -175,7 +175,7 @@ export function registerRoutes(app) {
       const hours = clampNum(body.hours, 1, 24 * 90, 24);
       const since = sinceIso(hours);
       const events = withDb(p, (db) => eventRows(db, { since, pack: strOrNull(body.pack), minImportance: body.min_importance, credibility: strOrNull(body.credibility), label: strOrNull(body.label), region: strOrNull(body.region), query: strOrNull(body.query), multiOnly: body.multi_only === true, order: strOrNull(body.order), before: strOrNull(body.before), limit: Math.min(Number(body.limit) || 40, 300) }));
-      return jsonResponse({ count: events.length, since_iso: since, events, next_before: events.length ? events[events.length - 1].last_seen_at : null }, 200);
+      return jsonResponse({ count: events.length, since_iso: since, events, next_before: events.length ? events[events.length - 1].latest_at || events[events.length - 1].last_seen_at : null }, 200);
     },
   });
 
