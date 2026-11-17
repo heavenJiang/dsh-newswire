@@ -121,7 +121,7 @@ window.__ModuleLoader__.load({
         'st.updated': '{t} 更新', 'st.failed': '{n} 个源失败', 'st.gaps': '{n} 处缺口', 'st.stale': '超过一天未更新',
         'rd.outlets': '{w}等 {n} 家', 'rd.developing': '进展', 'rd.more': '更多：各方说法、影响与来源', 'rd.less': '收起', 'rd.reportHint': '点出有误的那一句，它会立即撤下，下次重写时避开。',
         'rd.asof': '截至 {t}', 'rd.pack': '内容范围', 'rd.allPacks': '全部内容', 'rd.dek': '过去 {h} 小时 · {n} 件事 · 来自 {o} 家媒体',
-        'rd.keysH': '本版重点', 'rd.key': '重点', 'df.vs': '比上一版（{t}）：', 'df.new': '新 {n}', 'df.dev': '有进展 {n}', 'df.same': '沿用 {n}', 'df.gone': '撤下 {n}', 'df.only': '只看变化', 'df.all': '看全部', 'ed.newer': '有新版面（{t}）', 'ed.newerGo': '换上', 'rd.sinceH': '自你上次查看（{t}）', 'rd.sinceNew': '{n} 件新事', 'rd.sinceDev': '{n} 件有进展',
+        'rd.keysH': '本版重点', 'rd.key': '重点', 'rd.fold': '收起', 'rd.unfold': '展开 {n} 条', 'df.vs': '比上一版（{t}）：', 'df.new': '新 {n}', 'df.dev': '有进展 {n}', 'df.same': '沿用 {n}', 'df.gone': '撤下 {n}', 'df.only': '只看变化', 'df.all': '看全部', 'ed.newer': '有新版面（{t}）', 'ed.newerGo': '换上', 'rd.sinceH': '自你上次查看（{t}）', 'rd.sinceNew': '{n} 件新事', 'rd.sinceDev': '{n} 件有进展',
         'rd.about': '关于本期', 'rd.byModel': '由 {m} 阅读并编写', 'rd.byRules': '由程序按规则编排（节省 token 模式）', 'rd.read': '读入近 {h} 小时最重要的 {n} 条报道。', 'rd.checked': '模型写下的 {n} 句含数字或专名的话，{p} 句已与原文逐一核对。',
         'rd.past': '往期版面', 'rd.skim': '本期速览', 'rd.aboutDay': '关于这份回顾', 'rd.dayDek': '今天值得记住的 {n} 件事',
         'nav.panel': '见微知著', 'nav.logo': '见', 'rd.top': '头条', 'rd.stStories': ' 件事', 'rd.stOutlets': ' 家媒体', 'rd.stHours': ' 小时内', 'rd.stAi': '模型读完并核对', 'tab.news': '要闻', 'tab.timeline': '时间线', 'tab.items': '条目', 'tab.sources': '数据源', 'tab.runs': '运行',
@@ -243,7 +243,7 @@ window.__ModuleLoader__.load({
         'st.updated': 'updated {t}', 'st.failed': '{n} sources failed', 'st.gaps': '{n} gaps', 'st.stale': 'not updated for over a day',
         'rd.outlets': '{w} and {n} outlets', 'rd.developing': 'Developing', 'rd.more': 'More: views, impact and sources', 'rd.less': 'Less', 'rd.reportHint': 'Pick the wrong sentence: it is removed now and avoided in the next rewrite.',
         'rd.asof': 'as of {t}', 'rd.pack': 'Scope', 'rd.allPacks': 'Everything', 'rd.dek': 'Last {h} hours · {n} stories · {o} outlets',
-        'rd.keysH': 'Key stories', 'rd.key': 'Key', 'df.vs': 'Since the last edition ({t}):', 'df.new': '{n} new', 'df.dev': '{n} developing', 'df.same': '{n} unchanged', 'df.gone': '{n} dropped', 'df.only': 'Changes only', 'df.all': 'Show all', 'ed.newer': 'A newer edition is ready ({t})', 'ed.newerGo': 'Show it', 'rd.sinceH': 'Since you last looked ({t})', 'rd.sinceNew': '{n} new', 'rd.sinceDev': '{n} developing',
+        'rd.keysH': 'Key stories', 'rd.key': 'Key', 'rd.fold': 'Collapse', 'rd.unfold': 'Show {n}', 'df.vs': 'Since the last edition ({t}):', 'df.new': '{n} new', 'df.dev': '{n} developing', 'df.same': '{n} unchanged', 'df.gone': '{n} dropped', 'df.only': 'Changes only', 'df.all': 'Show all', 'ed.newer': 'A newer edition is ready ({t})', 'ed.newerGo': 'Show it', 'rd.sinceH': 'Since you last looked ({t})', 'rd.sinceNew': '{n} new', 'rd.sinceDev': '{n} developing',
         'rd.about': 'About this edition', 'rd.byModel': 'Read and written by {m}', 'rd.byRules': 'Laid out by rules (save-tokens mode)', 'rd.read': 'Read the {n} most important reports of the last {h} hours. ', 'rd.checked': '{p} of {n} model sentences with numbers or names were checked against the sources.',
         'rd.past': 'Past editions', 'rd.skim': 'In this edition', 'rd.aboutDay': 'About this recap', 'rd.dayDek': '{n} things worth remembering today',
         'nav.panel': 'Newswire', 'nav.logo': '见', 'rd.top': 'Top story', 'rd.stStories': ' stories', 'rd.stOutlets': ' outlets', 'rd.stHours': ' hours', 'rd.stAi': 'Read and checked by the model', 'tab.news': 'Top', 'tab.timeline': 'Timeline', 'tab.items': 'Items', 'tab.sources': 'Sources', 'tab.runs': 'Runs',
@@ -987,6 +987,11 @@ window.__ModuleLoader__.load({
       var anPair = useState({})
       var ana = anPair[0]
       var setAna = anPair[1]
+      // 版块折叠：我的关注默认收起成标题列表，其他版块默认展开；读者点过的记在本机
+      var foldPair = useState(function () { var v = null; try { v = JSON.parse(store('fold') || 'null') } catch (er) { v = null } return v && typeof v === 'object' ? v : { following: true } })
+      var fold = foldPair[0]
+      var setFoldMap = foldPair[1]
+      function setFold(id, v) { setFoldMap(function (m) { var n = Object.assign({}, m); n[id] = v; store('fold', JSON.stringify(n)); return n }) }
       var hPair = useState({ list: [], id: null })
       var hist = hPair[0]
       var setHist = hPair[1]
@@ -1096,6 +1101,23 @@ window.__ModuleLoader__.load({
       var snIds = Object.keys(sn).filter(function (id) { return st[id] })
       var snNew = snIds.filter(function (id) { return sn[id].new })
       var snDev = snIds.filter(function (id) { return !sn[id].new && sn[id].added })
+      // 跳到某条：它所在的版块收着就先展开，等渲染出来再滚过去
+      function goTo(id) {
+        var secId = inFol[id] ? 'following' : (sections.find(function (sec) { return sec.stories.indexOf(id) >= 0 }) || {}).id
+        if (secId && fold[secId]) { setFold(secId, false); setTimeout(function () { jumpTo(id) }, 60) } else jumpTo(id)
+      }
+      function foldBtn(id, n) {
+        var shut = Boolean(fold[id])
+        return h('button', { className: 'nw-fold-btn', 'aria-expanded': !shut, onClick: function () { setFold(id, !shut) } }, shut ? t('rd.unfold', { n: n }) + ' ▾' : t('rd.fold') + ' ▴')
+      }
+      // 收起的版块：只列标题（点一下展开并跳到那条）
+      function foldList(ids) {
+        return h('ul', { className: 'nw-fold-list' }, ids.map(function (id) {
+          var x = st[id]
+          return h('li', { key: id }, h('button', { className: 'nw-brief-link', onClick: function () { goTo(id) } },
+            (x.importance || 0) >= 60 ? h('span', { className: 'nw-rs-tag' }, t('rd.key')) : null, x.title))
+        }))
+      }
       function analyze(id) {
         setAna(function (m) { var n = Object.assign({}, m); n[id] = { busy: true }; return n })
         postJson(API.storyAnalyze, { story_id: id }).then(function (r) { setAna(function (m) { var n = Object.assign({}, m); n[id] = { a: r.analysis }; return n }) })
@@ -1129,7 +1151,7 @@ window.__ModuleLoader__.load({
         h('div', { className: 'nw-since-h' }, t('rd.sinceH', { t: when(since.at) }), h('span', { className: 'nw-muted' }, ' ' + [snNew.length ? t('rd.sinceNew', { n: snNew.length }) : '', snDev.length ? t('rd.sinceDev', { n: snDev.length }) : ''].filter(Boolean).join('，'))),
         h('ul', null, snNew.concat(snDev).sort(function (a, b) { return st[b].importance - st[a].importance }).slice(0, 5).map(function (id) {
           var x = st[id]
-          return h('li', { key: id }, h('button', { className: 'nw-brief-link', onClick: function () { jumpTo(id) } },
+          return h('li', { key: id }, h('button', { className: 'nw-brief-link', onClick: function () { goTo(id) } },
             h('span', { className: 'nw-rs-tag' + (sn[id].new ? '' : ' nw-rs-dev') }, sn[id].new ? t('sn.new') : t('rd.developing')), x.title,
             x.update_text && !sn[id].new ? h('span', { className: 'nw-muted' }, ' — ' + x.update_text) : null))
         })))
@@ -1144,7 +1166,7 @@ window.__ModuleLoader__.load({
           var k = df ? dmap[id] : null
           var one = String(x.lead || '').replace(/\s+/g, ' ')
           if (one.length > 56) one = one.slice(0, 54) + '…'
-          return h('li', { key: id }, h('button', { className: 'nw-key-link', onClick: function () { jumpTo(id) } },
+          return h('li', { key: id }, h('button', { className: 'nw-key-link', onClick: function () { goTo(id) } },
             h('span', { className: 'nw-key-n' }, String(keyIds.indexOf(id) + 1)),
             h('span', { className: 'nw-key-txt' },
               h('span', { className: 'nw-key-t' }, k === 'new' ? h('span', { className: 'nw-rs-tag' }, t('ed.new')) : k === 'dev' ? h('span', { className: 'nw-rs-tag nw-rs-dev' }, t('rd.developing')) : null, h('b', null, x.title)),
@@ -1152,8 +1174,8 @@ window.__ModuleLoader__.load({
         })))
 
       var folEl = !folIds.length ? null : h('section', { className: 'nw-sec nw-sec-fol nw-fol-top' },
-        h('h2', { className: 'nw-sec-h' }, h('span', null, '★ ' + t('fl.section')), h('span', { className: 'nw-sec-hint' }, t('fl.topHint', { n: folIds.length }))),
-        folIds.map(function (id, i) { return story(id, i < 3 ? 'normal' : 'brief') }))
+        h('h2', { className: 'nw-sec-h' }, h('span', null, '★ ' + t('fl.section')), h('span', { className: 'nw-sec-tail' }, h('span', { className: 'nw-sec-hint' }, t('fl.topHint', { n: folIds.length })), foldBtn('following', folIds.length))),
+        fold.following ? foldList(folIds) : folIds.map(function (id, i) { return story(id, i < 3 ? 'normal' : 'brief') }))
 
       var frontEl = !front.length ? null : h('section', { className: 'nw-front' },
         story(front[0], 'lead'),
@@ -1162,10 +1184,10 @@ window.__ModuleLoader__.load({
       var body = h('div', { className: 'nw-sections' }, sections.map(function (sec) {
         var fol = sec.id === 'following'
         return h('section', { key: sec.id, className: 'nw-sec nw-c-' + String(sec.id).split('.')[0] + (fol ? ' nw-sec-fol' : '') },
-          h('h2', { className: 'nw-sec-h' }, h('span', null, fol ? '★ ' + t('fl.section') : sec.name), h('span', { className: 'nw-sec-n' }, sec.stories.length)),
+          h('h2', { className: 'nw-sec-h' }, h('span', null, fol ? '★ ' + t('fl.section') : sec.name), h('span', { className: 'nw-sec-tail' }, h('span', { className: 'nw-sec-n' }, sec.stories.length), foldBtn(sec.id, sec.stories.length))),
           // 关注版块条目多且常常是同一话题：只放标题和导语
           // 各版块的报道和重点一样整篇显示（导语、要点，展开看各方说法与影响）：不按重要度降成只有标题或两行导语，轻重由「重点」标记和排序体现
-          sec.stories.map(function (id) { return story(id, fol ? 'brief' : 'normal') }))
+          fold[sec.id] ? foldList(sec.stories) : sec.stories.map(function (id) { return story(id, fol ? 'brief' : 'normal') }))
       }))
 
       var about = h('section', { className: 'nw-rail-box nw-about' },
@@ -1184,7 +1206,7 @@ window.__ModuleLoader__.load({
         skimSecs.map(function (sec) {
           return h('div', { key: sec.id, className: 'nw-skim-sec nw-c-' + String(sec.id).split('.')[0] },
             h('div', { className: 'nw-skim-h' }, sec.id === 'following' ? '★ ' + t('fl.section') : sec.name),
-            h('ul', null, sec.stories.map(function (id) { return h('li', { key: id }, h('button', { className: 'nw-brief-link', onClick: function () { jumpTo(id) } }, st[id].title)) })))
+            h('ul', null, sec.stories.map(function (id) { return h('li', { key: id }, h('button', { className: 'nw-brief-link', onClick: function () { goTo(id) } }, st[id].title)) })))
         })) : null
 
       if (ask.res) return h('div', { className: 'nw-edition' }, masthead, h(AskView, { res: ask.res, ans: ask.ans, onOpen: open, onClose: function () { setAsk({ text: '', res: null, ans: null }) } }))
@@ -3000,6 +3022,8 @@ window.__ModuleLoader__.load({
       '.nw-rs-lead,.nw-rs-points{max-width:820px}',
       '.nw-sec-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0 0;padding:0 0 12px;border-bottom:1px solid ' + C.line1 + ';font-size:15px;font-weight:700;letter-spacing:.06em;color:var(--sec,' + C.l1 + ')}',
       '.nw-sec-h > span:first-child{display:inline-flex;align-items:center;gap:9px} .nw-sec-h > span:first-child::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--sec,' + C.l1 + ')}',
+      '.nw-sec-tail{display:inline-flex;align-items:center;gap:10px} .nw-fold-btn{border:0;background:none;padding:2px 4px;font:inherit;font-size:12px;font-weight:500;letter-spacing:0;color:' + C.l3 + ';cursor:pointer;border-radius:6px} .nw-fold-btn:hover{color:' + C.l1 + ';background:' + C.line1 + '}',
+      '.nw-fold-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column} .nw-fold-list li{padding:7px 0;border-bottom:1px dashed ' + C.line1 + '} .nw-fold-list li:last-child{border-bottom:0} .nw-fold-list .nw-brief-link{font-size:14px;line-height:1.5} .nw-fold-list .nw-rs-tag{margin-right:6px}',
       '.nw-sec-n{font-size:11px;font-weight:700;letter-spacing:0;color:var(--sec,' + C.l3 + ');background:color-mix(in srgb,var(--sec,#888) 12%,transparent);border-radius:999px;padding:1px 9px} .nw-sec-hint{font-size:11px;font-weight:400;letter-spacing:0;color:' + C.l3 + '}',
       '.nw-sec-fol{--sec:' + C.accent + ';background:linear-gradient(180deg,color-mix(in srgb,' + C.accent + ' 7%,' + C.bg + ') 0,' + C.bg + ' 160px);border-color:color-mix(in srgb,' + C.accent + ' 28%,transparent)} .nw-sec-fol .nw-sec-h{border-bottom-color:color-mix(in srgb,' + C.accent + ' 22%,transparent)}',
       '.nw-kicker{display:flex;align-items:center;gap:8px;margin-bottom:2px}',

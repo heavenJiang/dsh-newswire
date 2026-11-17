@@ -183,12 +183,25 @@ export function editionDiff(db, row) {
   return { base_id: b.id, base_at: b.created_at, base_mode: b.mode, stories, counts };
 }
 
-/** 某个包最新的一份；没有时取任意包最新的一份。 */
+/**
+ * 「全部内容」该看哪一份的 id：定时任务只编 core 包，all 包只在读者手动重排时编，
+ * 之后改关注、报错的重排会把旧的 all 版面一再另存成「新」的一份（id 新、内容停在当时）。
+ * 所以比的是两份最新版面的内容新旧（since：版面覆盖的时间起点，重排不变），一样新时取后存的。
+ */
+export function latestAllId(db) {
+  if (!db) return null;
+  const q = db.prepare("SELECT id, json_extract(content, '$.since') since FROM editions WHERE pack = ? ORDER BY id DESC LIMIT 1");
+  const rows = [q.get("all"), q.get("core")].filter(Boolean);
+  if (!rows.length) { const any = db.prepare("SELECT id FROM editions ORDER BY id DESC LIMIT 1").get(); return any ? any.id : null; }
+  rows.sort((a, b) => String(b.since || "").localeCompare(String(a.since || "")) || b.id - a.id);
+  return rows[0].id;
+}
+
+/** 某个包最新的一份；「全部内容」（all 或不给）取 all 与 core 中内容更新的那份。 */
 export function latestEdition(db, pack) {
   if (!db) return null;
-  let r = db.prepare("SELECT * FROM editions WHERE pack = ? ORDER BY id DESC LIMIT 1").get(pack || "all");
-  if (!r && (!pack || pack === "all")) r = db.prepare("SELECT * FROM editions ORDER BY id DESC LIMIT 1").get();
-  return editionRow(r);
+  if (!pack || pack === "all") { const id = latestAllId(db); return id == null ? null : editionById(db, id); }
+  return editionRow(db.prepare("SELECT * FROM editions WHERE pack = ? ORDER BY id DESC LIMIT 1").get(pack));
 }
 
 /** 模型写的稿记到主事件的解读上，详情页「解读」直接可用。 */

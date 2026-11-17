@@ -2,6 +2,12 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.39 (2026-11-17)
+
+Reader report: much of the edition still showed news from days ago; the Following block (and the other sections) should be collapsible.
+- **Fix: "All content" stuck on an edition from November 13.** Scheduled rounds only write the `core` edition; an `all` edition is written only when a reader asks for a re-layout. The panel's default view ("All content"), its once-a-minute "is there a newer edition" check and every follow, mute or error-report re-layout all read the newest `all` row. The last real `all` edition was written on 11-13, and each later re-layout saved a copy of it as a "new" edition (45 rows, all with stories from 11-12 and 11-13), so the page kept showing four-day-old stories under a fresh time while the tracker cards and the latest-wire rail beside it were current. "All content" now takes whichever of the newest `all` and `core` editions covers the later window (an edition's `since`, which re-layouts keep), so re-layouts work on the current edition and keep its pack; the latest-wire rail measures against the last real edition instead of a re-layout.
+- **Sections fold.** Every section header has a Collapse / Show n button; a folded section lists its titles (Key-marked), and clicking one unfolds the section and scrolls to the story. Following starts folded; the other sections start open; choices are remembered in this browser. Jumping from Key stories, Since you last looked or the section index unfolds the target's section first.
+
 ## 1.1.38 (2026-11-12)
 
 Reader request: rewritten summaries should run a little longer, like the key stories; other stories with a long original get the same treatment as key stories; non-key stories should not be judged, or shown, by the title alone.

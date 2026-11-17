@@ -19,7 +19,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { attemptRows, continuityRows, dayRange, eventDetail, eventRows, itemRows, labelCounts, openIfExists, recentGaps, recentPushes, recentRuns, signalTrail, sinceIso, timelineDay, timelineRun } from "../engine/query.mjs";
 import { analyzeEvents } from "./model.mjs";
 import { judgeRecipe, learnRecipe } from "./recipe.mjs";
-import { latestWire, bodiesFor, editionById, editionDiff, editionList, latestEdition, loadLayout, qualityRows, reassemble, saveEdition, sinceSeen, storyDetail } from "./edition.mjs";
+import { latestWire, bodiesFor, editionById, editionDiff, editionList, latestAllId, latestEdition, loadLayout, qualityRows, reassemble, saveEdition, sinceSeen, storyDetail } from "./edition.mjs";
 import { composeDailyMessage, dailyDates, latestDaily, todayBj } from "./daily.mjs";
 import { KINDS as FOLLOW_KINDS, loadFollows, updateFollows } from "./follows.mjs";
 import { installedPackage } from "./update.mjs";
@@ -310,7 +310,11 @@ export function registerRoutes(app) {
       const pack = strOrNull(body.pack) || "all";
       // 面板开着时每分钟问一次：有没有更新的版面（定时任务、后台编排写完都会出新版面），只回 id 与时间
       if (body.head === true) {
-        const head = withDb(p, (db) => (db ? db.prepare("SELECT id, created_at, mode FROM editions WHERE pack = ? ORDER BY id DESC LIMIT 1").get(pack) || null : null));
+        const head = withDb(p, (db) => {
+          if (!db) return null;
+          if (pack === "all") { const id = latestAllId(db); return id == null ? null : db.prepare("SELECT id, created_at, mode FROM editions WHERE id = ?").get(id) || null; }
+          return db.prepare("SELECT id, created_at, mode FROM editions WHERE pack = ? ORDER BY id DESC LIMIT 1").get(pack) || null;
+        });
         return jsonResponse({ ok: true, head, model: modelView(), run: busyWith() || null }, 200);
       }
       if (body.refresh === true) {
@@ -596,7 +600,7 @@ export function registerRoutes(app) {
       const q = new URL(request.url, "http://x").searchParams;
       const out = withDb(p, (db) => {
         if (!db) return [];
-        const ed = db.prepare("SELECT created_at FROM editions WHERE pack = 'all' AND COALESCE(json_extract(content, '$.stats.partial'), 0) = 0 ORDER BY id DESC LIMIT 1").get();
+        const ed = db.prepare("SELECT created_at FROM editions WHERE pack IN ('all', 'core') AND COALESCE(json_extract(content, '$.stats.partial'), 0) = 0 AND COALESCE(json_extract(content, '$.stats.reassembled'), 0) = 0 ORDER BY id DESC LIMIT 1").get();
         return latestWire(db, { hours: Number(q.get("hours")) || 6, limit: Math.min(30, Number(q.get("limit")) || 12), editionAt: ed ? ed.created_at : null });
       });
       const run = withDb(p, (db) => (db ? db.prepare("SELECT MAX(finished_at) t FROM runs WHERE mode IN ('cycle', 'fetch')").get() : null));
