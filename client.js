@@ -44,6 +44,7 @@ window.__ModuleLoader__.load({
       track: '/api/newswire/track',
       trackItem: '/api/newswire/track/item',
       storyAnalyze: '/api/newswire/analyze',
+      marketImpact: '/api/newswire/market-impact',
       storyDetail: '/api/newswire/detail',
       sourceAdd: '/api/newswire/sources/add',
       onboard: '/api/newswire/onboard',
@@ -122,6 +123,7 @@ window.__ModuleLoader__.load({
         'st.updated': '{t} 更新', 'st.failed': '{n} 个源失败', 'st.gaps': '{n} 处缺口', 'st.stale': '超过一天未更新',
         'rd.outlets': '{w}等 {n} 家', 'rd.developing': '进展', 'rd.more': '更多：各方说法、影响与来源', 'rd.less': '收起', 'rd.reportHint': '点出有误的那一句，它会立即撤下，下次重写时避开。',
         'rd.asof': '截至 {t}', 'rd.pack': '内容范围', 'rd.allPacks': '全部内容', 'rd.dek': '过去 {h} 小时 · {n} 件事 · 来自 {o} 家媒体',
+        'mi.title': '股票影响研判', 'mi.run': '生成研判', 'mi.review': '重新审查并修订', 'mi.feedback': '希望重点核对什么（选填）', 'mi.analyzing': '正在分析本轮新闻…', 'mi.reviewing': '正在核对证据和反证…', 'mi.failed': '研判未完成，可以重试。', 'mi.firstReviewFailed': '首次审查未完成，可以重新审查。', 'mi.reviewFailed': '本次审查未完成。已有结果仍可查看，可再次审查。', 'mi.empty': '本轮没有通过审查的股票研判。', 'mi.reviewed': '审查时间 {t} · 本轮材料 {n} 篇 · 未保留草稿 {r} 条', 'mi.business': '受影响业务', 'mi.mechanism': '传导与兑现', 'mi.countercase': '最强反解释', 'mi.watch': '验证信号', 'mi.links': '关联 A 股', 'mi.changes': '本次审查修订', 'mi.refs': '依据', 'mi.unverified': '待核实', 'mi.identity': '公司及代码待核实', 'mi.reported': '报道支持', 'mi.note': '业务影响推演。关联和方向会随证据变化。', 'mi.signals': '业务影响方向', 'mi.horizon': '兑现时段', 'mi.expectations': '预期差',
         'rd.keysH': '本版重点', 'rd.key': '重点', 'rd.fold': '收起', 'rd.unfold': '展开 {n} 条', 'df.vs': '比上一版（{t}）：', 'df.new': '新增 {n}', 'df.dev': '有进展 {n}', 'df.same': '沿用 {n}', 'df.gone': '撤下 {n}', 'df.only': '新增与进展', 'df.all': '全部报道', 'df.noChanges': '本版暂无新增或进展，以下为沿用报道。', 'df.tagNew': '本版新增', 'df.tagSame': '沿用', 'rd.firstReport': '最早报道 {t}', 'rd.latestReport': '最新报道 {t}', 'rd.firstSeen': '首次抓取 {t}', 'ed.newer': '有新版面（{t}）', 'ed.newerGo': '换上', 'rd.sinceH': '自你上次查看（{t}）', 'rd.sinceNew': '{n} 件新事', 'rd.sinceDev': '{n} 件有进展',
         'rd.about': '关于本期', 'rd.byModel': '由 {m} 阅读并编写', 'rd.byRules': '由程序按规则编排（节省 token 模式）', 'rd.read': '读入近 {h} 小时最重要的 {n} 条报道。', 'rd.checked': '模型写下的 {n} 句含数字或专名的话，{p} 句已与原文逐一核对。',
         'rd.past': '往期版面', 'rd.skim': '本期速览', 'rd.aboutDay': '关于这份回顾', 'rd.dayDek': '今天值得记住的 {n} 件事',
@@ -244,6 +246,7 @@ window.__ModuleLoader__.load({
         'st.updated': 'updated {t}', 'st.failed': '{n} sources failed', 'st.gaps': '{n} gaps', 'st.stale': 'not updated for over a day',
         'rd.outlets': '{w} and {n} outlets', 'rd.developing': 'Developing', 'rd.more': 'More: views, impact and sources', 'rd.less': 'Less', 'rd.reportHint': 'Pick the wrong sentence: it is removed now and avoided in the next rewrite.',
         'rd.asof': 'as of {t}', 'rd.pack': 'Scope', 'rd.allPacks': 'Everything', 'rd.dek': 'Last {h} hours · {n} stories · {o} outlets',
+        'mi.title': 'Stock impact', 'mi.run': 'Generate analysis', 'mi.review': 'Review and revise', 'mi.feedback': 'What should the review check? (optional)', 'mi.analyzing': 'Analyzing news from this round…', 'mi.reviewing': 'Checking evidence and counterarguments…', 'mi.failed': 'Analysis did not finish. You can retry.', 'mi.firstReviewFailed': 'The first review did not finish. You can retry it.', 'mi.reviewFailed': 'The review did not finish. The previous result is still available, and you can retry.', 'mi.empty': 'No stock findings passed review this round.', 'mi.reviewed': 'Reviewed {t} · {n} reports screened · {r} drafts omitted', 'mi.business': 'Business exposure', 'mi.mechanism': 'Mechanism and timing', 'mi.countercase': 'Strongest alternative', 'mi.watch': 'What to verify', 'mi.links': 'Related A-shares', 'mi.changes': 'Review revisions', 'mi.refs': 'Evidence', 'mi.unverified': 'Unverified', 'mi.identity': 'Company and ticker unverified', 'mi.reported': 'Supported by reporting', 'mi.note': 'Business impact hypotheses. Links and direction may change with the evidence.', 'mi.signals': 'Business impact direction', 'mi.horizon': 'Time horizon', 'mi.expectations': 'Change versus expectations',
         'rd.keysH': 'Key stories', 'rd.key': 'Key', 'rd.fold': 'Collapse', 'rd.unfold': 'Show {n}', 'df.vs': 'Since the last edition ({t}):', 'df.new': '{n} new', 'df.dev': '{n} developing', 'df.same': '{n} unchanged', 'df.gone': '{n} dropped', 'df.only': 'New and developing', 'df.all': 'All stories', 'df.noChanges': 'No new or developing stories in this edition. Earlier coverage is shown below.', 'df.tagNew': 'New to this edition', 'df.tagSame': 'Carried over', 'rd.firstReport': 'First reported {t}', 'rd.latestReport': 'Latest report {t}', 'rd.firstSeen': 'First fetched {t}', 'ed.newer': 'A newer edition is ready ({t})', 'ed.newerGo': 'Show it', 'rd.sinceH': 'Since you last looked ({t})', 'rd.sinceNew': '{n} new', 'rd.sinceDev': '{n} developing',
         'rd.about': 'About this edition', 'rd.byModel': 'Read and written by {m}', 'rd.byRules': 'Laid out by rules (save-tokens mode)', 'rd.read': 'Read the {n} most important reports of the last {h} hours. ', 'rd.checked': '{p} of {n} model sentences with numbers or names were checked against the sources.',
         'rd.past': 'Past editions', 'rd.skim': 'In this edition', 'rd.aboutDay': 'About this recap', 'rd.dayDek': '{n} things worth remembering today',
@@ -974,6 +977,50 @@ window.__ModuleLoader__.load({
           h('ul', null, r.items.map(function (x) { return h('li', { key: x.id }, h('a', { className: 'nw-tl2-a', href: x.url, target: '_blank', rel: 'noopener noreferrer', title: x.original || undefined }, x.title), h('span', { className: 'nw-muted nw-xs' }, ' · ' + x.source + ' ' + when(x.t))) }))) : Empty({ children: t('ask.none', { t: (r.terms || []).join('、') || r.q }) }))
     }
 
+    function MarketImpact(props) {
+      var m = props.market || {}
+      var r = m.report
+      var input = useState('')
+      var feedback = input[0]
+      var setFeedback = input[1]
+      var sources = {}
+      ;(m.sources || []).forEach(function (s) { sources[s.ref] = s })
+      function citations(refs) {
+        return (refs || []).map(function (ref) {
+          var src = sources[ref]
+          if (!src) return null
+          var label = [src.source, src.title, when(src.at)].filter(Boolean).join(' · ')
+          return /^https?:\/\//i.test(src.url || '') ? h('a', { key: ref, className: 'nw-link', href: src.url, target: '_blank', rel: 'noopener noreferrer' }, label) : h('span', { key: ref }, label)
+        })
+      }
+      if (!r && !m.running && !props.canRun && !m.phase) return null
+      return h('section', { className: 'nw-sec nw-market-impact' },
+        h('h2', { className: 'nw-sec-h' }, t('mi.title'),
+          props.canRun ? h('button', { className: 'nw-mini', disabled: m.running, onClick: function () { props.onRun(feedback); setFeedback('') } }, t(m.canReview ? 'mi.review' : 'mi.run')) : null),
+        props.canRun && m.canReview && !m.running ? h('input', { className: 'nw-in nw-mi-feedback', 'aria-label': t('mi.feedback'), placeholder: t('mi.feedback'), maxLength: 400, value: feedback, onChange: function (e) { setFeedback(e.target.value) } }) : null,
+        m.running ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t(m.phase === 'reviewing' ? 'mi.reviewing' : 'mi.analyzing')) : null,
+        !m.running && (m.reviewError || m.phase === 'failed' || m.phase === 'reviewing' || m.phase === 'analyzing') ?
+          h('p', { className: 'nw-muted nw-xs', role: 'status' }, t(m.reviewError ? (r ? 'mi.reviewFailed' : 'mi.firstReviewFailed') : 'mi.failed')) : null,
+        r ? [
+          h('p', { key: 'reviewed', className: 'nw-muted nw-xs' }, t('mi.reviewed', { t: when(m.reviewed), n: m.count, r: r.rejected })),
+          !r.items.length ? h('p', { key: 'empty' }, t('mi.empty')) : null,
+          r.items.map(function (x) {
+            return h('details', { key: x.market + x.ticker, className: 'nw-mi-card' },
+              h('summary', null, h('strong', null, x.company + ' · ' + x.ticker), ' · ' + x.market + ' · ', h('span', { title: t('mi.signals') }, x.direction), !x.identified ? h('span', { className: 'nw-muted nw-xs' }, ' · ' + t('mi.identity')) : null, h('p', null, x.finding)),
+              h('dl', null, [
+                ['mi.business', x.business], ['mi.mechanism', x.mechanism], ['mi.countercase', x.countercase], ['mi.watch', x.watch], ['mi.horizon', x.horizon], ['mi.expectations', x.expectations]
+              ].filter(function (field) { return field[1] }).map(function (field) { return [h('dt', { key: field[0] }, t(field[0])), h('dd', { key: field[0] + '-value' }, field[1])] })),
+              x.links.length ? h('div', null, h('b', null, t('mi.links')), h('ul', null, x.links.map(function (a) {
+                return h('li', { key: a.ticker + a.relation }, h('strong', null, a.company + ' · ' + a.ticker), ' · ' + a.relation + ' · ' + t(a.supported ? 'mi.reported' : 'mi.unverified'),
+                  h('p', null, a.why), h('div', { className: 'nw-mi-sources' }, citations(a.refs)))
+              }))) : null,
+              h('div', { className: 'nw-mi-sources' }, h('b', null, t('mi.refs')), citations(x.refs)))
+          }),
+          r.changes.length ? h('details', { key: 'changes', className: 'nw-mi-card' }, h('summary', null, t('mi.changes')), h('ul', null, r.changes.map(function (x, i) { return h('li', { key: i }, x) }))) : null,
+          r.items.length ? h('p', { key: 'note', className: 'nw-muted nw-xs' }, t('mi.note')) : null
+        ] : null)
+    }
+
     function EditionView(props) {
       var ePair = useState({ phase: 'idle', ed: null, model: null, error: null, busy: false })
       var e = ePair[0]
@@ -1027,7 +1074,7 @@ window.__ModuleLoader__.load({
         markRef.current[pack] = true
         return postJson(API.edition, { pack: pack, mark_seen: mark, id: hist.id || undefined }).then(function (res) {
           if (mark) setSince(res.since || null)
-          setE({ phase: 'ready', ed: res.edition || null, diff: res.diff || null, model: res.model || null, error: null, busy: Boolean(res.model && res.model.busy) && !/^analyze:/.test(String(res.model.busy)), analyses: res.analyses || {}, canAnalyze: Boolean(res.can_analyze) })
+          setE({ phase: 'ready', ed: res.edition || null, diff: res.diff || null, model: res.model || null, error: null, busy: Boolean(res.model && res.model.busy) && !/^analyze:/.test(String(res.model.busy)), analyses: res.analyses || {}, market: res.market || null, canAnalyze: Boolean(res.can_analyze) })
           setNewer(null)
           return res
         }).catch(function (err) { setE({ phase: 'ready', ed: null, model: null, error: err.message, busy: false }) })
@@ -1060,6 +1107,18 @@ window.__ModuleLoader__.load({
         var timer = setInterval(function () { load() }, 5000)
         return function () { clearInterval(timer) }
       }, [e.busy, load])
+      useEffect(function () {
+        if (!e.market || !e.market.running) return
+        var timer = setInterval(function () { load() }, 8000)
+        return function () { clearInterval(timer) }
+      }, [Boolean(e.market && e.market.running), load])
+      function runMarket(feedback) {
+        var id = e.ed && e.ed.id
+        if (!id) return
+        postJson(API.marketImpact, { edition_id: id, feedback: feedback }).then(function (res) {
+          setE(function (current) { return current.ed && current.ed.id === id ? Object.assign({}, current, { market: res.market }) : current })
+        }).catch(function (err) { setIn(setE, { error: err.message }) })
+      }
       function redo() {
         setIn(setE, { busy: true, error: null })
         postJson(API.edition, { pack: pack, refresh: true }).then(function (res) {
@@ -1234,7 +1293,7 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'nw-edition' }, notes, masthead, sinceBox,
         !front.length && !sections.length && !folIds.length ? Empty({ children: t('ed.noStories') }) : null,
         h('div', { className: 'nw-read' },
-          h('div', { className: 'nw-read-main' }, keyBox, folEl, frontEl, body),
+          h('div', { className: 'nw-read-main' }, keyBox, h(MarketImpact, { key: ed.id, market: e.market, canRun: e.canAnalyze && !curTemp, onRun: runMarket }), folEl, frontEl, body),
           h('aside', { className: 'nw-rail' },
             h(LatestRail, { stamp: props.stamp, onOpen: open }),
             h(NoteList, { title: t('head.watch'), items: c.watch, stories: st, onOpen: open }),
@@ -2991,6 +3050,7 @@ window.__ModuleLoader__.load({
       '.nw-v-brief .nw-rs-lead{-webkit-line-clamp:2;font-size:13px;line-height:1.7} .nw-v-second .nw-rs-lead{-webkit-line-clamp:5}',
       '.nw-v-brief{padding:12px 0} .nw-v-brief .nw-rs-title{font-size:15px}',
       '.nw-v-mini{padding:7px 0} .nw-v-mini .nw-rs-title{font-size:14px;font-weight:500} .nw-v-mini .nw-rs-meta{font-size:11px}',
+      '.nw-market-impact{margin-bottom:20px} .nw-mi-feedback{width:100%;box-sizing:border-box;margin-bottom:8px} .nw-mi-card{border-top:1px solid ' + C.line1 + ';padding:8px 0} .nw-mi-card summary{cursor:pointer} .nw-mi-card p{margin:3px 0} .nw-mi-card dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 10px;margin:8px 0} .nw-mi-card dt{font-weight:700} .nw-mi-card dd{margin:0} .nw-mi-sources{display:flex;flex-direction:column;gap:2px;font-size:12px;overflow-wrap:anywhere}',
       '.nw-same:not(.nw-v-lead) .nw-rs-title{color:' + C.l2 + '}',
       '.nw-rs-key{flex:none;font-size:11px;font-weight:700;color:#fff;background:' + C.err + ';border-radius:4px;padding:0 5px;line-height:18px;transform:translateY(-1px)}',
       '.nw-diff{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:12px;margin-top:8px} .nw-df{color:' + C.l2 + '} .nw-df-new{color:' + C.err + ';font-weight:700} .nw-df-dev{color:' + C.accent + ';font-weight:700}',
@@ -3132,7 +3192,7 @@ window.__ModuleLoader__.load({
     }
 
     var plugin = { inject: ['slots'], apply: apply }
-    plugin.__test = { DailyView, PushPanel, PushHealth, QueueLine, TrackStrip, LatestRail, FlowPanel, FlowChart, FlowHead, AskView, Welcome, ImpactBlock, AnalysisFull, DetailFull, TrackTab, TrackDetail, TrackSynthesis, ContentCard, SourceBoard, SourceEditor, QualityCard, StoryDetail, FollowsView, EditionView, ReadStory, NoteList, ModelCard, Topics, NotesBox, VersionSection, UpdateBanner, checkForUpdate, applyUpdate, remotes, Page, NewsTab, TimelineTab, ItemsTab, SourcesTab, RunsTab, EventCard, EventDetailView, EventDetail, RunBars, ScheduleCard, StatusLine, TestResult, SignalChips, Spark, PanelIcon, t, setLang: function (v) { lang = v }, DICT, CSS }
+    plugin.__test = { DailyView, PushPanel, PushHealth, QueueLine, TrackStrip, LatestRail, FlowPanel, FlowChart, FlowHead, AskView, Welcome, ImpactBlock, MarketImpact, AnalysisFull, DetailFull, TrackTab, TrackDetail, TrackSynthesis, ContentCard, SourceBoard, SourceEditor, QualityCard, StoryDetail, FollowsView, EditionView, ReadStory, NoteList, ModelCard, Topics, NotesBox, VersionSection, UpdateBanner, checkForUpdate, applyUpdate, remotes, Page, NewsTab, TimelineTab, ItemsTab, SourcesTab, RunsTab, EventCard, EventDetailView, EventDetail, RunBars, ScheduleCard, StatusLine, TestResult, SignalChips, Spark, PanelIcon, t, setLang: function (v) { lang = v }, DICT, CSS }
     return plugin
   },
 })

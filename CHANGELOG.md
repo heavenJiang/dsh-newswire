@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.47 (2026-11-23)
+
+- The Today board can analyze US and mainland Chinese stock exposure across a round of news. A separate review revises findings against reporting, flags unsupported links, and can be rerun with reader feedback.
+
 ## 1.1.46 (2026-11-23)
 
 - Pushes include an available summary or update for each selected story. Key stories retain more detail in the short format.

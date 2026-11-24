@@ -7,6 +7,7 @@ import { setSourceState, sourceScores, thinCoverage } from "./sources.mjs";
 import { DEPTHS, usageToday } from "./runtime.mjs";
 import { answerNews, searchNews } from "./ask.mjs";
 import { latestDetail } from "./detail.mjs";
+import { marketKey } from "./market_impact.mjs";
 import { analysisBrief, latestAnalysis } from "./analysis.mjs";
 import { addTracker, listTrackers, removeTracker, suggestions as trackSuggestions, trackerDetail, unlinkStory } from "./tracking.mjs";
 import { PRIORITY } from "./queue.mjs";
@@ -29,7 +30,7 @@ export function registerRoutes(app) {
   const {
     afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
     guardedRun, handleReply, stopRun, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
-    pushHealth, pushNow, queue, readTaken, reflowWithFeedback, route, runAnalysis, runDetail, runSynthesis, startDetail, syncSourceState,
+    pushHealth, pushNow, queue, readTaken, reflowWithFeedback, route, marketImpactView, startMarketImpact, runAnalysis, runDetail, runSynthesis, startDetail, syncSourceState,
     syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
   } = app;
 
@@ -344,7 +345,8 @@ export function registerRoutes(app) {
         // 和上一轮的版面比：新、有进展、沿用
         let diff = null;
         try { diff = db && edition ? editionDiff(db, edition) : null; } catch { diff = null; }
-        return { edition, since, analyses, diff };
+        const market = edition ? marketImpactView(db, edition) : null;
+        return { edition, since, analyses, diff, market };
       });
       return jsonResponse(Object.assign({ ok: true, model: modelView(), can_analyze: modeNow() === "llm" && llmReady() }, out), 200);
     },
@@ -557,6 +559,21 @@ export function registerRoutes(app) {
       }
       if (body.cadence) await applyPush({ cadence: String(body.cadence) });
       return jsonResponse({ ok: true, follows, push: loadPush(p.pushPrefs) }, 200);
+    },
+  });
+
+  route({
+    path: "/api/newswire/market-impact",
+    methods: ["POST"],
+    fetch: async (request) => {
+      const body = await bodyOf(request);
+      if (!llmReady()) return jsonResponse({ error: "no_model" }, 409);
+      if (!Number.isSafeInteger(body.edition_id) || body.edition_id <= 0) return jsonResponse({ error: "edition_required" }, 400);
+      const edition = withDb(p, (db) => db ? editionById(db, body.edition_id) : null);
+      if (!marketKey(edition)) return jsonResponse({ error: "not_found" }, 404);
+      startMarketImpact(edition, true, strOrNull(body.feedback)?.slice(0, 400));
+      const market = withDb(p, (db) => marketImpactView(db, edition));
+      return jsonResponse({ ok: true, market }, 202);
     },
   });
 

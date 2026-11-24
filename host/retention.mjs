@@ -34,6 +34,9 @@ export function prune(db, o) {
     if (has(db, "edition_items")) out.edition_items = run("DELETE FROM edition_items WHERE edition_id NOT IN (SELECT id FROM _keep_editions)");
     out.editions = run("DELETE FROM editions WHERE id NOT IN (SELECT id FROM _keep_editions)");
     db.exec("DROP TABLE _keep_editions");
+    if (has(db, "kv")) db.exec(`DELETE FROM kv WHERE key GLOB 'market-impact:*'
+      AND key NOT IN (SELECT 'market-impact:' || pack || ':' || COALESCE(json_extract(content, '$.market_round'), run_id, id)
+        FROM editions)`);
   }
   const logSince = sql(now - R.logDays * 86400000);
   if (has(db, "llm_calls")) out.llm_calls = run("DELETE FROM llm_calls WHERE at < ?", logSince);

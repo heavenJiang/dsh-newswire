@@ -12,6 +12,7 @@ import { makeDeepRead, modelSplitDigests } from "./host/deepread.mjs";
 import { translateTitles } from "./host/translate.mjs";
 import { DEPTHS, depthOf, depthParams, makeGate, recordCall } from "./host/runtime.mjs";
 import { detailMaterials, latestDetail, saveDetail, writeDetail } from "./host/detail.mjs";
+import { draftMarketImpact, marketKey, marketMaterials, marketReviewMaterials, publicMarketImpact, readMarketImpact, reviewMarketImpact, writeMarketImpact } from "./host/market_impact.mjs";
 import { analysisMaterials, analyzeStory, autoAnalyzeTargets, saveAnalysis, searchQuery, webMaterials } from "./host/analysis.mjs";
 import { linkAll, repairAliasLinks, repairThemeLinks, synthTargets, synthesize } from "./host/tracking.mjs";
 import { PRIORITY, createQueue } from "./host/queue.mjs";
@@ -461,8 +462,13 @@ export function apply(ctx, config) {
         ed = ruleEdition(db, base);
       } else pg.start("save", { detail: "按版式组版、存档" });
       try { ed.tickers = tickerBoard(db, { since: base.since, pack }); } catch { ed.tickers = []; }
+      if (useLlm) ed.market_round = o.runId || base.since;
       const saved = saveEdition(db, ed, { runId: o.runId, error, ms: Date.now() - t0 });
       progressCleanup();
+      if (ed.market_round) {
+        const round = { id: saved.id, pack, run_id: o.runId || null, created_at: saved.created_at, content: { market_round: ed.market_round, since: ed.since, stories: ed.stories } };
+        try { startMarketImpact(round, false); } catch (err) { ctx.logger.warn("newswire: market impact: " + errText(err)); }
+      }
       autoAnalyze(ed);
       setTimeout(() => { void background(dailyAfterEdition(), "daily after edition"); }, 0);
       if (ed.mode === "llm") notesFromEdition(db, ed);
@@ -712,6 +718,51 @@ export function apply(ctx, config) {
       else f = updateFollows(f, "unfollow", "keyword", (t.aliases || []).join("|") || t.name);
       return f;
     });
+  }
+
+  const marketJobs = new Set();
+
+  function marketImpactView(db, edition) {
+    const state = publicMarketImpact(readMarketImpact(db, edition));
+    return state && Object.assign(state, { running: marketJobs.has(marketKey(edition)) });
+  }
+
+  function startMarketImpact(edition, reader, feedback) {
+    const key = marketKey(edition);
+    const prior = withDb(p, (db) => readMarketImpact(db, edition));
+    if (marketJobs.has(key) || (!reader && prior)) return;
+    marketJobs.add(key);
+    try {
+      withDb(p, (db) => writeMarketImpact(db, edition, {
+        ...(prior || { count: 0, materials: [] }), phase: prior?.draft ? "reviewing" : "analyzing", reviewError: false,
+      }));
+    } catch (err) {
+      marketJobs.delete(key);
+      throw err;
+    }
+    setTimeout(() => {
+      void background(queue.run({ kind: "analysis", label: "股票影响研判", priority: reader ? PRIORITY.reader : PRIORITY.background }, async () => {
+        let state = prior || { count: 0, materials: [] };
+        const save = (patch) => {
+          state = { ...state, ...patch };
+          withDb(p, (db) => writeMarketImpact(db, edition, state));
+        };
+        try {
+          if (!state.draft) {
+            const materials = withDb(p, (db) => marketMaterials(db, edition));
+            const draft = await draftMarketImpact(model, materials, cfg.modelTimeoutMs);
+            save({ phase: "reviewing", count: materials.length, materials: marketReviewMaterials(draft, materials), draft });
+          }
+          const report = await reviewMarketImpact(model, state.draft, state.materials, cfg.modelTimeoutMs, state.report, feedback);
+          save({ phase: "ready", reviewed: new Date().toISOString(), report, reviewError: false });
+        } catch (err) {
+          save({ phase: state.report ? "ready" : "failed", reviewError: Boolean(state.draft) });
+          throw err;
+        } finally {
+          marketJobs.delete(key);
+        }
+      }), "market impact");
+    }, 0);
   }
 
   /** 版面出来后的后台工作（不挡推送）：头版里重要的报道分析影响；追踪对象挂上新的故事线，新动态够多的重写综述。 */
@@ -1401,7 +1452,7 @@ export function apply(ctx, config) {
     // 路由和工具各在一个文件里（host/routes.mjs、host/tools.mjs）：状态都在上面，经 app 传过去
     const app = {
       afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
-      guardedRun, handleReply, stopRun, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
+      guardedRun, handleReply, stopRun, llmReady, marketImpactView, startMarketImpact, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
       pushHealth, pushNow, queue, readTaken, reflowWithFeedback, runAnalysis, runCycle, runDetail, runSynthesis, startDetail, syncSourceState,
       syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
       route, tool, disposers,
