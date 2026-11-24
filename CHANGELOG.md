@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.52 (2026-11-24)
+
+- Redesign the research dashboard and improve report readability on narrow screens.
+
 ## 1.1.51 (2026-11-24)
 
 - Stock research displays the full report first, retries token-limit failures in smaller batches, and preserves partial status with a resume action.
