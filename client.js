@@ -45,6 +45,8 @@ window.__ModuleLoader__.load({
       trackItem: '/api/newswire/track/item',
       storyAnalyze: '/api/newswire/analyze',
       marketImpact: '/api/newswire/market-impact',
+      stockResearch: '/api/newswire/stock-research',
+      stockExplain: '/api/newswire/stock-research/explain',
       storyDetail: '/api/newswire/detail',
       sourceAdd: '/api/newswire/sources/add',
       onboard: '/api/newswire/onboard',
@@ -67,6 +69,20 @@ window.__ModuleLoader__.load({
 
     var DICT = {
       zh: {
+        'tab.research': "研判", 'sr.market': "A 股态势", 'sr.stock': "个股研判", 'sr.query': "输入 A 股代码或公司简称", 'sr.search': "查找",
+        'sr.none': "没有找到对应的 A 股证券", 'sr.loading': "正在加载数据…", 'sr.unavailable': "该数据源暂时不可用", 'sr.asOf': "行情截至 {t}（北京时间）", 'sr.stale': "历史或延迟行情",
+        'sr.partial': "已取 {n}/{total} 条，统计为样本口径", 'sr.marketSource': "东方财富市场快照 · 腾讯财经指数", 'sr.tencentSource': "腾讯财经行情 · 巨潮证券目录", 'sr.hithinkSource': "同花顺行情接口", 'sr.apiRoute': "结构化接口", 'sr.browseRoute': "Browse 浏览器会话", 'sr.httpRoute': "公开网页", 'sr.snow': "雪球讨论情绪", 'sr.hithinkHeat': "同花顺关注热度", 'sr.heatNote': "热度反映关注程度，不能解读为看多或看空。", 'sr.heatRank': "当前榜单第 {n} 名", 'sr.heatValue': "热度 {n}", 'sr.heatOffList': "未进当前 Top 30", 'sr.heatHistory': "近 7 日热度排名", 'sr.samplePages': "已取 {n} 页", 'sr.sampleLimited': "抽样未覆盖完整 3 天", 'sr.snowBlocked': "雪球会话或讨论接口暂不可用，其他来源照常显示。", 'sr.industrySample': "行业来自东方财富样本 {n}/{total}", 'sr.industryBenchmark': "行业排名依据 {source} 的行业指数涨跌幅", 'sr.participationChange': "相比 {t}，上涨家数占比变化 {n} 个百分点", 'sr.index.sh000300': "沪深 300", 'sr.index.sh000001': "上证指数", 'sr.index.sz399001': "深证成指",
+        'sr.index.sz399006': "创业板指", 'sr.breadth': "上涨 / 下跌 / 平盘", 'sr.advances': "{up} / {down} / {flat}", 'sr.median': "个股涨跌中位数", 'sr.equal': "等权涨跌",
+        'sr.weighted': "总市值加权涨跌", 'sr.turnover': "成交额", 'sr.amount': "{n} 亿元", 'sr.limit': "涨停 / 跌停 / 炸板", 'sr.turnoverRef': "成交额为前 {n} 个交易日同一时段中位数的 {v} 倍",
+        'sr.turnoverPending': "同一时段的历史成交样本正在积累", 'sr.state.concentrated': "指数走强，个股普遍承压", 'sr.state.broad_up': "上涨面较广", 'sr.state.broad_down': "下跌面较广", 'sr.state.mixed': "涨跌分化",
+        'sr.state.partial': "按已取得的样本展示", 'sr.state.unavailable': "市场广度暂不可用", 'sr.leaders': "较强行业", 'sr.laggards': "较弱行业", 'sr.participation': "{n}/{total} 家上涨",
+        'sr.last': "最新报价", 'sr.priceAction': "当日最低 / 最高", 'sr.quoteTime': "报价时间 · 北京", 'sr.status': "成交状态", 'sr.trade.traded': "有成交",
+        'sr.trade.no_trade': "未见当日报价成交", 'sr.ranges': "未来收盘区间", 'sr.baseline': "以 {date} 收盘价 ¥{p} 为基准 · 算法 {version}", 'sr.tech': "20 日相对沪深 300 {r} · 日波动率 {v} · 最近成交量 / 前 20 日中位数 {vol}", 'sr.levels': "前 20 个交易日低位 ¥{low}、高位 ¥{high}，用于观察是否突破或跌破",
+        'sr.sessions': "{n} 个交易日", 'sr.sample': "{n} 个历史样本", 'sr.sparse': "{n} 个历史样本 · 样本较少", 'sr.scenario.strong': "偏强情景", 'sr.scenario.base': "基准情景",
+        'sr.scenario.weak': "偏弱情景", 'sr.rangeNote': "历史相似情景的收盘分位区间。公告与社区数据分别展示，尚未纳入区间校准。", 'sr.explain': "解释三种情景", 'sr.condition': "触发条件", 'sr.invalidation': "失效信号", 'sr.rangeMissing': "交易日线、报价或历史样本不足，暂不生成区间", 'sr.catalysts': "已收录的业务影响研判", 'sr.announcements': "公司公告",
+        'sr.media': "媒体报道", 'sr.noEvidence': "这段时间暂无可用记录", 'sr.community': "社区情绪", 'sr.communityCounts': "近 {sample} 条个人帖 · {authors} 个账号 · 偏多 {b} · 偏空 {s} · 未判定 {u}", 'sr.communityNote': "股吧及雪球各自统计近 3 天可见个人帖，每个账号取最近一条。个人讨论只用于统计情绪。",
+        'sr.guba': "查看东方财富股吧", 'sr.validation': "价格区间到期验证", 'sr.validated': "{date} 到期 {move} · 原区间 {low} ~ {high} · 期间 {min} ~ {max} · {hit}", 'sr.auditScore': "{days} 日 · 已验证 {n} 次 · 命中 {hit}/{n} · 平均区间宽 {width} 个百分点", 'sr.hit': "命中", 'sr.miss': "未命中",
+        'sr.missingBar': "{date} 到期，当日无有效交易记录", 'sr.validationPending': "暂无到期区间；到期后会自动核对", 'sr.open': "打开研判版块", 'sr.openStock': "查看个股行情与区间",
         'tk.upToDate': '综述已是最新',
         'tab.track': '追踪', 'tk.title': '追踪', 'tk.dekAll': '持续追踪一家公司、一项技术、一个人或一条主线：相关报道自动挂上，模型把几周来的动态串起来，判断趋势与影响。', 'tk.sug': '值得追踪', 'tk.sugTheme': '版面里串起 {n} 篇报道的主线', 'tk.sugEntity': '近 7 天出现在 {n} 条故事线里（近 3 天 {r} 条）',
         'tk.theme': '主线', 'tk.mentions': '{n} 条', 'tk.addPh': '公司、技术、人物或话题，如：英伟达、固态电池、伊朗战事', 'tk.tickerPh': '股票代码', 'tk.add': '开始追踪', 'tk.none': '还没有追踪的对象：从上面的建议里挑一个，或自己添加。追踪的对象会自动进「我的关注」，有新进展会推送。',
@@ -77,7 +93,7 @@ window.__ModuleLoader__.load({
         'rt.depth': '模型投入', 'rt.lean': '节省', 'rt.balanced': '均衡', 'rt.deep': '深度', 'rt.depthDesc': '每份版面读 {r} 条、写 {w} 篇、自动分析 {a} 篇影响、译 {t} 条外文标题', 'rt.depthDescAll': '每份版面读 {r} 条、时间内能写的稿都写（写不下的下一轮接着写）、自动分析 {a} 篇影响、译 {t} 条外文标题', 'rt.budget': '每天 token 上限', 'rt.budgetHint': '0 为不限；用完后模型步骤改由程序完成，第二天恢复',
         'rt.today': '今天', 'rt.todayLine': '调用 {c} 次 · 输入 {i} · 输出 {o} · 缓存命中 {k}', 'rt.cacheRate': '输入缓存命中 {p}%', 'rt.est': '（宿主没报用量，按字数估算）', 'rt.ofBudget': '已用上限的 {p}%',
         'rt.speed': '实测：输出约 {t} token/秒，单次中位 {s} 秒', 'rt.conc': '并发 {n}', 'rt.concProbe': '并发待测（下一份版面自动测）', 'rt.probe': '（实测并行效率 {e}）',
-        'rt.step.group': '归并', 'rt.step.read': '读页面', 'rt.step.recipe': '学解析', 'rt.full': '不限', 'rt.fullDesc': '不限：在「深度」之上，网页类的源每轮都由模型直接读页面，不靠解析规则，网站改版也不受影响；模型只能指认页面上真实存在的链接，标题和时间由程序逐条核对。不受每日 token 预算限制。RSS、接口和专用适配器读的是结构化数据，照常由程序处理。模型慢时按时间预算读，读不完的源照常由程序抓。', 'rt.readLine': '模型读页面：{at} 读了 {r}/{n} 个源，{ok} 个读出 {i} 条，核对丢掉 {d} 条，用时 {s} 秒', 'rt.readSkip': '{n} 个来不及，交给程序', 'rt.readFail': '没读出：{w}', 'rt.step.plan': '统筹', 'rt.step.write': '写稿', 'rt.step.translate': '翻译', 'rt.step.analyze': '影响分析', 'rt.step.ask': '问答', 'rt.step.split': '拆合集', 'rt.step.daily': '日报', 'rt.step.notes': '事件解读', 'rt.step.brief': '简报', 'rt.step.track': '追踪综述', 'rt.step.other': '其它',
+        'rt.step.group': '归并', 'rt.step.read': '读页面', 'rt.step.recipe': '学解析', 'rt.full': '不限', 'rt.fullDesc': '不限：在「深度」之上，网页类的源每轮都由模型直接读页面，不靠解析规则，网站改版也不受影响；模型只能指认页面上真实存在的链接，标题和时间由程序逐条核对。不受每日 token 预算限制。RSS、接口和专用适配器读的是结构化数据，照常由程序处理。模型慢时按时间预算读，读不完的源照常由程序抓。', 'rt.readLine': '模型读页面：{at} 读了 {r}/{n} 个源，{ok} 个读出 {i} 条，核对丢掉 {d} 条，用时 {s} 秒', 'rt.readSkip': '{n} 个来不及，交给程序', 'rt.readFail': '没读出：{w}', 'rt.step.plan': '统筹', 'rt.step.write': '写稿', 'rt.step.translate': '翻译', 'rt.step.analyze': '影响分析', 'rt.step.market_scan': '股票研判分批', 'rt.step.market_merge': '跨批归并', 'rt.step.market_focus': '股票重点补查', 'rt.step.market_audit': '股票后续验证', 'rt.step.ask': '问答', 'rt.step.split': '拆合集', 'rt.step.daily': '日报', 'rt.step.notes': '事件解读', 'rt.step.brief': '简报', 'rt.step.track': '追踪综述', 'rt.step.other': '其它',
         'rd.outletsN': '等 {n} 家', 'rd.community': '社区讨论：{w}', 'rd.history': '前情', 'rd.historyMark': '前情', 'ev.indep': '{n} 家独立报道', 'ev.single': '只有一家报道', 'ev.reports': '各家报道 · {n}', 'ev.first': '首报', 'ev.repost': '转载', 'ev.views': '阅读 {n}', 'ev.why': '为什么排在这里（重要度 {n}）',
         'ev.searchPh': '搜标题关键词', 'ev.h6': '6 小时', 'ev.h24': '24 小时', 'ev.h72': '3 天', 'ev.multi': '只看多家报道的', 'ev.moreFilters': '更多筛选', 'ev.hot': '热词：',
         'tl.hint': '每根柱子是一轮抓取，高度是这轮新增的条数；点一根看这一轮抓到了什么。', 'tl.night': '隔夜', 'tl.pushed': '已推送', 'tl.failed': '{n} 源失败', 'tl.gap': '有缺口', 'tl.gaps': '{n} 处缺口', 'tl.barTip': '{t} 这一轮：新增 {n} 条，其中 {m} 件多家报道',
@@ -123,7 +139,7 @@ window.__ModuleLoader__.load({
         'st.updated': '{t} 更新', 'st.failed': '{n} 个源失败', 'st.gaps': '{n} 处缺口', 'st.stale': '超过一天未更新',
         'rd.outlets': '{w}等 {n} 家', 'rd.developing': '进展', 'rd.more': '更多：各方说法、影响与来源', 'rd.less': '收起', 'rd.reportHint': '点出有误的那一句，它会立即撤下，下次重写时避开。',
         'rd.asof': '截至 {t}', 'rd.pack': '内容范围', 'rd.allPacks': '全部内容', 'rd.dek': '过去 {h} 小时 · {n} 件事 · 来自 {o} 家媒体',
-        'mi.title': '股票影响研判', 'mi.audit': '后续验证', 'mi.auditWait': '将在研判发布 6 小时后开始追踪，持续 7 天。', 'mi.coverage': '已纳入覆盖、待补研判', 'mi.whySelected': '入选理由', 'mi.reason.policy': '政策、贸易或利率变化', 'mi.reason.financials': '财报或公司指引变化', 'mi.reason.business': '订单、投资、并购或产供变化', 'mi.reason.governance': '治理变化或监管问询', 'mi.reason.pricing': '价格、供需或产能变化', 'mi.reason.front': '本版头版', 'mi.reason.news': '高重要度新增或进展', 'mi.delivered': '手机推送已提交', 'mi.pending': '等待手机推送', 'mi.read': '本轮阅读 {n} 篇', 'mi.run': '生成研判', 'mi.review': '发起后续复核', 'mi.feedback': '希望重点核对什么（选填）', 'mi.analyzing': '正在分析本轮新闻…', 'mi.reviewing': '正在核对证据和反证…', 'mi.failed': '研判未完成，可以重试。', 'mi.firstReviewFailed': '首次审查未完成，可以重新审查。', 'mi.reviewFailed': '本次复核未完成，可以查看此前的验证记录。', 'mi.empty': '本轮没有证据充分的个股研判。', 'mi.reviewed': '审查时间 {t} · 本轮材料 {n} 篇 · 未保留草稿 {r} 条', 'mi.business': '受影响业务', 'mi.mechanism': '传导与兑现', 'mi.countercase': '最强反解释', 'mi.watch': '验证信号', 'mi.links': '关联 A 股', 'mi.changes': '本次审查修订', 'mi.refs': '依据', 'mi.unverified': '待核实', 'mi.identity': '公司及代码待核实', 'mi.reported': '报道支持', 'mi.note': '业务影响推演。关联和方向会随证据变化。', 'mi.signals': '业务影响方向', 'mi.horizon': '兑现时段', 'mi.expectations': '预期差',
+        'mi.title': '股票影响研判', 'mi.audit': '后续验证', 'mi.auditWait': '将在研判发布 6 小时后开始追踪，持续 7 天。', 'mi.coverage': '已纳入覆盖、待补研判', 'mi.whySelected': '入选理由', 'mi.reason.policy': '政策、贸易或利率变化', 'mi.reason.financials': '财报或公司指引变化', 'mi.reason.business': '订单、投资、并购或产供变化', 'mi.reason.governance': '治理变化或监管问询', 'mi.reason.pricing': '价格、供需或产能变化', 'mi.reason.front': '本版头版', 'mi.reason.news': '高重要度新增或进展', 'mi.delivered': '手机推送已提交', 'mi.pending': '等待手机推送', 'mi.read': '本轮阅读 {n} 篇', 'mi.run': '生成研判', 'mi.review': '发起后续复核', 'mi.feedback': '希望重点核对什么（选填）', 'mi.analyzing': '正在分析本轮新闻…', 'mi.progress': '已完成首轮分析 {n}/{total} 篇', 'mi.timeout': '模型超时，仍可重新生成。', 'mi.partial': '有批次未完成，已保留通过校验的结论。', 'mi.reviewing': '正在核对证据和反证…', 'mi.failed': '研判未完成，可以重试。', 'mi.firstReviewFailed': '首次审查未完成，可以重新审查。', 'mi.reviewFailed': '本次复核未完成，可以查看此前的验证记录。', 'mi.empty': '本轮没有证据充分的个股研判。', 'mi.reviewed': '审查时间 {t} · 本轮材料 {n} 篇 · 未保留草稿 {r} 条', 'mi.business': '受影响业务', 'mi.mechanism': '传导与兑现', 'mi.countercase': '最强反解释', 'mi.watch': '验证信号', 'mi.links': '关联 A 股', 'mi.changes': '本次审查修订', 'mi.refs': '依据', 'mi.unverified': '待核实', 'mi.identity': '公司及代码待核实', 'mi.reported': '报道支持', 'mi.note': '业务影响推演。关联和方向会随证据变化。', 'mi.signals': '业务影响方向', 'mi.horizon': '兑现时段', 'mi.expectations': '预期差',
         'rd.keysH': '本版重点', 'rd.key': '重点', 'rd.fold': '收起', 'rd.unfold': '展开 {n} 条', 'df.vs': '比上一版（{t}）：', 'df.new': '新增 {n}', 'df.dev': '有进展 {n}', 'df.same': '沿用 {n}', 'df.gone': '撤下 {n}', 'df.only': '新增与进展', 'df.all': '全部报道', 'df.noChanges': '本版暂无新增或进展，以下为沿用报道。', 'df.tagNew': '本版新增', 'df.tagSame': '沿用', 'rd.firstReport': '最早报道 {t}', 'rd.latestReport': '最新报道 {t}', 'rd.firstSeen': '首次抓取 {t}', 'ed.newer': '有新版面（{t}）', 'ed.newerGo': '换上', 'rd.sinceH': '自你上次查看（{t}）', 'rd.sinceNew': '{n} 件新事', 'rd.sinceDev': '{n} 件有进展',
         'rd.about': '关于本期', 'rd.byModel': '由 {m} 阅读并编写', 'rd.byRules': '由程序按规则编排（节省 token 模式）', 'rd.read': '读入近 {h} 小时最重要的 {n} 条报道。', 'rd.checked': '模型写下的 {n} 句含数字或专名的话，{p} 句已与原文逐一核对。',
         'rd.past': '往期版面', 'rd.skim': '本期速览', 'rd.aboutDay': '关于这份回顾', 'rd.dayDek': '今天值得记住的 {n} 件事',
@@ -190,6 +206,20 @@ window.__ModuleLoader__.load({
         'ck.hint': '模型写的每句话里，数字、外文专名、引号里的词都要在材料里找得到；要点与各方说法找不到的已丢弃，导语找不到的标「待核」。中文人名地名无法自动核对。', 'ed.new': '新', 'ed.updated': '有进展', 'model.incr': '新增 {f} 条 · 沿用 {r} 篇稿', 'model.last': '上次编排', 'model.calls': '{n} 次调用', 'model.busy': '正在编排…', 'model.pick': '使用的模型',
       },
       en: {
+        'tab.research': "Research", 'sr.market': "A-share market", 'sr.stock': "Stock research", 'sr.query': "A-share code or company name", 'sr.search': "Search",
+        'sr.none': "No matching A-share listing", 'sr.loading': "Loading market data…", 'sr.unavailable': "Data currently unavailable", 'sr.asOf': "Snapshot as of {t} (Beijing)", 'sr.stale': "Historical or delayed quote",
+        'sr.partial': "{n}/{total} rows fetched. Metrics describe this sample.", 'sr.marketSource': "Eastmoney snapshot · Tencent Finance indices", 'sr.tencentSource': "Tencent Finance · CNINFO universe", 'sr.hithinkSource': "Hithink market API", 'sr.apiRoute': "Structured API", 'sr.browseRoute': "Browse session", 'sr.httpRoute': "Public webpage", 'sr.snow': "Xueqiu discussion sentiment", 'sr.hithinkHeat': "Hithink attention", 'sr.heatNote': "Attention ranks measure interest. They do not indicate bullish or bearish sentiment.", 'sr.heatRank': "Current rank {n}", 'sr.heatValue': "Attention {n}", 'sr.heatOffList': "Outside the current Top 30", 'sr.heatHistory': "7-day attention ranks", 'sr.samplePages': "{n} pages sampled", 'sr.sampleLimited': "Sample does not cover the full three-day window", 'sr.snowBlocked': "The Xueqiu session or discussion endpoint is unavailable. Other sources remain visible.", 'sr.industrySample': "Industries use {n}/{total} Eastmoney rows", 'sr.industryBenchmark': "Industry ranking uses sector index returns from {source}", 'sr.participationChange': "Share of advancing stocks changed by {n} percentage points since {t}", 'sr.index.sh000300': "CSI 300", 'sr.index.sh000001': "Shanghai Composite", 'sr.index.sz399001': "Shenzhen Component",
+        'sr.index.sz399006': "ChiNext Index", 'sr.breadth': "Advances / declines / flat", 'sr.advances': "{up} / {down} / {flat}", 'sr.median': "Median stock return", 'sr.equal': "Equal-weighted return",
+        'sr.weighted': "Market-cap-weighted return", 'sr.turnover': "Turnover", 'sr.amount': "CNY {n} × 100m", 'sr.limit': "Limit-up / limit-down / failed limit-up", 'sr.turnoverRef': "Turnover is {v}× median of {n} comparable sessions",
+        'sr.turnoverPending': "Comparable intraday turnover history is still accumulating", 'sr.state.concentrated': "Index up, median stock down", 'sr.state.broad_up': "Broad advance", 'sr.state.broad_down': "Broad decline", 'sr.state.mixed': "Mixed breadth",
+        'sr.state.partial': "Showing available sample", 'sr.state.unavailable': "Breadth unavailable", 'sr.leaders': "Leading industries", 'sr.laggards': "Lagging industries", 'sr.participation': "{n}/{total} advancing",
+        'sr.last': "Latest quote", 'sr.priceAction': "Daily low / high", 'sr.quoteTime': "Quote time · Beijing", 'sr.status': "Trading activity", 'sr.trade.traded': "Trades recorded",
+        'sr.trade.no_trade': "No trade shown in quote", 'sr.ranges': "Future closing ranges", 'sr.baseline': "Anchored to {date} close of ¥{p} · {version}", 'sr.tech': "20-session relative to CSI 300 {r} · daily volatility {v} · volume / prior 20-session median {vol}", 'sr.levels': "Prior 20-session range ¥{low}–¥{high}, for watching breaks",
+        'sr.sessions': "{n} trading sessions", 'sr.sample': "{n} historical samples", 'sr.sparse': "{n} historical samples · sparse", 'sr.scenario.strong': "Stronger scenario", 'sr.scenario.base': "Base scenario",
+        'sr.scenario.weak': "Weaker scenario", 'sr.rangeNote': "Closing return ranges from historical analogs. Announcements and community data are shown separately and have not been calibrated into the ranges.", 'sr.explain': "Explain scenarios", 'sr.condition': "Trigger", 'sr.invalidation': "Invalidation", 'sr.rangeMissing': "Quotes, aligned bars or historical samples are insufficient", 'sr.catalysts': "Business impact findings", 'sr.announcements': "Company announcements",
+        'sr.media': "Media coverage", 'sr.noEvidence': "No records in this window", 'sr.community': "Community sentiment", 'sr.communityCounts': "{sample} recent personal posts · {authors} authors · {b} bullish · {s} bearish · {u} unclassified", 'sr.communityNote': "Each channel samples visible personal posts from the last three days, one vote per author. Used for sentiment only.",
+        'sr.guba': "Eastmoney Guba", 'sr.validation': "Closing range verification", 'sr.validated': "{date} realized {move} · published {low} to {high} · period {min} to {max} · {hit}", 'sr.auditScore': "{days} sessions · {n} verified · {hit}/{n} in range · mean width {width} percentage points", 'sr.hit': "In range", 'sr.miss': "Out of range",
+        'sr.missingBar': "No valid trading bar on {date}", 'sr.validationPending': "No matured ranges yet. Verification runs automatically.", 'sr.open': "Open Research", 'sr.openStock': "View quote and stock ranges",
         'tk.upToDate': 'Synthesis is up to date',
         'tab.track': 'Tracking', 'tk.title': 'Tracking', 'tk.dekAll': 'Follow a company, technology, person or theme over time: related reports attach automatically, and the model connects weeks of developments to judge the trend and its implications.', 'tk.sug': 'Worth tracking', 'tk.sugTheme': 'a theme linking {n} reports in the edition', 'tk.sugEntity': 'in {n} storylines over 7 days ({r} in the last 3)',
         'tk.theme': 'theme', 'tk.mentions': '{n}', 'tk.addPh': 'Company, technology, person or topic, e.g. Nvidia, solid-state batteries, the Iran war', 'tk.tickerPh': 'Ticker', 'tk.add': 'Track', 'tk.none': 'Nothing tracked yet: pick a suggestion above or add your own. Tracked subjects join Following and new developments are pushed.',
@@ -200,7 +230,7 @@ window.__ModuleLoader__.load({
         'rt.depth': 'Model effort', 'rt.lean': 'Lean', 'rt.balanced': 'Balanced', 'rt.deep': 'Deep', 'rt.depthDesc': 'per edition: reads {r} items, writes {w} stories, analyzes {a} automatically, translates {t} foreign titles', 'rt.depthDescAll': 'per edition: reads {r} items, writes as many stories as time allows (the rest next round), analyzes {a} automatically, translates {t} foreign titles', 'rt.budget': 'Daily token limit', 'rt.budgetHint': '0 = no limit; once used up, model steps fall back to the program until tomorrow',
         'rt.today': 'Today', 'rt.todayLine': '{c} calls · input {i} · output {o} · cache hits {k}', 'rt.cacheRate': '{p}% of input from cache', 'rt.est': '(estimated from text length; the host reported no usage)', 'rt.ofBudget': '{p}% of the limit',
         'rt.speed': 'Measured: about {t} output tokens/s, median call {s}s', 'rt.conc': 'concurrency {n}', 'rt.concProbe': 'concurrency not measured yet (next edition)', 'rt.probe': '(parallel efficiency {e})',
-        'rt.step.group': 'grouping', 'rt.step.read': 'page reading', 'rt.step.recipe': 'learning parsers', 'rt.full': 'Unlimited', 'rt.fullDesc': 'Unlimited: on top of Deep, the model reads every web-page source directly each round, with no parsing rules, so site redesigns don\'t matter; the model can only point to links that really exist on the page, and the program checks every title and time. No daily token budget applies. RSS, APIs and dedicated adapters read structured data and stay with the program. With a slow model, reading follows a time budget and sources it can\'t reach are fetched by the program as usual.', 'rt.readLine': 'Page reading: {at}, read {r}/{n} sources, {ok} yielded {i} items, {d} dropped by checks, {s} s', 'rt.readSkip': '{n} left to the program for time', 'rt.readFail': 'nothing read: {w}', 'rt.step.plan': 'planning', 'rt.step.write': 'writing', 'rt.step.translate': 'translation', 'rt.step.analyze': 'impact', 'rt.step.ask': 'Q&A', 'rt.step.split': 'roundups', 'rt.step.daily': 'recap', 'rt.step.notes': 'event notes', 'rt.step.brief': 'briefs', 'rt.step.track': 'tracking', 'rt.step.other': 'other',
+        'rt.step.group': 'grouping', 'rt.step.read': 'page reading', 'rt.step.recipe': 'learning parsers', 'rt.full': 'Unlimited', 'rt.fullDesc': 'Unlimited: on top of Deep, the model reads every web-page source directly each round, with no parsing rules, so site redesigns don\'t matter; the model can only point to links that really exist on the page, and the program checks every title and time. No daily token budget applies. RSS, APIs and dedicated adapters read structured data and stay with the program. With a slow model, reading follows a time budget and sources it can\'t reach are fetched by the program as usual.', 'rt.readLine': 'Page reading: {at}, read {r}/{n} sources, {ok} yielded {i} items, {d} dropped by checks, {s} s', 'rt.readSkip': '{n} left to the program for time', 'rt.readFail': 'nothing read: {w}', 'rt.step.plan': 'planning', 'rt.step.write': 'writing', 'rt.step.translate': 'translation', 'rt.step.analyze': 'impact', 'rt.step.market_scan': 'stock analysis batches', 'rt.step.market_merge': 'cross-batch synthesis', 'rt.step.market_focus': 'priority stock review', 'rt.step.market_audit': 'stock follow-up', 'rt.step.ask': 'Q&A', 'rt.step.split': 'roundups', 'rt.step.daily': 'recap', 'rt.step.notes': 'event notes', 'rt.step.brief': 'briefs', 'rt.step.track': 'tracking', 'rt.step.other': 'other',
         'rd.outletsN': ' and {n} outlets', 'rd.community': 'Discussed on {w}', 'rd.history': 'Earlier', 'rd.historyMark': 'earlier', 'ev.indep': '{n} independent outlets', 'ev.single': 'one outlet only', 'ev.reports': 'Reports · {n}', 'ev.first': 'first', 'ev.repost': 'repost', 'ev.views': '{n} views', 'ev.why': 'Why it ranks here (importance {n})',
         'ev.searchPh': 'Search titles', 'ev.h6': '6 hours', 'ev.h24': '24 hours', 'ev.h72': '3 days', 'ev.multi': 'Several outlets only', 'ev.moreFilters': 'More filters', 'ev.hot': 'Trending: ',
         'tl.hint': 'Each bar is one fetch round; its height is the new items. Click one to see what that round brought.', 'tl.night': 'overnight', 'tl.pushed': 'pushed', 'tl.failed': '{n} failed', 'tl.gap': 'gap', 'tl.gaps': '{n} gaps', 'tl.barTip': 'Round at {t}: {n} new items, {m} stories with several outlets',
@@ -246,7 +276,7 @@ window.__ModuleLoader__.load({
         'st.updated': 'updated {t}', 'st.failed': '{n} sources failed', 'st.gaps': '{n} gaps', 'st.stale': 'not updated for over a day',
         'rd.outlets': '{w} and {n} outlets', 'rd.developing': 'Developing', 'rd.more': 'More: views, impact and sources', 'rd.less': 'Less', 'rd.reportHint': 'Pick the wrong sentence: it is removed now and avoided in the next rewrite.',
         'rd.asof': 'as of {t}', 'rd.pack': 'Scope', 'rd.allPacks': 'Everything', 'rd.dek': 'Last {h} hours · {n} stories · {o} outlets',
-        'mi.title': 'Stock impact', 'mi.audit': 'Follow-up verification', 'mi.auditWait': 'Follow-up starts six hours after publication and continues for seven days.', 'mi.coverage': 'Covered stories awaiting a finding', 'mi.whySelected': 'Selection criteria', 'mi.reason.policy': 'Policy, trade or interest rates', 'mi.reason.financials': 'Earnings or guidance', 'mi.reason.business': 'Orders, investment, M&A or production', 'mi.reason.governance': 'Governance or regulatory scrutiny', 'mi.reason.pricing': 'Pricing, supply or capacity', 'mi.reason.front': 'Front-page story', 'mi.reason.news': 'Major new story or development', 'mi.delivered': 'Sent to mobile delivery', 'mi.pending': 'Waiting for mobile delivery', 'mi.read': '{n} reports screened', 'mi.run': 'Generate analysis', 'mi.review': 'Run follow-up review', 'mi.feedback': 'What should the review check? (optional)', 'mi.analyzing': 'Analyzing news from this round…', 'mi.reviewing': 'Checking evidence and counterarguments…', 'mi.failed': 'Analysis did not finish. You can retry.', 'mi.firstReviewFailed': 'The first review did not finish. You can retry it.', 'mi.reviewFailed': 'The review did not finish. Previous verification entries remain available.', 'mi.empty': 'No individual stock findings had sufficient evidence this round.', 'mi.reviewed': 'Reviewed {t} · {n} reports screened · {r} drafts omitted', 'mi.business': 'Business exposure', 'mi.mechanism': 'Mechanism and timing', 'mi.countercase': 'Strongest alternative', 'mi.watch': 'What to verify', 'mi.links': 'Related A-shares', 'mi.changes': 'Review revisions', 'mi.refs': 'Evidence', 'mi.unverified': 'Unverified', 'mi.identity': 'Company and ticker unverified', 'mi.reported': 'Supported by reporting', 'mi.note': 'Business impact hypotheses. Links and direction may change with the evidence.', 'mi.signals': 'Business impact direction', 'mi.horizon': 'Time horizon', 'mi.expectations': 'Change versus expectations',
+        'mi.title': 'Stock impact', 'mi.audit': 'Follow-up verification', 'mi.auditWait': 'Follow-up starts six hours after publication and continues for seven days.', 'mi.coverage': 'Covered stories awaiting a finding', 'mi.whySelected': 'Selection criteria', 'mi.reason.policy': 'Policy, trade or interest rates', 'mi.reason.financials': 'Earnings or guidance', 'mi.reason.business': 'Orders, investment, M&A or production', 'mi.reason.governance': 'Governance or regulatory scrutiny', 'mi.reason.pricing': 'Pricing, supply or capacity', 'mi.reason.front': 'Front-page story', 'mi.reason.news': 'Major new story or development', 'mi.delivered': 'Sent to mobile delivery', 'mi.pending': 'Waiting for mobile delivery', 'mi.read': '{n} reports screened', 'mi.run': 'Generate analysis', 'mi.review': 'Run follow-up review', 'mi.feedback': 'What should the review check? (optional)', 'mi.analyzing': 'Analyzing news from this round…', 'mi.progress': '{n}/{total} reports analyzed in the first pass', 'mi.timeout': 'The model timed out. You can retry.', 'mi.partial': 'Some batches did not finish. Validated findings are shown.', 'mi.reviewing': 'Checking evidence and counterarguments…', 'mi.failed': 'Analysis did not finish. You can retry.', 'mi.firstReviewFailed': 'The first review did not finish. You can retry it.', 'mi.reviewFailed': 'The review did not finish. Previous verification entries remain available.', 'mi.empty': 'No individual stock findings had sufficient evidence this round.', 'mi.reviewed': 'Reviewed {t} · {n} reports screened · {r} drafts omitted', 'mi.business': 'Business exposure', 'mi.mechanism': 'Mechanism and timing', 'mi.countercase': 'Strongest alternative', 'mi.watch': 'What to verify', 'mi.links': 'Related A-shares', 'mi.changes': 'Review revisions', 'mi.refs': 'Evidence', 'mi.unverified': 'Unverified', 'mi.identity': 'Company and ticker unverified', 'mi.reported': 'Supported by reporting', 'mi.note': 'Business impact hypotheses. Links and direction may change with the evidence.', 'mi.signals': 'Business impact direction', 'mi.horizon': 'Time horizon', 'mi.expectations': 'Change versus expectations',
         'rd.keysH': 'Key stories', 'rd.key': 'Key', 'rd.fold': 'Collapse', 'rd.unfold': 'Show {n}', 'df.vs': 'Since the last edition ({t}):', 'df.new': '{n} new', 'df.dev': '{n} developing', 'df.same': '{n} unchanged', 'df.gone': '{n} dropped', 'df.only': 'New and developing', 'df.all': 'All stories', 'df.noChanges': 'No new or developing stories in this edition. Earlier coverage is shown below.', 'df.tagNew': 'New to this edition', 'df.tagSame': 'Carried over', 'rd.firstReport': 'First reported {t}', 'rd.latestReport': 'Latest report {t}', 'rd.firstSeen': 'First fetched {t}', 'ed.newer': 'A newer edition is ready ({t})', 'ed.newerGo': 'Show it', 'rd.sinceH': 'Since you last looked ({t})', 'rd.sinceNew': '{n} new', 'rd.sinceDev': '{n} developing',
         'rd.about': 'About this edition', 'rd.byModel': 'Read and written by {m}', 'rd.byRules': 'Laid out by rules (save-tokens mode)', 'rd.read': 'Read the {n} most important reports of the last {h} hours. ', 'rd.checked': '{p} of {n} model sentences with numbers or names were checked against the sources.',
         'rd.past': 'Past editions', 'rd.skim': 'In this edition', 'rd.aboutDay': 'About this recap', 'rd.dayDek': '{n} things worth remembering today',
@@ -996,22 +1026,24 @@ window.__ModuleLoader__.load({
       if (!r && !m.running && !props.canRun && !m.phase) return null
       return h('div', { className: 'nw-market-impact' }, h('section', { className: 'nw-sec' },
         h('h2', { className: 'nw-sec-h' }, t('mi.title'),
-          props.canRun && (!r || m.phase === 'failed') ? h('button', { className: 'nw-mini', disabled: m.running, onClick: function () { props.onRun('generate') } }, t('mi.run')) : null),
-        m.running ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t('mi.analyzing')) : null,
-        !m.running && (m.phase === 'failed' || m.phase === 'analyzing') ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t('mi.failed')) : null,
+          props.canRun && (!r || m.phase === 'failed' || (m.incomplete || []).length) ? h('button', { className: 'nw-mini', disabled: m.running, onClick: function () { props.onRun('generate') } }, t('mi.run')) : null),
+        m.running ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, m.count > 0 && m.scanned != null ? t('mi.progress', { n: m.scanned, total: m.count }) : t('mi.analyzing')) : null,
+        !m.running && (m.phase === 'failed' || m.phase === 'analyzing') ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t(m.error === 'timeout' ? 'mi.timeout' : 'mi.failed')) : null,
+        !m.running && (m.incomplete || []).length ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t('mi.partial')) : null,
         r ? [
-          h('p', { key: 'read', className: 'nw-muted nw-xs' }, t('mi.read', { n: m.count }), m.delivery ? ' · ' + t(m.delivery === 'pending' ? 'mi.pending' : 'mi.delivered') : null),
+          h('p', { key: 'read', className: 'nw-muted nw-xs' }, t('mi.read', { n: m.scanned == null ? m.count : m.scanned }), m.delivery ? ' · ' + t(m.delivery === 'pending' ? 'mi.pending' : 'mi.delivered') : null),
           !r.items.length ? h('p', { key: 'empty' }, t('mi.empty')) : null,
           r.items.map(function (x) {
             return h('details', { key: x.market + x.ticker, className: 'nw-mi-card' },
-              h('summary', null, h('strong', null, x.company + (x.identified ? ' · ' + x.ticker : '')), ' · ' + x.market + ' · ', h('span', { title: t('mi.signals') }, x.direction), !x.identified ? h('span', { className: 'nw-muted nw-xs' }, ' · ' + t('mi.identity')) : null, h('p', null, x.finding)),
+              h('summary', null, h('strong', null, x.company + (x.identified ? ' · ' + x.ticker : '')), ' · ' + x.market + ' · ', h('span', { title: t('mi.signals') }, x.direction), !x.identified ? h('span', { className: 'nw-muted nw-xs' }, ' · ' + t('mi.identity')) : null, h('p', null, x.finding || x.mechanism)),
+              props.onStock && x.market === 'A股' && x.identified ? h('button', { className: 'nw-mini', onClick: function () { props.onStock(x.ticker) } }, t('sr.openStock')) : null,
               h('dl', null, [
                 ['mi.whySelected', (x.selection || []).map(function (reason) { return t('mi.reason.' + reason) }).join(' · ')], ['mi.business', x.business], ['mi.mechanism', x.mechanism], ['mi.countercase', x.countercase], ['mi.watch', x.watch], ['mi.horizon', x.horizon], ['mi.expectations', x.expectations]
               ].filter(function (field) { return field[1] }).map(function (field) { return [h('dt', { key: field[0] }, t(field[0])), h('dd', { key: field[0] + '-value' }, field[1])] })),
               (x.additional || []).length ? h('ul', null, x.additional.map(function (a, i) { return h('li', { key: i }, a.text, h('div', { className: 'nw-mi-sources' }, citations(a.refs))) })) : null,
               x.links.length ? h('div', null, h('b', null, t('mi.links')), h('ul', null, x.links.map(function (a) {
                 return h('li', { key: a.ticker + a.relation }, h('strong', null, a.company + (a.supported ? ' · ' + a.ticker : '')), ' · ' + a.relation + ' · ' + t(a.supported ? 'mi.reported' : 'mi.unverified'),
-                  h('p', null, a.why), h('div', { className: 'nw-mi-sources' }, citations(a.refs)))
+                  h('p', null, a.why), props.onStock && a.supported ? h('button', { className: 'nw-mini', onClick: function () { props.onStock(a.ticker) } }, t('sr.openStock')) : null, h('div', { className: 'nw-mi-sources' }, citations(a.refs)))
               }))) : null,
               h('div', { className: 'nw-mi-sources' }, h('b', null, t('mi.refs')), citations(x.refs)))
           }),
@@ -1308,7 +1340,11 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'nw-edition' }, notes, masthead, sinceBox,
         !front.length && !sections.length && !folIds.length ? Empty({ children: t('ed.noStories') }) : null,
         h('div', { className: 'nw-read' },
-          h('div', { className: 'nw-read-main' }, keyBox, h(MarketImpact, { key: ed.id, market: e.market, canRun: e.canAnalyze && !curTemp, onRun: runMarket }), folEl, frontEl, body),
+          h('div', { className: 'nw-read-main' }, keyBox, props.onResearch ? h('section', { className: 'nw-sec nw-sr-teaser' },
+            h('h2', { className: 'nw-sec-h' }, t('mi.title'), h('button', { className: 'nw-mini', onClick: function () { props.onResearch() } }, t('sr.open'))),
+            e.market && e.market.report ? h('ul', { className: 'nw-sr-ranks' }, (e.market.report.items || []).slice(0, 3).map(function (x) {
+              return h('li', { key: x.market + x.ticker }, h('strong', null, x.company), ' · ', x.finding || x.mechanism)
+            })) : null) : h(MarketImpact, { key: ed.id, market: e.market, canRun: e.canAnalyze && !curTemp, onRun: runMarket }), folEl, frontEl, body),
           h('aside', { className: 'nw-rail' },
             h(LatestRail, { stamp: props.stamp, onOpen: open }),
             h(NoteList, { title: t('head.watch'), items: c.watch, stories: st, onOpen: open }),
@@ -2039,7 +2075,7 @@ window.__ModuleLoader__.load({
       if (view === 'follows') return h('div', { className: 'nw-news' }, h(FollowsView, { stamp: props.stamp, taxonomy: props.taxonomy, names: props.names, sources: props.sources }))
       // 今日、回顾：点进故事线时列表只藏起来，返回时还在原处
       var storyEl = view !== 'events' && storySel ? h(StoryDetail, { id: storySel, names: props.names, onBack: backFromStory, onFollow: storyFollow, followed: Boolean(flw && flw.follow.some(function (x) { return x.kind === 'story' && x.value === storySel })) }) : null
-      var mainEl = view === 'daily' ? h(DailyView, { pack: f.pack || 'all', stamp: props.stamp, names: props.names, onOpen: openFromEdition }) : view === 'edition' ? h(EditionView, { pack: f.pack || 'all', packs: props.packs, onPack: setPack, stamp: props.stamp, names: props.names, onOpen: openFromEdition, firstRun: Boolean(props.ready && !(props.summary && props.summary.latest_run)), onReload: props.reload }) : null
+      var mainEl = view === 'daily' ? h(DailyView, { pack: f.pack || 'all', stamp: props.stamp, names: props.names, onOpen: openFromEdition }) : view === 'edition' ? h(EditionView, { pack: f.pack || 'all', packs: props.packs, onPack: setPack, stamp: props.stamp, names: props.names, onOpen: openFromEdition, onResearch: props.onResearch, firstRun: Boolean(props.ready && !(props.summary && props.summary.latest_run)), onReload: props.reload }) : null
       if (mainEl) return h('div', { className: 'nw-news' }, h('div', { style: storySel ? HIDE : null }, mainEl), storyEl)
       if (storyEl) return h('div', { className: 'nw-news' }, storyEl)
       var set = function (patch) { setF(Object.assign({}, f, patch)) }
@@ -2733,7 +2769,231 @@ window.__ModuleLoader__.load({
         probs.length ? h('button', { className: 'nw-st-warn', onClick: props.onGo }, '⚠ ' + probs.join(' · ')) : null)
     }
 
-    var TABS = [['today', 'tab.today'], ['track', 'tab.track'], ['daily', 'tab.daily'], ['follows', 'tab.follows']]
+    function StockResearchView(props) {
+      var overviewPair = useState(null), overview = overviewPair[0], setOverview = overviewPair[1]
+      var queryPair = useState(props.selection || ''), query = queryPair[0], setQuery = queryPair[1]
+      var matchesPair = useState(null), matches = matchesPair[0], setMatches = matchesPair[1]
+      var codePair = useState(/^\d{6}$/.test(props.selection || '') ? props.selection : ''), code = codePair[0], setCode = codePair[1]
+      var detailPair = useState(null), detail = detailPair[0], setDetail = detailPair[1]
+      var sentimentPair = useState(null), sentiment = sentimentPair[0], setSentiment = sentimentPair[1]
+      var edPair = useState(null), edition = edPair[0], setEdition = edPair[1]
+      var msgPair = useState(''), message = msgPair[0], setMessage = msgPair[1]
+      var busyPair = useState({}), busy = busyPair[0], setBusy = busyPair[1]
+      var searchRef = React.useRef(0)
+      function loadEdition() {
+        return postJson(API.edition, { pack: 'all' }).then(setEdition).catch(function () {})
+      }
+      useEffect(function () {
+        var active = true
+        function refresh() {
+          getJson(API.stockResearch).then(function (r) { if (active) setOverview(r.overview) })
+            .catch(function () { if (active) setOverview({ status: 'unavailable' }) })
+        }
+        refresh()
+        loadEdition()
+        var timer = setInterval(refresh, 120000)
+        var edTimer = setInterval(loadEdition, 30000)
+        return function () { active = false; clearInterval(timer); clearInterval(edTimer) }
+      }, [props.stamp])
+      useEffect(function () {
+        if (!code) return
+        var active = true
+        setDetail(null)
+        setIn(setBusy, { detail: true })
+        function refresh() {
+          getJson(API.stockResearch + '?code=' + encodeURIComponent(code)).then(function (r) {
+            if (active) { setDetail(r.stock); setIn(setBusy, { detail: false }) }
+          }).catch(function () { if (active) { setDetail({ unavailable: true }); setIn(setBusy, { detail: false }) } })
+        }
+        refresh()
+        var timer = setInterval(refresh, 120000)
+        return function () { active = false; clearInterval(timer) }
+      }, [code])
+      useEffect(function () {
+        if (!code) return
+        var active = true
+        setSentiment(null)
+        function refresh() {
+          getJson(API.stockResearch + '?sentiment=' + encodeURIComponent(code)).then(function (r) { if (active) setSentiment({ code: code, data: r.sentiment }) })
+            .catch(function () { if (active) setSentiment({ code: code, data: { xueqiu: { ok: false }, hithink: { ok: false } } }) })
+        }
+        refresh()
+        var timer = setInterval(refresh, 300000)
+        return function () { active = false; clearInterval(timer) }
+      }, [code])
+      function selectStock(value) {
+        searchRef.current++
+        setQuery(value)
+        setCode(value)
+        setMatches(null)
+        setMessage('')
+        setIn(setBusy, { search: false })
+      }
+      function search(event) {
+        event.preventDefault()
+        var value = query.trim()
+        if (!value) return
+        var request = ++searchRef.current
+        setIn(setBusy, { search: true })
+        setMessage('')
+        getJson(API.stockResearch + '?q=' + encodeURIComponent(value)).then(function (r) {
+          if (searchRef.current !== request) return
+          var results = r.symbols || []
+          if (results.length === 1) selectStock(results[0].code)
+          else if (!results.length && /^\d{6}$/.test(value)) selectStock(value)
+          else { setMatches(results); setIn(setBusy, { search: false }) }
+        }).catch(function () {
+          if (searchRef.current !== request) return
+          if (/^\d{6}$/.test(value)) selectStock(value)
+          else { setMessage(t('sr.unavailable')); setIn(setBusy, { search: false }) }
+        })
+      }
+      function runMarket(action, feedback) {
+        if (!edition || !edition.edition) return
+        setMessage('')
+        postJson(API.marketImpact, { edition_id: edition.edition.id, action: action, feedback: feedback })
+          .then(loadEdition).catch(function () { setMessage(t('sr.unavailable')) })
+      }
+      return h('div', { className: 'nw-stock-research' },
+        h('section', { className: 'nw-sec' }, h('h2', { className: 'nw-sec-h' }, t('sr.market')),
+          overview ? h(StockOverview, { data: overview }) : h('p', { className: 'nw-muted', role: 'status' }, t('sr.loading'))),
+        h('section', { className: 'nw-sec nw-sr-stock' },
+          h('h2', { className: 'nw-sec-h' }, t('sr.stock')),
+          h('form', { className: 'nw-sr-search', onSubmit: search },
+            h('input', { className: 'nw-in', type: 'search', value: query, maxLength: 24, 'aria-label': t('sr.query'), placeholder: t('sr.query'), onChange: function (e) { searchRef.current++; setIn(setBusy, { search: false }); setQuery(e.target.value) } }),
+            h('button', { type: 'submit', className: 'nw-btn nw-sm', disabled: busy.search }, t('sr.search'))),
+          message ? h('p', { className: 'nw-muted', role: 'status' }, message) : null,
+          matches ? (matches.length ? h('ul', { className: 'nw-sr-result' }, matches.map(function (s) { return h('li', { key: s.code }, h('button', { className: 'nw-mini', onClick: function () { selectStock(s.code) } }, s.name + ' · ' + s.code)) })) : h('p', { className: 'nw-muted' }, t('sr.none'))) : null,
+          busy.detail ? h('p', { className: 'nw-muted', role: 'status' }, t('sr.loading')) : null,
+          detail ? (detail.unavailable ? h('p', { className: 'nw-muted' }, t('sr.unavailable')) : h(StockCompany, { key: code, data: detail, sentiment: sentiment && sentiment.code === code ? sentiment.data : null, canExplain: Boolean(edition && edition.can_analyze) })) : null),
+        edition && edition.edition ? h(MarketImpact, { key: edition.edition.id, market: edition.market, canRun: edition.can_analyze, onRun: runMarket, onStock: selectStock }) : null)
+    }
+
+    function marketProvider(source) {
+      return source === 'Hithink' ? t('sr.hithinkSource') : source === 'Tencent Finance' ? t('sr.tencentSource') : source === 'Eastmoney' ? t('sr.marketSource') : source || ''
+    }
+    function stockPct(value) { return value == null ? '—' : (value > 0 ? '+' : '') + Number(value).toFixed(2) + '%' }
+    function stockPrice(value) { return value == null ? '—' : Number(value).toFixed(2) }
+    function stockAmount(value) { return value == null ? '—' : t('sr.amount', { n: (value / 100000000).toFixed(1) }) }
+    function StockOverview(props) {
+      var x = props.data, m = x.market, stats = m && m.stats
+      function industries(title, rows) {
+        return rows && rows.length ? h('div', null, h('h3', null, t(title)),
+          h('ul', { className: 'nw-sr-ranks' }, rows.map(function (r) {
+            return h('li', { key: r.name }, h('strong', null, r.name), h('span', null, stockPct(r.median)), r.count != null ? h('span', { className: 'nw-muted' }, t('sr.participation', { n: r.up, total: r.count })) : null, h('span', { className: 'nw-muted' }, stockAmount(r.amount)))
+          }))) : null
+      }
+      return h('div', { className: 'nw-sr-overview' },
+        h('p', { className: 'nw-muted nw-xs' }, m && m.asOf ? t('sr.asOf', { t: m.asOf }) + ' · ' + marketProvider(m.source || 'Eastmoney') : t('sr.unavailable'),
+          x.stale && m ? ' · ' + t('sr.stale') : null, m && !m.complete ? ' · ' + t('sr.partial', { n: m.received, total: m.total }) : null),
+        Object.keys(x.indices || {}).length ? h('div', { className: 'nw-sr-metrics' }, Object.keys(x.indices).map(function (key) {
+          var i = x.indices[key]
+          return h('div', { key: key }, h('small', null, t('sr.index.' + key)), h('strong', null, stockPct(i.change)), h('small', { className: 'nw-muted' }, [i.at, marketProvider(i.source)].filter(Boolean).join(' · ')))
+        })) : null,
+        stats ? [
+          h('h3', { key: 'state' }, t('sr.state.' + (m.complete ? x.status : 'partial'))),
+          h('div', { key: 'metrics', className: 'nw-sr-metrics' }, [
+            ['sr.breadth', t('sr.advances', { up: stats.up, down: stats.down, flat: stats.unchanged })], ['sr.median', stockPct(stats.median)],
+            ['sr.equal', stockPct(stats.equal)], ['sr.weighted', stockPct(stats.weighted)], ['sr.turnover', stockAmount(stats.amount)],
+            ['sr.limit', x.limits && [x.limits.upLimit, x.limits.downLimit, x.limits.failedLimit].some(function (n) { return n != null }) ? [x.limits.upLimit, x.limits.downLimit, x.limits.failedLimit].map(function (n) { return n == null ? '—' : n }).join(' / ') : '—']
+          ].map(function (r) { return h('div', { key: r[0] }, h('small', null, t(r[0])), h('strong', null, r[1])) })),
+          h('p', { key: 'ref', className: 'nw-muted nw-xs' }, x.turnoverReference ? t('sr.turnoverRef', { v: x.turnoverReference.ratio, n: x.turnoverReference.samples }) : t('sr.turnoverPending')),
+          x.participationChange != null ? h('p', { key: 'participation-change', className: 'nw-muted nw-xs' }, t('sr.participationChange', { t: x.participationSince.slice(11, 16), n: (x.participationChange > 0 ? '+' : '') + x.participationChange.toFixed(2) })) : null,
+          m.industryBenchmark ? h('p', { key: 'industry-index', className: 'nw-muted nw-xs' }, t('sr.industryBenchmark', { source: marketProvider(m.industryBenchmark) })) : null,
+          m.industrySample && !m.industrySample.complete ? h('p', { key: 'industry-coverage', className: 'nw-muted nw-xs' }, t('sr.industrySample', { n: m.industrySample.received, total: m.industrySample.total })) : null,
+          h('div', { key: 'industries', className: 'nw-sr-columns' }, industries('sr.leaders', m.leaders), industries('sr.laggards', m.laggards))
+        ] : null)
+    }
+
+    function StockCompany(props) {
+      var d = props.data, f = d.forecast || {}, q = d.quote
+      var pair = useState({}), result = pair[0], setResult = pair[1]
+      var explanation = result.data && result.data.date === f.date ? result.data : null
+      function explain() {
+        setResult({ busy: true })
+        postJson(API.stockExplain, { code: d.symbol.code }).then(function (res) { setResult({ data: res.analysis }) })
+          .catch(function () { setResult({ error: true }) })
+      }
+      function evidence(items) {
+        return items.length ? h('ul', { className: 'nw-sr-ranks' }, items.map(function (n) {
+          return h('li', { key: n.id || n.url }, h('a', { className: 'nw-link', href: n.url, target: '_blank', rel: 'noopener noreferrer' }, n.title), h('span', { className: 'nw-muted nw-xs' }, [n.source, n.at].filter(Boolean).join(' · ')))
+        })) : h('p', { className: 'nw-muted' }, t('sr.noEvidence'))
+      }
+      var c = d.community && d.community.data
+      var sentiment = props.sentiment
+      var snow = sentiment && sentiment.xueqiu && sentiment.xueqiu.data
+      var heat = sentiment && sentiment.hithink && sentiment.hithink.data
+      function discussion(data, heading, route, unavailable) {
+        return h('div', null, h('h4', null, t(heading), ' · ', t(route)),
+          data ? h('div', null, h('p', null, t('sr.communityCounts', { sample: data.sample, authors: data.authors, b: data.bullish, s: data.bearish, u: data.unclassified })),
+            h('a', { className: 'nw-link', href: data.url, target: '_blank', rel: 'noopener noreferrer' }, t(heading)), h('small', { className: 'nw-muted' }, ' · ' + data.asOf, data.pages ? ' · ' + t('sr.samplePages', { n: data.pages }) : null, data.partial ? ' · ' + t('sr.sampleLimited') : null))
+            : h('p', { className: 'nw-muted' }, t(unavailable)))
+      }
+      var completed = (d.history || []).flatMap(function (p) { return p.horizons.filter(function (h) { return h.observed }).map(function (h) { return { baseDate: p.date, baseline: p.baseline, algorithm: p.algorithm, horizon: h.horizon, boxes: h.scenarios, observed: h.observed } }) })
+      return h('div', null,
+        h('h3', null, d.symbol.name + ' · ' + d.symbol.code + '.' + d.symbol.exchange),
+        q ? h('div', { className: 'nw-sr-metrics' }, [
+          ['sr.last', stockPrice(q.price) + ' · ' + stockPct(q.change)], ['sr.priceAction', stockPrice(q.low) + '–' + stockPrice(q.high)],
+          ['sr.turnover', stockAmount(q.amount)], ['sr.quoteTime', q.at + (q.source ? ' · ' + marketProvider(q.source) : '') + (d.quoteStale ? ' · ' + t('sr.stale') : '')],
+          ['sr.status', t('sr.trade.' + q.state)],
+        ].map(function (r) { return h('div', { key: r[0] }, h('small', null, t(r[0])), h('strong', null, r[1])) })) : h('p', { className: 'nw-muted' }, t('sr.unavailable')),
+        d.industry ? h('p', { className: 'nw-muted nw-xs' }, d.industry.name + ' · ' + stockPct(d.industry.median) + ' · ' + t('sr.participation', { n: d.industry.up, total: d.industry.count }) + ' · ' + d.industry.asOf,
+          d.industry.complete ? null : ' · ' + t('sr.state.partial')) : null,
+        h('details', { className: 'nw-mi-card', open: true }, h('summary', null, t('sr.ranges')),
+          props.canExplain && f.status === 'ready' ? h('button', { className: 'nw-mini', disabled: result.busy, onClick: explain }, t(result.busy ? 'sr.loading' : 'sr.explain')) : null,
+          result.error ? h('p', { className: 'nw-muted nw-xs' }, t('sr.unavailable')) : null,
+          explanation && explanation.overview ? h('p', null, explanation.overview) : null,
+          f.status === 'ready' ? [
+            h('p', { key: 'base', className: 'nw-muted nw-xs' }, t('sr.baseline', { date: f.date, p: stockPrice(f.baseline), version: f.algorithm }), f.historySource ? ' · ' + marketProvider(f.historySource) : null),
+            h('p', { key: 'features' }, t('sr.tech', { r: stockPct(f.features.relative20), v: stockPct(f.features.dailyVol), vol: f.features.volumeRatio == null ? '—' : f.features.volumeRatio })),
+            f.features.levels ? h('p', { key: 'levels', className: 'nw-muted nw-xs' }, t('sr.levels', { low: stockPrice(f.features.levels.support), high: stockPrice(f.features.levels.resistance) })) : null,
+            f.horizons.map(function (b) {
+              return h('div', { key: b.horizon },
+                h('h4', null, t('sr.sessions', { n: b.horizon }), ' · ', h('span', { className: 'nw-muted nw-xs' }, t(b.sparse ? 'sr.sparse' : 'sr.sample', { n: b.samples }))),
+                h('div', { className: 'nw-sr-metrics' }, b.scenarios.map(function (s) {
+                  return h('div', { key: s.name }, h('small', null, t('sr.scenario.' + s.name)), h('strong', null, stockPct(s.change[0]) + ' ~ ' + stockPct(s.change[1])), h('small', { className: 'nw-muted' }, stockPrice(s.price[0]) + '–' + stockPrice(s.price[1])))
+                })))
+            }),
+            explanation ? h('ul', { key: 'explanation' }, explanation.scenarios.map(function (s) {
+              return h('li', { key: s.name }, h('strong', null, t('sr.scenario.' + s.name)),
+                h('p', null, t('sr.condition') + ' · ' + s.trigger), h('p', null, t('sr.invalidation') + ' · ' + s.invalidation),
+                s.refs.length ? evidence(s.refs) : null)
+            })) : null,
+            h('p', { key: 'note', className: 'nw-muted nw-xs' }, t('sr.rangeNote')),
+          ] : h('p', { className: 'nw-muted' }, t('sr.rangeMissing'))),
+        (d.catalysts || []).length ? h('details', { className: 'nw-mi-card' }, h('summary', null, t('sr.catalysts')),
+          h('ul', null, d.catalysts.map(function (n, i) { return h('li', { key: i }, h('strong', null, n.company), n.way ? ' · ' + n.way : null, h('p', null, n.finding), n.watch ? h('p', { className: 'nw-muted nw-xs' }, n.watch) : null) }))) : null,
+        h('div', { className: 'nw-sr-columns' },
+          h('details', { className: 'nw-mi-card', open: true }, h('summary', null, t('sr.announcements')),
+            d.announcements.ok ? evidence(d.announcements.data) : h('p', { className: 'nw-muted' }, t('sr.unavailable'))),
+          h('details', { className: 'nw-mi-card', open: true }, h('summary', null, t('sr.media')), evidence(d.news || []))),
+        h('details', { className: 'nw-mi-card', open: true }, h('summary', null, t('sr.community')),
+          discussion(c, 'sr.guba', 'sr.httpRoute', 'sr.unavailable'),
+          discussion(snow, 'sr.snow', 'sr.browseRoute', sentiment ? 'sr.snowBlocked' : 'sr.loading'),
+          h('div', null, h('h4', null, t('sr.hithinkHeat'), ' · ', t('sr.apiRoute')),
+            heat ? [
+              h('p', { key: 'ranking' }, heat.rank != null ? t('sr.heatRank', { n: heat.rank }) : heat.inTop30 === false ? t('sr.heatOffList') : null,
+                heat.heat != null ? ' · ' + t('sr.heatValue', { n: heat.heat }) : null, heat.asOf ? ' · ' + heat.asOf : null),
+              heat.trend && heat.trend.length ? h('p', { key: 'trend' }, t('sr.heatHistory'), ' · ', heat.trend.map(function (x) { return x.date.slice(5) + ' #' + x.rank }).join('、')) : null,
+            ] : h('p', { className: 'nw-muted' }, t(sentiment ? 'sr.unavailable' : 'sr.loading')),
+            h('p', { className: 'nw-muted nw-xs' }, t('sr.heatNote'))),
+          h('p', { className: 'nw-muted nw-xs' }, t('sr.communityNote'))),
+        h('details', { className: 'nw-mi-card' }, h('summary', null, t('sr.validation')),
+          [5, 20].map(function (days) {
+            var matches = completed.filter(function (r) { return r.horizon === days && r.observed.state === 'complete' })
+            if (!matches.length) return null
+            var hit = matches.filter(function (r) { return r.observed.hit }).length
+            var width = matches.reduce(function (n, r) { return n + r.boxes[r.boxes.length - 1].change[1] - r.boxes[0].change[0] }, 0) / matches.length
+            return h('p', { key: days, className: 'nw-muted nw-xs' }, t('sr.auditScore', { days: days, n: matches.length, hit: hit, width: width.toFixed(1) }))
+          }),
+          completed.length ? h('ul', { className: 'nw-sr-ranks' }, completed.slice(0, 12).map(function (r) {
+            var low = r.boxes[0].change[0], high = r.boxes[r.boxes.length - 1].change[1]
+            return h('li', { key: r.baseDate + ':' + r.horizon }, h('strong', null, r.baseDate + ' · ' + t('sr.sessions', { n: r.horizon })),
+              h('span', { className: 'nw-muted nw-xs' }, r.observed.state === 'complete' ? t('sr.validated', { date: r.observed.date, move: stockPct(r.observed.move), low: stockPct(low), high: stockPct(high), min: stockPct(r.observed.low), max: stockPct(r.observed.high), hit: t(r.observed.hit ? 'sr.hit' : 'sr.miss') }) : t('sr.missingBar', { date: r.observed.date })))
+          })) : h('p', { className: 'nw-muted' }, t('sr.validationPending'))))
+    }
+
+    var TABS = [['today', 'tab.today'], ['research', 'tab.research'], ['track', 'tab.track'], ['daily', 'tab.daily'], ['follows', 'tab.follows']]
     var TOOL_TABS = [['events', 'tab.events'], ['timeline', 'tab.timeline'], ['items', 'tab.items'], ['sources', 'tab.sources'], ['runs', 'tab.runs']]
     var NEWS_VIEW = { today: 'edition', daily: 'daily', follows: 'follows', events: 'events' }
 
@@ -2742,6 +3002,7 @@ window.__ModuleLoader__.load({
       var tabPair = useState(savedTab === 'news' || !savedTab ? 'today' : savedTab)
       var tab = tabPair[0]
       var setTab = tabPair[1]
+      var stockChoice = useState(''), researchCode = stockChoice[0], setResearchCode = stockChoice[1]
       var dataPair = useState({ summary: null, digest: '', sources: null, taxonomy: null, schedule: null, phase: 'loading', error: null, stamp: 0 })
       var data = dataPair[0]
       var setData = dataPair[1]
@@ -2789,7 +3050,8 @@ window.__ModuleLoader__.load({
 
       var names = {}
       ;((data.taxonomy && data.taxonomy.labels) || []).forEach(function (top) { names[top.id] = top.name; (top.children || []).forEach(function (c) { names[c.id] = c.name }) })
-      var common = { names: names, taxonomy: data.taxonomy, stamp: data.stamp, summary: data.summary, packs: (data.sources && data.sources.packs) || {}, reload: reload, ready: data.phase === 'ready' && !data.error }
+      function openResearch(code) { setResearchCode(code || ''); pick('research') }
+      var common = { names: names, taxonomy: data.taxonomy, onResearch: openResearch, stamp: data.stamp, summary: data.summary, packs: (data.sources && data.sources.packs) || {}, reload: reload, ready: data.phase === 'ready' && !data.error }
       // 宿主的中间列不滚动：外层 .nw-scroll 撑满主面板并自己滚动，里面 .nw-root 居中限宽
       return h('div', { className: 'nw-scroll' }, h('div', { className: 'nw-root' },
         h('header', { className: 'nw-top' },
@@ -2806,6 +3068,7 @@ window.__ModuleLoader__.load({
           TOOL_TABS.map(function (x) { return h('button', { key: x[0], role: 'tab', 'aria-selected': tab === x[0], className: 'nw-tab nw-tab-tool' + (tab === x[0] ? ' nw-cur' : ''), onClick: function () { pick(x[0]) } }, t(x[1])) })),
         h(TabErrorBoundary, null,
           NEWS_VIEW[tab] ? h(NewsTab, Object.assign({ key: tab, view: NEWS_VIEW[tab], sources: data.sources }, common)) : null,
+          tab === 'research' ? h(StockResearchView, { key: researchCode || 'research', selection: researchCode, stamp: data.stamp }) : null,
           tab === 'track' ? h(TrackTab, common) : null,
           tab === 'timeline' ? h(TimelineTab, common) : null,
           tab === 'items' ? h(ItemsTab, Object.assign({ sources: data.sources }, common)) : null,
@@ -3065,6 +3328,7 @@ window.__ModuleLoader__.load({
       '.nw-v-brief .nw-rs-lead{-webkit-line-clamp:2;font-size:13px;line-height:1.7} .nw-v-second .nw-rs-lead{-webkit-line-clamp:5}',
       '.nw-v-brief{padding:12px 0} .nw-v-brief .nw-rs-title{font-size:15px}',
       '.nw-v-mini{padding:7px 0} .nw-v-mini .nw-rs-title{font-size:14px;font-weight:500} .nw-v-mini .nw-rs-meta{font-size:11px}',
+      '.nw-stock-research{padding-top:12px} .nw-sr-stock,.nw-sr-teaser{margin-top:16px} .nw-sr-search{display:flex;gap:8px;margin:10px 0} .nw-sr-search input{min-width:0;flex:1} .nw-sr-result{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0} .nw-sr-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:8px;margin:8px 0} .nw-sr-metrics>div{min-width:0;padding:8px;border:1px solid ' + C.line1 + ';border-radius:8px} .nw-sr-metrics strong,.nw-sr-metrics small{display:block;overflow-wrap:anywhere} .nw-sr-metrics small{font-size:11px;color:' + C.l2 + '} .nw-sr-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,245px),1fr));gap:12px} .nw-sr-ranks{padding:0;list-style:none;margin:6px 0} .nw-sr-ranks li{padding:6px 0;border-bottom:1px solid ' + C.line1 + ';display:flex;flex-wrap:wrap;gap:4px 8px}',
       '.nw-market-impact{margin-bottom:20px} .nw-mi-audit{margin-top:16px} .nw-mi-feedback{width:100%;box-sizing:border-box;margin-bottom:8px} .nw-mi-card{border-top:1px solid ' + C.line1 + ';padding:8px 0} .nw-mi-card summary{cursor:pointer} .nw-mi-card p{margin:3px 0} .nw-mi-card dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 10px;margin:8px 0} .nw-mi-card dt{font-weight:700} .nw-mi-card dd{margin:0} .nw-mi-sources{display:flex;flex-direction:column;gap:2px;font-size:12px;overflow-wrap:anywhere}',
       '.nw-same:not(.nw-v-lead) .nw-rs-title{color:' + C.l2 + '}',
       '.nw-rs-key{flex:none;font-size:11px;font-weight:700;color:#fff;background:' + C.err + ';border-radius:4px;padding:0 5px;line-height:18px;transform:translateY(-1px)}',
@@ -3207,7 +3471,7 @@ window.__ModuleLoader__.load({
     }
 
     var plugin = { inject: ['slots'], apply: apply }
-    plugin.__test = { DailyView, PushPanel, PushHealth, QueueLine, TrackStrip, LatestRail, FlowPanel, FlowChart, FlowHead, AskView, Welcome, ImpactBlock, MarketImpact, AnalysisFull, DetailFull, TrackTab, TrackDetail, TrackSynthesis, ContentCard, SourceBoard, SourceEditor, QualityCard, StoryDetail, FollowsView, EditionView, ReadStory, NoteList, ModelCard, Topics, NotesBox, VersionSection, UpdateBanner, checkForUpdate, applyUpdate, remotes, Page, NewsTab, TimelineTab, ItemsTab, SourcesTab, RunsTab, EventCard, EventDetailView, EventDetail, RunBars, ScheduleCard, StatusLine, TestResult, SignalChips, Spark, PanelIcon, t, setLang: function (v) { lang = v }, DICT, CSS }
+    plugin.__test = { DailyView, PushPanel, PushHealth, QueueLine, TrackStrip, LatestRail, FlowPanel, FlowChart, FlowHead, AskView, Welcome, ImpactBlock, MarketImpact, StockResearchView, StockOverview, StockCompany, AnalysisFull, DetailFull, TrackTab, TrackDetail, TrackSynthesis, ContentCard, SourceBoard, SourceEditor, QualityCard, StoryDetail, FollowsView, EditionView, ReadStory, NoteList, ModelCard, Topics, NotesBox, VersionSection, UpdateBanner, checkForUpdate, applyUpdate, remotes, Page, NewsTab, TimelineTab, ItemsTab, SourcesTab, RunsTab, EventCard, EventDetailView, EventDetail, RunBars, ScheduleCard, StatusLine, TestResult, SignalChips, Spark, PanelIcon, t, setLang: function (v) { lang = v }, DICT, CSS }
     return plugin
   },
 })

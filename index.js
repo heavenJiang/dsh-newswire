@@ -12,6 +12,8 @@ import { makeDeepRead, modelSplitDigests } from "./host/deepread.mjs";
 import { translateTitles } from "./host/translate.mjs";
 import { DEPTHS, depthOf, depthParams, makeGate, recordCall } from "./host/runtime.mjs";
 import { detailMaterials, latestDetail, saveDetail, writeDetail } from "./host/detail.mjs";
+import { createHithinkMarket } from "./host/hithink_market.mjs";
+import { createStockResearch } from "./host/stock_research.mjs";
 import { auditMarketImpact, draftMarketImpact, marketFollowup, marketKey, marketMaterials, marketPushMessage, marketReviewMaterials, publicMarketImpact, publishMarketImpact, readMarketImpact, writeMarketImpact } from "./host/market_impact.mjs";
 import { analysisMaterials, analyzeStory, autoAnalyzeTargets, saveAnalysis, searchQuery, webMaterials } from "./host/analysis.mjs";
 import { linkAll, repairAliasLinks, repairThemeLinks, synthTargets, synthesize } from "./host/tracking.mjs";
@@ -68,6 +70,7 @@ export const Config = z.object({
   llmStories: z.number().min(3).max(40).step(1).default(DEFAULTS.llmStories),
   llmBudgetMs: z.number().min(60000).max(3600000).step(10000).default(DEFAULTS.llmBudgetMs),
   modelTimeoutMs: z.number().min(10000).max(600000).step(1000).default(DEFAULTS.modelTimeoutMs),
+  marketModelTimeoutMs: z.number().min(60000).max(900000).step(1000).default(DEFAULTS.marketModelTimeoutMs),
   cycleBudgetMs: z.number().min(120000).max(3600000).step(10000).default(DEFAULTS.cycleBudgetMs),
 }).i18n({
   en: {
@@ -88,6 +91,7 @@ export const Config = z.object({
     llmStories: "LLM mode: stories the model writes copy for per edition (front page and sections); the rest get program copy.",
     llmBudgetMs: "LLM mode: time budget for one edition, in milliseconds; steps past it fall back to rule results.",
     modelTimeoutMs: "Timeout for one model call, in milliseconds.",
+    marketModelTimeoutMs: "Timeout for one background stock impact or follow-up model call, in milliseconds. Defaults to 8 minutes.",
     cycleBudgetMs: "Longest a scheduled push round may take, in milliseconds. The harness stops a tool call after 10 minutes, so the default leaves a minute of margin. With a slow model the edition is prepared ahead of each scheduled push, and a round that runs out of time sends the edition the model has finished so far.",
   },
   zh: {
@@ -108,6 +112,7 @@ export const Config = z.object({
     llmStories: "LLM 模式：每份版面由模型写稿的报道篇数（头版与各版块），其余用程序拼的稿。",
     llmBudgetMs: "LLM 模式：一份版面的时间预算（毫秒），超出后剩下的步骤用规则结果。",
     modelTimeoutMs: "单次模型调用的超时（毫秒）。",
+    marketModelTimeoutMs: "股票研判与后续验证的后台单次模型超时（毫秒），默认 8 分钟。",
     cycleBudgetMs: "定时推送每轮最多用多久（毫秒）。宿主对一次工具调用最多等 10 分钟，默认留 1 分钟余量。模型慢时会在每次定时推送前提前编排；到点时间不够，就发模型已经写好的版面。",
   },
 });
@@ -155,6 +160,14 @@ export const Config = z.object({
 export function apply(ctx, config) {
   const cfg = settingsFrom(config);
   const p = pathsOf(cfg);
+  const stockResearch = createStockResearch({
+    withDb: (fn) => withDb(p, fn), primary: createHithinkMarket(),
+    xueqiuBrowse: async (symbol) => {
+      const res = await runEngine(ctx, cfg, p, ["--mode", "xueqiu-discussions", "--config", p.cfgFile,
+        "--symbol", symbol.provider.toUpperCase(), ...binFlags(cfg, "newswire-sentiment")], 55000);
+      return engineJson(res.stdout) || { ok: false, error: "browse_unavailable" };
+    },
+  });
   const inflight = { current: null };
   const optional = {};
   // 模型偏好：面板里选的模式与模型存在数据目录的 model.json；没选过时用插件设置的模式和 harness 的默认模型
@@ -754,7 +767,7 @@ export function apply(ctx, config) {
     marketJobs.add(key);
     try {
       patchMarket(edition, {
-        v: 2, phase: "analyzing", editionId: edition.id, attempted: new Date().toISOString(),
+        v: 2, phase: "analyzing", scanned: 0, incomplete: [], error: null, editionId: edition.id, attempted: new Date().toISOString(),
         editionInfo: { id: edition.id, pack: edition.pack, run_id: edition.run_id, created_at: edition.created_at, content: { market_round: edition.content.market_round } },
       });
     } catch (err) {
@@ -765,15 +778,21 @@ export function apply(ctx, config) {
       void background(queue.run({ kind: "analysis", label: "股票影响研判", priority: reader ? PRIORITY.reader : PRIORITY.background }, async () => {
         try {
           const materials = withDb(p, (db) => marketMaterials(db, edition));
-          const draft = await draftMarketImpact(model, materials, cfg.modelTimeoutMs);
+          const incomplete = [];
+          let scanned = 0;
+          patchMarket(edition, { count: materials.length });
+          const draft = await draftMarketImpact(model, materials, cfg.marketModelTimeoutMs, {
+            onScan: (n) => { scanned = n; patchMarket(edition, { scanned }); },
+            onIncomplete: (step, count) => incomplete.push({ step, count }),
+          });
           const report = publishMarketImpact(draft, materials);
           const message = marketPushMessage(report, bjHhmm(edition.created_at));
           const previous = prior?.v === 2 ? prior : null;
           const delivery = message ? (previous?.delivery?.text === message ? previous.delivery : { status: "pending", text: message }) : null;
-          patchMarket(edition, { phase: "ready", count: materials.length, materials: [...new Map(marketReviewMaterials(draft, materials).concat(materials.filter((m) => report.coverage.some((c) => c.ref === m.ref))).map((m) => [m.ref, m])).values()],
+          patchMarket(edition, { phase: "ready", count: materials.length, scanned, incomplete, materials: [...new Map(marketReviewMaterials(draft, materials).concat(materials.filter((m) => report.coverage.some((c) => c.ref === m.ref))).map((m) => [m.ref, m])).values()],
             draft, report, issued: nowIsoUtc(), audit: null, reviewed: null, reviewError: false, delivery });
         } catch (err) {
-          patchMarket(edition, { phase: "failed" });
+          patchMarket(edition, { phase: "failed", error: /timeout|timed out|request was aborted/i.test(errText(err)) ? "timeout" : "failed" });
           throw err;
         } finally {
           marketJobs.delete(key);
@@ -792,7 +811,7 @@ export function apply(ctx, config) {
       void background(queue.run({ kind: "analysis", label: "股票研判后续验证", priority: reader ? PRIORITY.reader : PRIORITY.background }, async () => {
         try {
           const followup = withDb(p, (db) => marketFollowup(db, state.report.items, state.issued || edition.created_at));
-          const results = await auditMarketImpact(model, state.report.items, followup, cfg.modelTimeoutMs, feedback, state.materials);
+          const results = await auditMarketImpact(model, state.report.items, followup, cfg.marketModelTimeoutMs, feedback, state.materials);
           patchMarket(edition, { reviewError: false, audit: { at: new Date().toISOString(), results, history: [state.audit, ...(state.audit?.history || [])].filter(Boolean).slice(0, 5).map(({ history, ...entry }) => entry) } });
         } catch (err) {
           patchMarket(edition, { reviewError: true, auditFailedAt: new Date().toISOString() });
@@ -1547,6 +1566,7 @@ export function apply(ctx, config) {
     disposers.push(() => { hooks.dailyRun = null; });
     // 预编排：每分钟看一眼下一次定时推送还有多久
     { const t = setInterval(() => { void background(prewarmTick(), "prewarm"); void background(checkPending(), "pending push"); void background(marketTick(), "market tick"); try { maintenanceTick(); } catch { /* 明天再清 */ } }, 60000); disposers.push(() => clearInterval(t)); }
+    { const t = setInterval(() => { void background(stockResearch.verifyPending(), "stock forecast verification"); }, 10 * 60000); disposers.push(() => clearInterval(t)); }
     // 30 秒看一次时钟（同一分钟只触发一次），保证不漏掉整点
     { const t = setInterval(() => { void background(clockTick(), "direct clock"); }, 30000); disposers.push(() => clearInterval(t)); }
 
@@ -1554,7 +1574,7 @@ export function apply(ctx, config) {
     const app = {
       afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
       guardedRun, handleReply, stopRun, llmReady, marketImpactView, startMarketImpact, startMarketAudit, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
-      pushHealth, pushNow, queue, readTaken, reflowWithFeedback, runAnalysis, runCycle, runDetail, runSynthesis, startDetail, syncSourceState,
+      pushHealth, pushNow, queue, readTaken, reflowWithFeedback, stockResearch, runAnalysis, runCycle, runDetail, runSynthesis, startDetail, syncSourceState,
       syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
       route, tool, disposers,
     };

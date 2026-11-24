@@ -111,8 +111,9 @@ export function createModel(o) {
           }
         }
         if (outer && outer.aborted) throw stopErr();
+        if (ctl.signal.aborted) throw ctl.signal.reason;
       } catch (e) {
-        failure = outer && outer.aborted ? stopErr() : e;
+        failure = outer && outer.aborted ? stopErr() : ctl.signal.aborted && ctl.signal.reason?.message === "timeout" ? ctl.signal.reason : e;
         throw failure;
       } finally {
         clearTimeout(timer);

@@ -154,3 +154,25 @@ test("看板接口提供已审核的研判，重审失败保留已发布结论",
   assert.match(prompts[1], /核对并网日期/);
   assert.equal(pushes.length, 1);
 });
+
+test("研判超时拆分重试，归并超时不丢已完成的分析", async () => {
+  const mats = Array.from({ length: 25 }, (_, i) => article(i + 1, "材料" + (i + 1), "正文".repeat(500)));
+  const seen = [], incomplete = [];
+  let scans = 0;
+  const model = { complete: async (prompt, opt) => {
+    seen.push(opt.step);
+    assert.ok(opt.maxTokens < 10000);
+    assert.ok(prompt.length < 19000);
+    if (opt.step === "market_merge" || (opt.step === "market_scan" && ++scans === 1)) throw new Error("timeout");
+    return JSON.stringify({ items: prompt.includes('"ref":1,') ? [{ ...finding, refs: [1], links: [] }] : [] });
+  } };
+  let count = 0;
+  const draft = await draftMarketImpact(model, mats, 240000, {
+    onScan: (n) => { count = n; },
+    onIncomplete: (stage, n) => incomplete.push([stage, n]),
+  });
+  assert.equal(count, mats.length);
+  assert.equal(seen.filter((s) => s === "market_scan").length, 4);
+  assert.deepEqual(incomplete, [["market_merge", 0]]);
+  assert.equal(publishMarketImpact(draft, mats).items[0].company, "示例云");
+});

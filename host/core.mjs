@@ -35,6 +35,7 @@ export const DEFAULTS = {
   llmStories: 16,
   llmBudgetMs: 1500000,
   modelTimeoutMs: 180000,
+  marketModelTimeoutMs: 480000,
   cycleBudgetMs: 540000,
 };
 
@@ -112,6 +113,7 @@ export function settingsFrom(config) {
     llmStories: numSetting(raw, "llmStories", 3, 40),
     llmBudgetMs: numSetting(raw, "llmBudgetMs", 60000, 1500000),
     modelTimeoutMs: numSetting(raw, "modelTimeoutMs", 10000, 600000),
+    marketModelTimeoutMs: numSetting(raw, "marketModelTimeoutMs", 60000, 900000),
     cycleBudgetMs: numSetting(raw, "cycleBudgetMs", 120000, 3600000),
   };
 }

@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.49 (2026-11-23)
+
+- Research has its own tab for A-share breadth, stock scenarios, company announcements and closing-range verification. Hithink is the preferred quote source. Xueqiu, Eastmoney and Hithink attention are shown separately. Stock-impact calls use smaller batches and an eight-minute default timeout.
+
 ## 1.1.48 (2026-11-23)
 
 - Stock impact analysis runs automatically after an edition and sends a separate mobile summary. A separate follow-up verifies findings against later reporting. Business events can trigger priority review, and coverage is checked against validated findings.

@@ -122,6 +122,22 @@ async function preflight(sources) {
   return pre;
 }
 
+// 雪球只取已有浏览器会话可见的讨论，结果不写新闻库。
+if (MODE === "xueqiu-discussions") {
+  const symbol = str(A.symbol);
+  if (!/^(?:SH|SZ|BJ)\d{6}$/.test(symbol)) {
+    console.log("NEWSWIRE_JSON " + JSON.stringify({ ok: false, error: "symbol_required" }));
+    process.exit(2);
+  }
+  const url = "https://www.xueqiu.com/S/" + symbol;
+  const pre = await preflight([{ id: "xueqiu-discussions", url, channels: ["browse"] }]);
+  const result = pre.ok ? await browseFetch("xueqiu-discussions", url, 20, { timeoutMs: 48000 }) : null;
+  const items = result?.data?.items;
+  await new Promise((done) => process.stdout.write("NEWSWIRE_JSON " + JSON.stringify(Array.isArray(items)
+    ? { ok: true, items, pages: result.data.pages || 1, partial: Boolean(result.data.partial) } : { ok: false, error: result?.data?.error || "browse_unavailable" }) + "\n", done));
+  process.exit(Array.isArray(items) ? 0 : 2);
+}
+
 // ------------------------------------------------------------------ 页面全文快照（模型读页面用）
 if (MODE === "read") {
   const url = str(A.url);

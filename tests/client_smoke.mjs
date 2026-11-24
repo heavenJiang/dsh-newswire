@@ -181,6 +181,33 @@ cases.push(
     if (!main || JSON.stringify(main).includes("教育部发布留学预警")) throw new Error("默认变化视图混入沿用报道");
     return n;
   }],
+  ["StockResearchView", () => {
+    const node = T.StockResearchView({ selection: "", stamp: 1 });
+    for (const key of ["sr.market", "sr.stock", "sr.query"]) if (!JSON.stringify(node).includes(T.t(key))) throw new Error("研判页缺 " + key);
+    return node;
+  }],
+  ["StockOverview(partial)", () => {
+    const node = T.StockOverview({ data: { stale: false, status: "mixed", indices: {}, market: {
+      asOf: "2026-11-23 15:00:00", complete: false, received: 120, total: 130, stats: { up: 50, down: 55, unchanged: 15, median: -0.1, equal: -0.1, weighted: -0.2, amount: 100 },
+      leaders: [{ name: "半导体", median: 1, up: 2, count: 3, amount: 50 }],
+    } } });
+    const j = JSON.stringify(node);
+    if (!j.includes(T.t("sr.partial", { n: 120, total: 130 })) || !j.includes("半导体")) throw new Error("行情缺分页提示或行业");
+    return node;
+  }],
+  ["StockCompany", () => {
+    const node = T.StockCompany({ data: {
+      symbol: { name: "示例公司", code: "600519", exchange: "SH" },
+      forecast: { status: "ready", date: "2026-11-23", baseline: 100, algorithm: "analog-v1", features: { relative20: 1, dailyVol: 2, volumeRatio: 1.5 },
+        horizons: [{ horizon: 5, samples: 18, sparse: true, scenarios: [{ name: "base", change: [-2, 3], price: [98, 103] }] }] },
+      announcements: { ok: true, data: [{ id: "n", url: "https://static.cninfo.com.cn/a.pdf", title: "公司公告" }] },
+      community: { data: { sample: 42, authors: 24, bullish: 3, bearish: 5, unclassified: 16, url: "https://guba.eastmoney.com/list,600519.html" } },
+      news: [], history: [],
+    } });
+    const j = JSON.stringify(node);
+    for (const val of [T.t("sr.community"), T.t("sr.validation"), T.t("sr.announcements"), "-2.00% ~ +3.00%", "https://static.cninfo.com.cn/a.pdf"]) if (!j.includes(val)) throw new Error("个股卡片缺 " + val);
+    return node;
+  }],
   ["MarketImpact(reviewed)", () => {
     const node = T.MarketImpact({ canRun: true, market: {
       phase: "ready", count: 20, reviewed: "2026-11-08T10:00:00Z", canReview: true, reviewError: true, audit: { at: "2026-11-08T10:00:00Z", results: [{ company: "示例公司", ticker: "TEST", verdict: "需修正", note: "修正兑现时点", sources: [] }] },

@@ -30,7 +30,7 @@ export function registerRoutes(app) {
   const {
     afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
     guardedRun, handleReply, stopRun, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
-    pushHealth, pushNow, queue, readTaken, reflowWithFeedback, route, marketImpactView, startMarketImpact, startMarketAudit, runAnalysis, runDetail, runSynthesis, startDetail, syncSourceState,
+    pushHealth, pushNow, queue, readTaken, reflowWithFeedback, route, marketImpactView, startMarketImpact, startMarketAudit, stockResearch, runAnalysis, runDetail, runSynthesis, startDetail, syncSourceState,
     syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
   } = app;
 
@@ -558,6 +558,44 @@ export function registerRoutes(app) {
       }
       if (body.cadence) await applyPush({ cadence: String(body.cadence) });
       return jsonResponse({ ok: true, follows, push: loadPush(p.pushPrefs) }, 200);
+    },
+  });
+
+  route({
+    path: "/api/newswire/stock-research",
+    methods: ["GET"],
+    fetch: async (request) => {
+      const query = new URL(request.url).searchParams;
+      try {
+        if (query.has("q")) return jsonResponse({ symbols: await stockResearch.search(query.get("q")) }, 200);
+        if (query.has("sentiment")) {
+          const data = await stockResearch.sentiment(query.get("sentiment"));
+          return data ? jsonResponse({ sentiment: data }, 200) : jsonResponse({ error: "invalid_a_share_code" }, 400);
+        }
+        if (query.has("code")) {
+          const data = await stockResearch.stock(query.get("code"));
+          return data ? jsonResponse({ stock: data }, 200) : jsonResponse({ error: "invalid_a_share_code" }, 400);
+        }
+        return jsonResponse({ overview: await stockResearch.overview() }, 200);
+      } catch {
+        return jsonResponse({ error: "stock_data_unavailable" }, 503);
+      }
+    },
+  });
+
+  route({
+    path: "/api/newswire/stock-research/explain",
+    methods: ["POST"],
+    fetch: async (request) => {
+      const body = await bodyOf(request);
+      if (!llmReady()) return jsonResponse({ error: "no_model" }, 409);
+      try {
+        const analysis = await queue.run({ kind: "analysis", label: "个股区间情景", priority: PRIORITY.reader },
+          () => stockResearch.explain(body.code, model, cfg.modelTimeoutMs));
+        return analysis ? jsonResponse({ analysis }, 200) : jsonResponse({ error: "stock_range_unavailable" }, 409);
+      } catch {
+        return jsonResponse({ error: "stock_explanation_unavailable" }, 502);
+      }
     },
   });
 

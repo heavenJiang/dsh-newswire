@@ -5,7 +5,7 @@ import { bodiesFor, sample } from "./edition_base.mjs";
 import { checkText } from "./factcheck.mjs";
 import { parseJsonLoose } from "./model.mjs";
 
-const BATCH = 45;
+const BATCH = 24;
 const text = (v, n = 450) => typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "";
 const list = (v) => Array.isArray(v) ? v : [];
 const refsOf = (v, allowed) => [...new Set(list(v).filter((id) => Number.isInteger(id) && allowed.has(id)))].slice(0, 4);
@@ -28,6 +28,12 @@ function marketTrigger(title) {
   return MARKET_TRIGGERS.find(([, pattern]) => pattern.test(title || ""))?.[0];
 }
 
+// 社区帖子只进入专门的情绪统计，已有库中的相关链接也不进入业务证据。
+const marketEvidence = `COALESCE(a.kind,'news') IN ('news','digest_item')
+  AND COALESCE(a.url,'') NOT LIKE '%xueqiu.com%' AND COALESCE(a.url,'') NOT LIKE '%guba.eastmoney.com%'
+  AND COALESCE(a.origin_url,'') NOT LIKE '%xueqiu.com%' AND COALESCE(a.origin_url,'') NOT LIKE '%guba.eastmoney.com%'
+  AND COALESCE(s.url,'') NOT LIKE '%xueqiu.com%' AND COALESCE(s.url,'') NOT LIKE '%guba.eastmoney.com%'`;
+
 export function marketMaterials(db, ed) {
   const run = ed.run_id || ed.content.market_round || db.prepare(`SELECT run_id FROM editions
     WHERE pack = ? AND id < ? AND run_id IS NOT NULL AND json_extract(content, '$.since') = ?
@@ -40,7 +46,7 @@ export function marketMaterials(db, ed) {
     LEFT JOIN sources s ON s.id = a.source_id
     WHERE r.run_id = ? AND a.first_seen_at >= r.started_at AND a.first_seen_at <= ?
       AND COALESCE(a.published_at, a.first_seen_at) >= ?
-      AND COALESCE(a.kind, 'news') IN ('news', 'digest_item')
+      AND ${marketEvidence}
     ORDER BY COALESCE(a.published_at, a.first_seen_at) DESC, a.id`)
     .all(run, run, ed.created_at, ed.content.since || "");
   // 手动重编没有抓取轮次，按版面中新起或有进展的故事线取本版收录的文章。
@@ -48,7 +54,7 @@ export function marketMaterials(db, ed) {
   if (fallback) {
     const ids = new Set(Object.values(ed.content.stories || {}).filter((s) => s.is_new || s.updated).flatMap((s) => s.article_ids || []));
     const get = db.prepare(`SELECT a.*, COALESCE(s.name, a.source_id) AS source FROM articles a
-      LEFT JOIN sources s ON s.id = a.source_id WHERE a.id = ? AND COALESCE(a.published_at, a.first_seen_at) >= ?`);
+      LEFT JOIN sources s ON s.id = a.source_id WHERE a.id = ? AND COALESCE(a.published_at, a.first_seen_at) >= ? AND ${marketEvidence}`);
     for (const id of ids) {
       const row = get.get(id, ed.content.since || "");
       if (row) rows.push(row);
@@ -60,7 +66,7 @@ export function marketMaterials(db, ed) {
   const front = new Set(ed.content.front || []);
   const getStory = db.prepare(`SELECT a.*, COALESCE(s.name,a.source_id) AS source FROM articles a LEFT JOIN sources s ON s.id = a.source_id
     WHERE a.id = ? AND COALESCE(a.published_at,a.first_seen_at) >= ? AND a.first_seen_at <= ?
-      AND COALESCE(a.kind,'news') IN ('news','digest_item')`);
+      AND ${marketEvidence}`);
   const included = new Set(rows.map((a) => a.id));
   const storyByArticle = new Map();
   for (const [id, story] of Object.entries(stories)) {
@@ -97,8 +103,8 @@ const analysisBrief = [
 ].join("\n");
 const shape = '{"items":[{"market":"美股或A股","company":"","ticker":"","direction":"利好/利空/双向/待确认","business":"","finding":"","mechanism":"","countercase":"","watch":"","horizon":"","expectations":"","refs":[1],"links":[{"company":"","ticker":"","relation":"直接供货/间接供货/客户/竞争替代/共同驱动","why":"","refs":[1]}]}]}';
 
-async function modelJson(model, prompt, timeoutMs) {
-  const value = parseJsonLoose(await model.complete(prompt, { step: "analyze", maxTokens: 10000, timeoutMs }));
+async function modelJson(model, prompt, timeoutMs, step) {
+  const value = parseJsonLoose(await model.complete(prompt, { step, maxTokens: 7500, timeoutMs }));
   if (!value || !Array.isArray(value.items)) throw new Error("market_bad_response");
   return value;
 }
@@ -112,43 +118,67 @@ function proposals(items, allowed) {
   });
 }
 
-export async function draftMarketImpact(model, materials, timeoutMs) {
+const retriable = (err) => /timeout|timed out|request was aborted|market_bad_response|empty_reply/i.test(String(err?.message || err));
+const promptMaterial = ({ ref, title, text: detail, priority, priorityReason }, limit = 420) => ({
+  ref, title: text(title, 140), text: text(detail, limit), ...(priority ? { priority, priorityReason } : {}),
+});
+
+export async function draftMarketImpact(model, materials, timeoutMs, progress = {}) {
   let drafts = [];
+  let scanned = 0;
   const signals = [];
-  for (let offset = 0; offset < materials.length; offset += BATCH) {
-    const batch = materials.slice(offset, offset + BATCH);
+  async function scan(batch, step, task, canSplit = true) {
+    let j;
+    try {
+      j = await modelJson(model, analysisBrief + task + "\n仅输出 JSON：" + shape + "\n材料：" + JSON.stringify(batch.map((m) => promptMaterial(m))), timeoutMs, step);
+    } catch (err) {
+      if (!retriable(err)) throw err;
+      if (canSplit && batch.length > 4) {
+        const half = Math.ceil(batch.length / 2);
+        await scan(batch.slice(0, half), step, task, false);
+        await scan(batch.slice(half), step, task, false);
+      } else progress.onIncomplete?.(step, batch.length);
+      return;
+    }
     const allowed = new Set(batch.map((m) => m.ref));
-    const j = await modelJson(model, analysisBrief + "\n逐一处理标了 priority 的重点故事，给有明确业务影响的上市标的；证据不足可留到覆盖列表。其余保留所有有清楚传导依据的重要标的，同一公司合并。另输出 signals（最多五条，每条含 text 和 refs）保留其他批次可能用到的预算、供应瓶颈、政策、竞争反应和反证。refs 只填原材料编号。仅输出 JSON：" + shape + "\n材料：\n" + JSON.stringify(batch), timeoutMs);
     drafts.push(...proposals(j.items, allowed));
     for (const signal of list(j.signals).slice(0, 5)) {
       const refs = refsOf(signal?.refs, allowed);
-      if (refs.length && text(signal?.text)) signals.push({ text: text(signal.text, 220), refs });
+      if (refs.length && text(signal?.text)) signals.push({ text: text(signal.text, 180), refs });
+    }
+    if (step === "market_scan") {
+      scanned += batch.length;
+      progress.onScan?.(scanned);
     }
   }
-  if (materials.length > BATCH && (drafts.length || signals.length)) {
-    const used = new Set(drafts.flatMap((x) => x.refs.concat(x.links.flatMap((a) => a.refs))).concat(signals.flatMap((x) => x.refs)));
-    for (const m of materials) if (m.priority) used.add(m.ref);
-    const evidence = materials.filter((m) => used.has(m.ref));
-    const j = await modelJson(model, analysisBrief + "\n以下是各批的候选、线索和原报道。跨批组合线索、寻找相反证据和共同约束，每个有依据的重点标的都须保留；不同公司不要为了压缩条数而合并。只引用给出的材料编号。仅输出 JSON：" + shape +
-      "\n候选：" + JSON.stringify(drafts) + "\n线索：" + JSON.stringify(signals) + "\n原报道：" + JSON.stringify(evidence), timeoutMs);
-    const merged = proposals(j.items, used);
-    drafts = merged.concat(drafts);
+
+  for (let offset = 0; offset < materials.length; offset += BATCH) {
+    const batch = materials.slice(offset, offset + BATCH);
+    await scan(batch, "market_scan", "\n逐一处理标了 priority 的重点故事，给有明确业务影响的上市标的。其余保留有清楚传导依据的重要标的。输出至多 5 条 signals，含 text 和 refs。每个依据使用原文编号。");
   }
-  // 用发布时相同的校验和去重规则检查覆盖。已经被校验剔除的草稿无法覆盖重点。
+  if (materials.length > BATCH && (drafts.length || signals.length)) {
+    // 汇总只传去重后的线索和必要摘录。全文已在分批时看过，候选引用仍按原文核对。
+    const compactDrafts = drafts.slice(0, 36).map((x) => ({ market: x.market, company: x.company, ticker: x.ticker, direction: x.direction, finding: text(x.finding || x.mechanism, 160), refs: x.refs }));
+    const compactSignals = signals.slice(0, 40);
+    const used = new Set(compactDrafts.flatMap((x) => x.refs).concat(compactSignals.flatMap((x) => x.refs)));
+    const evidence = materials.filter((m) => used.has(m.ref)).slice(0, 30).map((m) => promptMaterial(m, 200));
+    const allowed = new Set(evidence.map((m) => m.ref).concat([...used]));
+    try {
+      const j = await modelJson(model, analysisBrief + "\n跨批组合线索，寻找相反证据与共同约束；只写有新增洞见的公司，保留原草案。只引用提供的编号。JSON：" + shape +
+        "\n候选：" + JSON.stringify(compactDrafts) + "\n线索：" + JSON.stringify(compactSignals) + "\n摘录：" + JSON.stringify(evidence), timeoutMs, "market_merge");
+      drafts = proposals(j.items, allowed).concat(drafts);
+    } catch (err) {
+      if (!retriable(err)) throw err;
+      progress.onIncomplete?.("market_merge", 0);
+    }
+  }
   const eligible = publishMarketImpact(drafts, materials);
   const missingTitles = new Set(eligible.coverage.map((c) => c.title));
-  const focus = new Map();
-  for (const m of materials) if (m.priority) {
-    const group = focus.get(m.priority) || [];
-    group.push(m);
-    focus.set(m.priority, group);
-  }
-  const missing = [...focus.entries()].filter(([title]) => missingTitles.has(title)).flatMap(([, group]) => group);
+  const missing = materials.filter((m) => missingTitles.has(m.priority));
   for (let offset = 0; offset < missing.length; offset += BATCH) {
-    const evidence = missing.slice(offset, offset + BATCH);
-    const j = await modelJson(model, analysisBrief + "\n补查以下没有通过发布校验的重点故事。逐条先识别消息直接涉及的上市公司，并解释直接业务影响，再考虑 A 股映射。若业务影响仍不明确，可以留空。JSON：" + shape + "\n原报道：" + JSON.stringify(evidence), timeoutMs);
-    drafts.push(...proposals(j.items, new Set(evidence.map((m) => m.ref))));
+    await scan(missing.slice(offset, offset + BATCH), "market_focus", "\n补查没有通过发布校验的重点故事。先识别消息直接涉及的上市公司并解释业务影响，再考虑 A 股映射。证据不足时可留空。");
   }
+  if (materials.length && !scanned && !drafts.length) throw new Error("market_timeout_or_empty");
   return drafts;
 }
 
@@ -251,14 +281,14 @@ export function publicMarketImpact(state) {
   if (!state) return null;
   const { phase, count, report, materials = [], reviewError } = state;
   const used = new Set((report?.items || []).flatMap((x) => x.refs.concat(x.links.flatMap((a) => a.refs))).concat((report?.coverage || []).map((c) => c.ref)));
-  return { phase, count, report, reviewError, audit: state.audit || null, delivery: state.delivery?.status || null, sources: materials.filter((m) => used.has(m.ref)).map(({ text, ...m }) => m), canReview: Boolean(state.report?.items.length) };
+  return { phase, count, scanned: state.scanned ?? null, incomplete: state.incomplete || [], error: state.error || null, report, reviewError, audit: state.audit || null, delivery: state.delivery?.status || null, sources: materials.filter((m) => used.has(m.ref)).map(({ text, ...m }) => m), canReview: Boolean(state.report?.items.length) };
 }
 
 /** 取研判发布以后确实发布且抓到的公司新报道，避免拿旧材料冒充验证。 */
 export function marketFollowup(db, items, since) {
   const find = db.prepare(`SELECT a.title, a.title_zh, a.summary, a.url, a.published_at AS at, COALESCE(s.name, a.source_id) AS source
     FROM articles a LEFT JOIN sources s ON s.id = a.source_id
-    WHERE a.first_seen_at > ? AND a.published_at > ? AND COALESCE(a.kind,'news') IN ('news','digest_item')
+    WHERE a.first_seen_at > ? AND a.published_at > ? AND ${marketEvidence}
       AND (instr(lower(a.title), lower(?)) > 0 OR instr(lower(a.title_zh), lower(?)) > 0 OR instr(lower(a.summary), lower(?)) > 0)
     ORDER BY a.published_at DESC LIMIT 5`);
   const byUrl = new Map();
@@ -284,7 +314,7 @@ export async function auditMarketImpact(model, items, followup, timeoutMs, feedb
     "原始证据：" + JSON.stringify(original),
     "后续报道：" + JSON.stringify(followup),
     feedback ? "读者复核线索（不可当作证据）：" + JSON.stringify(feedback) : "",
-  ].join("\n"), timeoutMs);
+  ].join("\n"), timeoutMs, "market_audit");
   const evidence = new Map(followup.map((m) => [m.ref, m]));
   return cohort.map((x) => {
     const v = j.items.find((z) => z?.id === x.id);

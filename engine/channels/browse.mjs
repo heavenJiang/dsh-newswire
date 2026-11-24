@@ -293,10 +293,47 @@ const CLS_BODY = [
   "const payload = { items: Array.from(items.values()), pages, stop };"
 ];
 
+const XUEQIU_DISCUSSIONS = [
+  "const payload = await page.evaluate(async ({ jobUrl, max }) => {",
+  "  if (!['xueqiu.com', 'www.xueqiu.com'].includes(location.hostname)) return { error: 'session_redirected' };",
+  "  if (/验证码|安全验证|captcha/i.test(document.title)) return { error: 'session_challenge' };",
+  "  const stock = new URL(jobUrl).pathname.split('/').at(-1);",
+  "  const authors = new Map(); const seen = new Set(); const items = [];",
+  "  let pages = 0, partial = false;",
+  "  for (let n = 1; n <= 5; n++) {",
+  "    const query = new URLSearchParams({ symbol: stock, count: String(max), page: String(n), sort: 'time' });",
+  "    const response = await fetch('/query/v1/symbol/search/status?' + query, { credentials: 'same-origin',",
+  "      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, signal: AbortSignal.timeout(6500) }).catch(() => null);",
+  "    const data = response?.ok ? await response.json().catch(() => null) : null;",
+  "    const rows = data?.list ?? data?.statuses ?? data?.data?.list;",
+  "    if (!Array.isArray(rows)) {",
+  "      if (!pages) return { error: response?.status === 401 || response?.status === 403 ? 'session_denied' : 'discussion_unavailable' };",
+  "      partial = true; break;",
+  "    }",
+  "    pages++; let rawNew = 0; let recent = 0;",
+  "    for (const r of rows) {",
+  "      if (!r?.id || seen.has(r.id)) continue;",
+  "      seen.add(r.id); rawNew++;",
+  "      const at = Number(r.created_at) || Date.parse(r.created_at);",
+  "      if (!at || at < Date.now() - 3 * 86400000) continue;",
+  "      recent++;",
+  "      if (!(r.user?.id || r.user_id) || r.retweeted_status || Number(r.retweet_status_id) > 0 || r.source_status || r.type === 'news' || r.user?.is_org || r.user?.verified_type === 1) continue;",
+  "      const body = String(r.description || r.text || '').replace(/<[^>]*>/g, ' ').slice(0, 1000);",
+  "      if (!body || /^(?:【|\\[)?(?:公司公告|媒体报道|新闻快讯|研报摘要)/.test(body.trim())) continue;",
+  "      const author = String(r.user?.id || r.user_id); if (!authors.has(author)) authors.set(author, authors.size + 1);",
+  "      items.push({ author: authors.get(author), at, text: body });",
+  "    }",
+  "    if (!rawNew || !recent || rows.length < max || (Number(data.maxPage) > 0 && n >= Number(data.maxPage))) break;",
+  "    if (n === 5) partial = true;",
+  "  }",
+  "  return { items, pages, partial };",
+  "}, { jobUrl: JOB_URL, max: MAXN });"
+];
+
 export function renderJob(mode, url, max, opts) {
   const m = opts || {};
   const token = m.token || "x";
-  let body = mode === "rss" ? RSS_BODY : mode === "cls_api" ? CLS_BODY : mode === "article" ? ARTICLE_BODY : mode === "html" ? (m.raw ? RAW_HTML_BODY : HTML_BODY) : mode === "select" ? SELECT_BODY : mode === "outline" ? OUTLINE_BODY : mode === "read" ? READ_BODY : INDEX_BODY;
+  let body = mode === "rss" ? RSS_BODY : mode === "cls_api" ? CLS_BODY : mode === "article" ? ARTICLE_BODY : mode === "html" ? (m.raw ? RAW_HTML_BODY : HTML_BODY) : mode === "select" ? SELECT_BODY : mode === "outline" ? OUTLINE_BODY : mode === "read" ? READ_BODY : mode === "xueqiu-discussions" ? XUEQIU_DISCUSSIONS : INDEX_BODY;
   const pre = mode === "cls_api" ? [] : head(url);
   const fill = (l) => l.replaceAll("WAITFOR", JSON.stringify(m.waitFor || ""));
   if (mode === "select") body = body.map((l) => l.replaceAll("EXTRACT", JSON.stringify(m.extract || {})));
