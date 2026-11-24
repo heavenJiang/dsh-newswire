@@ -1028,10 +1028,10 @@ window.__ModuleLoader__.load({
       if (!r && !m.running && !props.canRun && !m.phase) return null
       return h('div', { className: 'nw-market-impact' }, h('section', { className: 'nw-sec' },
         h('h2', { className: 'nw-sec-h' }, t('mi.title'),
-          props.canRun && (!r || m.phase === 'failed' || (m.incomplete || []).length) ? h('button', { className: 'nw-mini', disabled: m.running, onClick: function () { props.onRun('generate') } }, t(m.phase === 'failed' || (m.incomplete || []).length ? 'sr.resume' : 'mi.run')) : null),
+          props.canRun && (!r || m.phase === 'failed' || m.phase === 'partial' || (m.incomplete || []).length) ? h('button', { className: 'nw-mini', disabled: m.running, onClick: function () { props.onRun(m.phase === 'partial' && m.incomplete?.length ? 'resume' : 'generate') } }, t(m.phase === 'failed' || (m.incomplete || []).length ? 'sr.resume' : 'mi.run')) : null),
         m.running ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, m.count > 0 && m.scanned != null ? t('mi.progress', { n: m.scanned, total: m.count }) : t('mi.analyzing')) : null,
-        !m.running && (m.phase === 'failed' || m.phase === 'analyzing') ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t(m.error === 'timeout' ? 'mi.timeout' : 'mi.failed')) : null,
-        !m.running && (m.incomplete || []).length ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t('mi.partial')) : null,
+        !m.running && (m.phase === 'failed' || m.phase === 'partial' || m.phase === 'analyzing') ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t(m.error === 'timeout' ? 'mi.timeout' : 'mi.failed')) : null,
+        !m.running && m.phase === 'partial' ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t('mi.partial')) : null,
         r ? [
           h('p', { key: 'read', className: 'nw-muted nw-xs' }, t('mi.read', { n: m.scanned == null ? m.count : m.scanned }), m.delivery ? ' · ' + t(m.delivery === 'pending' ? 'mi.pending' : 'mi.delivered') : null),
           !r.items.length ? h('p', { key: 'empty' }, t('mi.empty')) : null,
@@ -2885,13 +2885,13 @@ window.__ModuleLoader__.load({
             edition.edition && job.editionId === edition.edition.id && edition.diff ? ' · ' + t('sr.storyCounts', { n: edition.diff.counts.new, dev: edition.diff.counts.dev }) : '',
             job.failed.length ? h('span', null, ' · ' + t('sr.missing') + ' ' + job.failed.join(', '), ' ',
               h('button', { className: 'nw-mini', disabled: fetching, onClick: function () { fetchNews('retry_sources') } }, t('sr.retry'))) : null) : null,
-          report && report.compared ? (report.changes.length ? report.changes.map(function (c) {
+          edition && edition.edition ? h(MarketImpact, { key: edition.edition.id, market: edition.market, canRun: edition.can_analyze, onRun: runMarket, onStock: selectStock }) : null,
+          report && report.compared ? h('details', null, h('summary', null, t('sr.changes')), (report.changes.length ? report.changes.map(function (c) {
             return h('details', { key: c.market + c.ticker, className: 'nw-mi-card' },
               h('summary', null, h('strong', null, c.company), ' · ' + t('sr.' + c.kind) + ' · ' + (c.kind === 'direction' ? c.before + ' → ' : '') + c.direction, h('p', null, c.finding)),
               c.evidence.map(function (e, i) { return h('p', { key: i }, /^https?:\/\//i.test(e.url || '') ? h('a', { className: 'nw-link', href: e.url, target: '_blank', rel: 'noopener noreferrer' }, e.title) : e.title,
                 e.published ? ' · ' + t('sr.published') + ' ' + when(e.published) : '', e.fetched ? ' · ' + t('sr.fetched') + ' ' + when(e.fetched) : '') }))
-          }) : h('p', null, t('sr.noChanges'))) : null),
-        edition && edition.edition ? h(MarketImpact, { key: edition.edition.id, market: edition.market, canRun: edition.can_analyze, onRun: runMarket, onStock: selectStock }) : null,
+          }) : h('p', null, t('sr.noChanges')))) : null),
         edition && edition.previous ? h('details', null, h('summary', null, t('sr.previous') + ' · ' + when(edition.previous.at)),
           h(MarketImpact, { market: edition.previous.market, onStock: selectStock })) : null,
         h('section', { className: 'nw-sec nw-sr-stock' },

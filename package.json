@@ -1,7 +1,7 @@
 {
   "name": "dsh-newswire",
-  "version": "1.1.50",
-  "description": "见微知著 (Newswire) for DeepSeek Harness: news from dozens of Chinese and international outlets, read by an LLM and laid out as a newspaper-style edition with storylines and cited, fact-checked copy; tracking of companies, technologies and themes with impact and outlook analysis; phone pushes and a daily digest. LLM mode or save-tokens mode.",
+  "version": "1.1.51",
+  "description": "\u89c1\u5fae\u77e5\u8457 (Newswire) for DeepSeek Harness: news from dozens of Chinese and international outlets, read by an LLM and laid out as a newspaper-style edition with storylines and cited, fact-checked copy; tracking of companies, technologies and themes with impact and outlook analysis; phone pushes and a daily digest. LLM mode or save-tokens mode.",
   "keywords": [
     "deepseek-harness",
     "dsh",
@@ -13,8 +13,8 @@
     "browse",
     "agent-reach",
     "sqlite",
-    "新闻",
-    "见微知著",
+    "\u65b0\u95fb",
+    "\u89c1\u5fae\u77e5\u8457",
     "llm",
     "tracking"
   ],

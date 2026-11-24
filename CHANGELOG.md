@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.51 (2026-11-24)
+
+- Stock research displays the full report first, retries token-limit failures in smaller batches, and preserves partial status with a resume action.
+
 ## 1.1.50 (2026-11-23)
 
 - Research supports on-demand news checks, retries for failed sources and incomplete model batches, and individual stock refreshes. Changes to company findings appear first and are included in mobile updates.

@@ -25,10 +25,16 @@ test("整轮分批取材，汇总跨批依据，独立审查过滤无出处的�
   materials[0] = article(1, "示例云 TEST 上调采购", "示例云调整设备采购计划");
   materials[1] = article(2, "示例云披露另一份租赁合同");
   materials[45] = article(46, "机房并网延期", "示例电气供电系统进入项目");
-  const analyst = modelFor({ items: [{ ...finding, refs: [1, 999] }], signals: [] }, { items: [], signals: [{ text: "并网延后", refs: [46] }] }, { items: [finding] });
+  const analyst = { prompts: [], complete: async (prompt) => {
+    analyst.prompts.push(prompt);
+    if (prompt.includes("跨批组合")) return JSON.stringify({ items: [finding] });
+    if (prompt.includes("示例云 TEST")) return JSON.stringify({ items: [{ ...finding, refs: [1, 999] }], signals: [] });
+    if (prompt.includes("机房并网延期")) return JSON.stringify({ items: [], signals: [{ text: "并网延后", refs: [46] }] });
+    return JSON.stringify({ items: [], signals: [] });
+  } };
   const draft = await draftMarketImpact(analyst, materials, 5000);
-  assert.equal(analyst.prompts.length, 3);
-  assert.match(analyst.prompts[2], /机房并网延期/);
+  assert.ok(analyst.prompts.length > 3);
+  assert.ok(analyst.prompts.some((prompt) => prompt.includes("机房并网延期")));
   const supporting = marketReviewMaterials(draft, materials);
   assert.deepEqual(supporting.map((x) => x.ref), [1, 2, 46]);
 
@@ -189,7 +195,7 @@ test("研判超时拆分重试，归并超时不丢已完成的分析", async ()
     seen.push(opt.step);
     assert.ok(opt.maxTokens < 10000);
     assert.ok(prompt.length < 19000);
-    if (opt.step === "market_merge" || (opt.step === "market_scan" && ++scans === 1)) throw new Error("timeout");
+    if (opt.step === "market_merge" || (opt.step === "market_scan" && ++scans === 1)) throw new Error(opt.step === "market_merge" ? "maximum tokens reached" : "timeout");
     return JSON.stringify({ items: prompt.includes('"ref":1,') ? [{ ...finding, refs: [1], links: [] }] : [] });
   } };
   const checkpoints = {};
@@ -199,7 +205,7 @@ test("研判超时拆分重试，归并超时不丢已完成的分析", async ()
     onIncomplete: (stage, n) => incomplete.push([stage, n]),
   });
   assert.equal(count, mats.length);
-  assert.equal(seen.filter((s) => s === "market_scan").length, 4);
+  assert.equal(seen.filter((s) => s === "market_scan").length, 9);
   assert.deepEqual(incomplete, [["market_merge", 0]]);
   assert.equal(publishMarketImpact(draft, mats).items[0].company, "示例云");
   const resumed = modelFor({ items: [] });

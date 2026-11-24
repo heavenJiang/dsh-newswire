@@ -813,7 +813,7 @@ export function apply(ctx, config) {
     });
   }
 
-  function startMarketImpact(edition, reader) {
+  function startMarketImpact(edition, reader, resume = false) {
     const key = marketKey(edition);
     const prior = withDb(p, (db) => readMarketImpact(db, edition));
     if (!key || marketJobs.has(key) || marketAudits.has(key) || (!reader && prior?.v === 2
@@ -832,7 +832,7 @@ export function apply(ctx, config) {
       void background(queue.run({ kind: "analysis", label: "股票影响研判", priority: reader ? PRIORITY.reader : PRIORITY.background }, async () => {
         try {
           const materials = withDb(p, (db) => marketMaterials(db, edition));
-          const checkpoints = prior?.checkpoints || {};
+          const checkpoints = resume ? (prior?.checkpoints || {}) : {};
           const incomplete = [];
           let scanned = 0;
           patchMarket(edition, { count: materials.length });
@@ -851,7 +851,7 @@ export function apply(ctx, config) {
           const message = marketPushMessage(pushReport, bjHhmm(edition.created_at), deliveryBase === baseline ? report.changes : marketChanges(report, materials, deliveryBase));
           const previous = prior?.v === 2 ? prior : null;
           const delivery = message ? (previous?.delivery?.text === message ? previous.delivery : { status: "pending", text: message }) : previous?.delivery?.status === "sent" ? previous.delivery : null;
-          patchMarket(edition, { phase: "ready", count: materials.length, scanned, incomplete, materials: [...new Map(marketReviewMaterials(draft, materials).concat(materials.filter((m) => report.coverage.some((c) => c.ref === m.ref))).map((m) => [m.ref, m])).values()],
+          patchMarket(edition, { phase: incomplete.length ? "partial" : "ready", count: materials.length, scanned, incomplete, materials: [...new Map(marketReviewMaterials(draft, materials).concat(materials.filter((m) => report.coverage.some((c) => c.ref === m.ref))).map((m) => [m.ref, m])).values()],
             checkpoints: incomplete.length ? checkpoints : null, draft, report, issued: nowIsoUtc(), audit: null, reviewed: null, reviewError: false, delivery });
         } catch (err) {
           patchMarket(edition, { phase: "failed", error: /timeout|timed out|request was aborted/i.test(errText(err)) ? "timeout" : "failed" });

@@ -6,7 +6,7 @@ import { bodiesFor, sample } from "./edition_base.mjs";
 import { checkText } from "./factcheck.mjs";
 import { parseJsonLoose } from "./model.mjs";
 
-const BATCH = 24;
+const BATCH = 4;
 const text = (v, n = 450) => typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "";
 const list = (v) => Array.isArray(v) ? v : [];
 const refsOf = (v, allowed) => [...new Set(list(v).filter((id) => Number.isInteger(id) && allowed.has(id)))].slice(0, 4);
@@ -105,7 +105,7 @@ const analysisBrief = [
 const shape = '{"items":[{"market":"美股或A股","company":"","ticker":"","direction":"利好/利空/双向/待确认","business":"","finding":"","mechanism":"","countercase":"","watch":"","horizon":"","expectations":"","refs":[1],"links":[{"company":"","ticker":"","relation":"直接供货/间接供货/客户/竞争替代/共同驱动","why":"","refs":[1]}]}]}';
 
 async function modelJson(model, prompt, timeoutMs, step) {
-  const value = parseJsonLoose(await model.complete(prompt, { step, maxTokens: 7500, timeoutMs }));
+  const value = parseJsonLoose(await model.complete(prompt, { step, maxTokens: 2400, timeoutMs }));
   if (!value || !Array.isArray(value.items)) throw new Error("market_bad_response");
   return value;
 }
@@ -119,7 +119,7 @@ function proposals(items, allowed) {
   });
 }
 
-const retriable = (err) => /timeout|timed out|request was aborted|market_bad_response|empty_reply/i.test(String(err?.message || err));
+const retriable = (err) => /timeout|timed out|request was aborted|market_bad_response|empty_reply|maximum.*tokens|max_tokens|token limit|length limit|context length|上下文|最大词元|最大令牌/i.test(String(err?.message || err));
 const promptMaterial = ({ ref, title, text: detail, priority, priorityReason }, limit = 420) => ({
   ref, title: text(title, 140), text: text(detail, limit), ...(priority ? { priority, priorityReason } : {}),
 });
@@ -151,7 +151,7 @@ export async function draftMarketImpact(model, materials, timeoutMs, progress = 
       j = await completed(analysisBrief + task + "\n仅输出 JSON：" + shape + "\n材料：" + JSON.stringify(batch.map((m) => promptMaterial(m))), step);
     } catch (err) {
       if (!retriable(err)) throw err;
-      if (canSplit && batch.length > 4) {
+      if (canSplit && batch.length > 1) {
         checkpoints[splitKey] = true;
         progress.onCheckpoint?.();
         await halves();

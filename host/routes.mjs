@@ -345,9 +345,9 @@ export function registerRoutes(app) {
         let diff = null;
         try { diff = db && edition ? editionDiff(db, edition) : null; } catch { diff = null; }
         const market = edition ? marketImpactView(db, edition) : null;
-        const previous = body.research && edition && !market?.report ? previousMarket(db, edition) : null;
+        const previous = body.research && edition ? previousMarket(db, edition) : null;
         return { edition, since, analyses, diff, market, ...(body.research ? { researchFetch: researchFetchView(),
-          previous: previous ? { market: publicMarketImpact(previous), at: previous.issued } : null } : {}) };
+          previous: previous ? { edition_id: previous.editionId, market: publicMarketImpact(previous), at: previous.issued } : null } : {}) };
       });
       return jsonResponse(Object.assign({ ok: true, model: modelView(), can_analyze: modeNow() === "llm" && llmReady() }, out), 200);
     },
@@ -622,7 +622,7 @@ export function registerRoutes(app) {
       if (!marketKey(edition)) return jsonResponse({ error: "not_found" }, 404);
       if (body.action === "audit") {
         if (!startMarketAudit(edition, true, strOrNull(body.feedback)?.slice(0, 400))) return jsonResponse({ error: "market_audit_unavailable" }, 409);
-      } else startMarketImpact(edition, true);
+      } else startMarketImpact(edition, true, body.action === "resume");
       const market = withDb(p, (db) => marketImpactView(db, edition));
       return jsonResponse({ ok: true, market }, 202);
     },
