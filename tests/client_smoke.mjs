@@ -183,7 +183,7 @@ cases.push(
   }],
   ["StockResearchView", () => {
     const node = T.StockResearchView({ selection: "", stamp: 1 });
-    for (const key of ["sr.market", "sr.stock", "sr.query"]) if (!JSON.stringify(node).includes(T.t(key))) throw new Error("研判页缺 " + key);
+    for (const key of ["sr.changes", "sr.fetch", "sr.market", "sr.stock", "sr.query"]) if (!JSON.stringify(node).includes(T.t(key))) throw new Error("研判页缺 " + key);
     return node;
   }],
   ["StockOverview(partial)", () => {

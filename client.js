@@ -69,6 +69,7 @@ window.__ModuleLoader__.load({
 
     var DICT = {
       zh: {
+        'sr.storyCounts': '新增事件 {n} 件，已有事件更新 {dev} 件', 'sr.fetch': "抓取最新并研判", 'sr.retry': "补抓失败来源", 'sr.resume': "补跑未完成研判", 'sr.update': "更新本股资料", 'sr.changes': "本轮变化", 'sr.fetching': "正在检查新闻源", 'sr.editing': "正在编排新版面", 'sr.failed': "抓取或编排未完成，请查看运行日志", 'sr.checked': "已检查，新增研判材料 {n} 条", 'sr.noInput': "已检查，无新增材料", 'sr.noChanges': "本轮没有新增公司判断", 'sr.missing': "未成功的来源", 'sr.previous': "上一份已发布研判", 'sr.new': "本轮新增", 'sr.direction': "方向调整", 'sr.evidence': "新增依据", 'sr.published': "原文发布", 'sr.fetched': "首次抓到", 'sr.blocked': "暂时无法启动，请查看是否已有抓取任务", 'sr.updated': "已检查本股资料",
         'tab.research': "研判", 'sr.market': "A 股态势", 'sr.stock': "个股研判", 'sr.query': "输入 A 股代码或公司简称", 'sr.search': "查找",
         'sr.none': "没有找到对应的 A 股证券", 'sr.loading': "正在加载数据…", 'sr.unavailable': "该数据源暂时不可用", 'sr.asOf': "行情截至 {t}（北京时间）", 'sr.stale': "历史或延迟行情",
         'sr.partial': "已取 {n}/{total} 条，统计为样本口径", 'sr.marketSource': "东方财富市场快照 · 腾讯财经指数", 'sr.tencentSource': "腾讯财经行情 · 巨潮证券目录", 'sr.hithinkSource': "同花顺行情接口", 'sr.apiRoute': "结构化接口", 'sr.browseRoute': "Browse 浏览器会话", 'sr.httpRoute': "公开网页", 'sr.snow': "雪球讨论情绪", 'sr.hithinkHeat': "同花顺关注热度", 'sr.heatNote': "热度反映关注程度，不能解读为看多或看空。", 'sr.heatRank': "当前榜单第 {n} 名", 'sr.heatValue': "热度 {n}", 'sr.heatOffList': "未进当前 Top 30", 'sr.heatHistory': "近 7 日热度排名", 'sr.samplePages': "已取 {n} 页", 'sr.sampleLimited': "抽样未覆盖完整 3 天", 'sr.snowBlocked': "雪球会话或讨论接口暂不可用，其他来源照常显示。", 'sr.industrySample': "行业来自东方财富样本 {n}/{total}", 'sr.industryBenchmark': "行业排名依据 {source} 的行业指数涨跌幅", 'sr.participationChange': "相比 {t}，上涨家数占比变化 {n} 个百分点", 'sr.index.sh000300': "沪深 300", 'sr.index.sh000001': "上证指数", 'sr.index.sz399001': "深证成指",
@@ -206,6 +207,7 @@ window.__ModuleLoader__.load({
         'ck.hint': '模型写的每句话里，数字、外文专名、引号里的词都要在材料里找得到；要点与各方说法找不到的已丢弃，导语找不到的标「待核」。中文人名地名无法自动核对。', 'ed.new': '新', 'ed.updated': '有进展', 'model.incr': '新增 {f} 条 · 沿用 {r} 篇稿', 'model.last': '上次编排', 'model.calls': '{n} 次调用', 'model.busy': '正在编排…', 'model.pick': '使用的模型',
       },
       en: {
+        'sr.storyCounts': '{n} new events, {dev} developing events', 'sr.fetch': "Fetch news and analyze", 'sr.retry': "Retry failed sources", 'sr.resume': "Resume incomplete analysis", 'sr.update': "Refresh stock data", 'sr.changes': "Changes this round", 'sr.fetching': "Checking sources", 'sr.editing': "Preparing edition", 'sr.failed': "Fetch or edition failed. See run log.", 'sr.checked': "Checked. {n} new research inputs.", 'sr.noInput': "Checked. No new material.", 'sr.noChanges': "No changes to company findings.", 'sr.missing': "Failed sources", 'sr.previous': "Last published report", 'sr.new': "New this round", 'sr.direction': "Direction changed", 'sr.evidence': "New evidence", 'sr.published': "Published", 'sr.fetched': "First seen", 'sr.blocked': "Could not start. Check for an active fetch.", 'sr.updated': "Stock data checked",
         'tab.research': "Research", 'sr.market': "A-share market", 'sr.stock': "Stock research", 'sr.query': "A-share code or company name", 'sr.search': "Search",
         'sr.none': "No matching A-share listing", 'sr.loading': "Loading market data…", 'sr.unavailable': "Data currently unavailable", 'sr.asOf': "Snapshot as of {t} (Beijing)", 'sr.stale': "Historical or delayed quote",
         'sr.partial': "{n}/{total} rows fetched. Metrics describe this sample.", 'sr.marketSource': "Eastmoney snapshot · Tencent Finance indices", 'sr.tencentSource': "Tencent Finance · CNINFO universe", 'sr.hithinkSource': "Hithink market API", 'sr.apiRoute': "Structured API", 'sr.browseRoute': "Browse session", 'sr.httpRoute': "Public webpage", 'sr.snow': "Xueqiu discussion sentiment", 'sr.hithinkHeat': "Hithink attention", 'sr.heatNote': "Attention ranks measure interest. They do not indicate bullish or bearish sentiment.", 'sr.heatRank': "Current rank {n}", 'sr.heatValue': "Attention {n}", 'sr.heatOffList': "Outside the current Top 30", 'sr.heatHistory': "7-day attention ranks", 'sr.samplePages': "{n} pages sampled", 'sr.sampleLimited': "Sample does not cover the full three-day window", 'sr.snowBlocked': "The Xueqiu session or discussion endpoint is unavailable. Other sources remain visible.", 'sr.industrySample': "Industries use {n}/{total} Eastmoney rows", 'sr.industryBenchmark': "Industry ranking uses sector index returns from {source}", 'sr.participationChange': "Share of advancing stocks changed by {n} percentage points since {t}", 'sr.index.sh000300': "CSI 300", 'sr.index.sh000001': "Shanghai Composite", 'sr.index.sz399001': "Shenzhen Component",
@@ -1026,7 +1028,7 @@ window.__ModuleLoader__.load({
       if (!r && !m.running && !props.canRun && !m.phase) return null
       return h('div', { className: 'nw-market-impact' }, h('section', { className: 'nw-sec' },
         h('h2', { className: 'nw-sec-h' }, t('mi.title'),
-          props.canRun && (!r || m.phase === 'failed' || (m.incomplete || []).length) ? h('button', { className: 'nw-mini', disabled: m.running, onClick: function () { props.onRun('generate') } }, t('mi.run')) : null),
+          props.canRun && (!r || m.phase === 'failed' || (m.incomplete || []).length) ? h('button', { className: 'nw-mini', disabled: m.running, onClick: function () { props.onRun('generate') } }, t(m.phase === 'failed' || (m.incomplete || []).length ? 'sr.resume' : 'mi.run')) : null),
         m.running ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, m.count > 0 && m.scanned != null ? t('mi.progress', { n: m.scanned, total: m.count }) : t('mi.analyzing')) : null,
         !m.running && (m.phase === 'failed' || m.phase === 'analyzing') ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t(m.error === 'timeout' ? 'mi.timeout' : 'mi.failed')) : null,
         !m.running && (m.incomplete || []).length ? h('p', { className: 'nw-muted nw-xs', role: 'status' }, t('mi.partial')) : null,
@@ -2779,9 +2781,11 @@ window.__ModuleLoader__.load({
       var edPair = useState(null), edition = edPair[0], setEdition = edPair[1]
       var msgPair = useState(''), message = msgPair[0], setMessage = msgPair[1]
       var busyPair = useState({}), busy = busyPair[0], setBusy = busyPair[1]
+      var reloadPair = useState(null), reload = reloadPair[0], setReload = reloadPair[1]
+      var fetchMsgPair = useState(''), fetchMsg = fetchMsgPair[0], setFetchMsg = fetchMsgPair[1]
       var searchRef = React.useRef(0)
       function loadEdition() {
-        return postJson(API.edition, { pack: 'all' }).then(setEdition).catch(function () {})
+        return postJson(API.edition, { pack: 'all', research: true }).then(setEdition).catch(function () {})
       }
       useEffect(function () {
         var active = true
@@ -2798,31 +2802,39 @@ window.__ModuleLoader__.load({
       useEffect(function () {
         if (!code) return
         var active = true
-        setDetail(null)
+        var forced = reload && reload.code === code
+        if (!forced) setDetail(null)
         setIn(setBusy, { detail: true })
         function refresh() {
-          getJson(API.stockResearch + '?code=' + encodeURIComponent(code)).then(function (r) {
+          var request = forced ? postJson(API.stockResearch, { code: code, part: 'stock' }) : getJson(API.stockResearch + '?code=' + encodeURIComponent(code))
+          forced = false
+          request.then(function (r) {
             if (active) { setDetail(r.stock); setIn(setBusy, { detail: false }) }
           }).catch(function () { if (active) { setDetail({ unavailable: true }); setIn(setBusy, { detail: false }) } })
         }
         refresh()
         var timer = setInterval(refresh, 120000)
         return function () { active = false; clearInterval(timer) }
-      }, [code])
+      }, [code, reload])
       useEffect(function () {
         if (!code) return
         var active = true
-        setSentiment(null)
+        var forced = reload && reload.code === code
+        if (!forced) setSentiment(null)
+        setIn(setBusy, { social: true })
         function refresh() {
-          getJson(API.stockResearch + '?sentiment=' + encodeURIComponent(code)).then(function (r) { if (active) setSentiment({ code: code, data: r.sentiment }) })
-            .catch(function () { if (active) setSentiment({ code: code, data: { xueqiu: { ok: false }, hithink: { ok: false } } }) })
+          var request = forced ? postJson(API.stockResearch, { code: code, part: 'sentiment' }) : getJson(API.stockResearch + '?sentiment=' + encodeURIComponent(code))
+          forced = false
+          request.then(function (r) { if (active) setSentiment({ code: code, data: r.sentiment }) })
+            .catch(function () { if (active) setSentiment({ code: code, data: { xueqiu: { ok: false }, hithink: { ok: false } } }) }).finally(function () { if (active) setIn(setBusy, { social: false }) })
         }
         refresh()
         var timer = setInterval(refresh, 300000)
         return function () { active = false; clearInterval(timer) }
-      }, [code])
+      }, [code, reload])
       function selectStock(value) {
         searchRef.current++
+        setReload(null)
         setQuery(value)
         setCode(value)
         setMatches(null)
@@ -2850,23 +2862,50 @@ window.__ModuleLoader__.load({
       }
       function runMarket(action, feedback) {
         if (!edition || !edition.edition) return
-        setMessage('')
+        setFetchMsg('')
         postJson(API.marketImpact, { edition_id: edition.edition.id, action: action, feedback: feedback })
-          .then(loadEdition).catch(function () { setMessage(t('sr.unavailable')) })
+          .then(loadEdition).catch(function () { setFetchMsg(t('sr.unavailable')) })
       }
+      var job = edition && edition.researchFetch
+      var fetching = busy.fetch || (job && ['fetching', 'editing'].includes(job.phase))
+      function fetchNews(action) {
+        setIn(setBusy, { fetch: true })
+        setFetchMsg('')
+        postJson(API.marketImpact, { action: action }).then(loadEdition)
+          .catch(function () { setFetchMsg(t('sr.blocked')) })
+          .finally(function () { setIn(setBusy, { fetch: false }) })
+      }
+      var report = edition && edition.market && edition.market.report
       return h('div', { className: 'nw-stock-research' },
-        h('section', { className: 'nw-sec' }, h('h2', { className: 'nw-sec-h' }, t('sr.market')),
-          overview ? h(StockOverview, { data: overview }) : h('p', { className: 'nw-muted', role: 'status' }, t('sr.loading'))),
+        h('section', { className: 'nw-sec' },
+          h('h2', { className: 'nw-sec-h' }, t('sr.changes')),
+          h('button', { className: 'nw-btn nw-sm', disabled: fetching || !(edition && edition.can_analyze), onClick: function () { fetchNews('fetch') } }, t('sr.fetch')),
+          fetchMsg ? h('p', { role: 'status' }, fetchMsg) : null,
+          job ? h('p', { role: 'status' }, job.at ? when(job.at) + ' · ' : '', t('sr.' + (job.phase === 'checked' && !job.count ? 'noInput' : job.phase), { n: job.count }),
+            edition.edition && job.editionId === edition.edition.id && edition.diff ? ' · ' + t('sr.storyCounts', { n: edition.diff.counts.new, dev: edition.diff.counts.dev }) : '',
+            job.failed.length ? h('span', null, ' · ' + t('sr.missing') + ' ' + job.failed.join(', '), ' ',
+              h('button', { className: 'nw-mini', disabled: fetching, onClick: function () { fetchNews('retry_sources') } }, t('sr.retry'))) : null) : null,
+          report && report.compared ? (report.changes.length ? report.changes.map(function (c) {
+            return h('details', { key: c.market + c.ticker, className: 'nw-mi-card' },
+              h('summary', null, h('strong', null, c.company), ' · ' + t('sr.' + c.kind) + ' · ' + (c.kind === 'direction' ? c.before + ' → ' : '') + c.direction, h('p', null, c.finding)),
+              c.evidence.map(function (e, i) { return h('p', { key: i }, /^https?:\/\//i.test(e.url || '') ? h('a', { className: 'nw-link', href: e.url, target: '_blank', rel: 'noopener noreferrer' }, e.title) : e.title,
+                e.published ? ' · ' + t('sr.published') + ' ' + when(e.published) : '', e.fetched ? ' · ' + t('sr.fetched') + ' ' + when(e.fetched) : '') }))
+          }) : h('p', null, t('sr.noChanges'))) : null),
+        edition && edition.edition ? h(MarketImpact, { key: edition.edition.id, market: edition.market, canRun: edition.can_analyze, onRun: runMarket, onStock: selectStock }) : null,
+        edition && edition.previous ? h('details', null, h('summary', null, t('sr.previous') + ' · ' + when(edition.previous.at)),
+          h(MarketImpact, { market: edition.previous.market, onStock: selectStock })) : null,
         h('section', { className: 'nw-sec nw-sr-stock' },
-          h('h2', { className: 'nw-sec-h' }, t('sr.stock')),
+          h('h2', { className: 'nw-sec-h' }, t('sr.stock'), code ? h('button', { className: 'nw-mini', disabled: busy.detail || busy.social, onClick: function () { setReload({ code: code, at: new Date().toISOString() }) } }, t('sr.update')) : null),
           h('form', { className: 'nw-sr-search', onSubmit: search },
             h('input', { className: 'nw-in', type: 'search', value: query, maxLength: 24, 'aria-label': t('sr.query'), placeholder: t('sr.query'), onChange: function (e) { searchRef.current++; setIn(setBusy, { search: false }); setQuery(e.target.value) } }),
             h('button', { type: 'submit', className: 'nw-btn nw-sm', disabled: busy.search }, t('sr.search'))),
           message ? h('p', { className: 'nw-muted', role: 'status' }, message) : null,
           matches ? (matches.length ? h('ul', { className: 'nw-sr-result' }, matches.map(function (s) { return h('li', { key: s.code }, h('button', { className: 'nw-mini', onClick: function () { selectStock(s.code) } }, s.name + ' · ' + s.code)) })) : h('p', { className: 'nw-muted' }, t('sr.none'))) : null,
+          reload && reload.code === code && !busy.detail && !busy.social && detail && !detail.unavailable ? h('small', { role: 'status' }, t('sr.updated') + ' · ' + when(reload.at)) : null,
           busy.detail ? h('p', { className: 'nw-muted', role: 'status' }, t('sr.loading')) : null,
           detail ? (detail.unavailable ? h('p', { className: 'nw-muted' }, t('sr.unavailable')) : h(StockCompany, { key: code, data: detail, sentiment: sentiment && sentiment.code === code ? sentiment.data : null, canExplain: Boolean(edition && edition.can_analyze) })) : null),
-        edition && edition.edition ? h(MarketImpact, { key: edition.edition.id, market: edition.market, canRun: edition.can_analyze, onRun: runMarket, onStock: selectStock }) : null)
+        h('section', { className: 'nw-sec' }, h('h2', { className: 'nw-sec-h' }, t('sr.market')),
+          overview ? h(StockOverview, { data: overview }) : h('p', { className: 'nw-muted', role: 'status' }, t('sr.loading'))))
     }
 
     function marketProvider(source) {

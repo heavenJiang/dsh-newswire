@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { apply } from "../../index.js";
 import { openDb } from "../../engine/store/schema.mjs";
-import { auditMarketImpact, draftMarketImpact, marketMaterials, marketPushMessage, marketReviewMaterials, publicMarketImpact, publishMarketImpact, readMarketImpact, writeMarketImpact } from "../../host/market_impact.mjs";
+import { auditMarketImpact, draftMarketImpact, marketChanges, marketMaterials, marketPushMessage, marketReviewMaterials, publicMarketImpact, publishMarketImpact, readMarketImpact, writeMarketImpact } from "../../host/market_impact.mjs";
 
 const article = (ref, title, text = "") => ({ ref, title, text, source: "测试来源", url: "https://example.test/" + ref });
 const finding = {
@@ -110,6 +110,7 @@ test("看板接口提供已审核的研判，重审失败保留已发布结论",
   const prompts = [];
   const routes = new Map();
   const disposers = [];
+  const fetches = [];
   apply({
     inject(deps, fn) {
       if (deps[0] === "phonePush") fn({ effect() {}, phonePush: { available: () => true, send: async (text) => { pushes.push(text); return { delivered: 1 }; } } });
@@ -119,6 +120,16 @@ test("看板接口提供已审核的研判，重审失败保留已发布结论",
         yield { type: "finish", reason: { kind: "stop" } };
       } } });
     },
+    subprocess: { spawn({ argv }) {
+      const run = argv[argv.indexOf("--run-id") + 1];
+      const only = argv.includes("--sources") ? argv[argv.indexOf("--sources") + 1] : null;
+      fetches.push(only);
+      const store = openDb(join(dir, "news.sqlite"));
+      store.prepare("INSERT INTO runs(run_id, started_at) VALUES (?,datetime('now'))").run(run);
+      store.prepare("INSERT INTO fetch_attempts(run_id,source_id,ok) VALUES (?, 'offline', ?)").run(run, only ? 1 : 0);
+      store.close();
+      return { done: Promise.resolve({ exitCode: only ? 0 : 2 }) };
+    } },
     effect(fn) { disposers.push(fn()); },
     tools: { register: () => () => {} },
     connection: { fetch: { register: (def) => { routes.set(def.path, def); return () => {}; } } },
@@ -153,6 +164,21 @@ test("看板接口提供已审核的研判，重审失败保留已发布结论",
   assert.deepEqual(after.report, first.report);
   assert.match(prompts[1], /核对并网日期/);
   assert.equal(pushes.length, 1);
+  for (const [action, phase] of [["fetch", "failed"], ["retry_sources", "checked"]]) {
+    assert.equal((await call("/api/newswire/market-impact", { action })).status, 202);
+    let job;
+    for (let i = 0; i < 100; i++) {
+      job = (await (await call("/api/newswire/edition", { research: true })).json()).researchFetch;
+      if (job.phase === phase) break;
+      await delay(10);
+    }
+    assert.equal(job.phase, phase);
+    assert.deepEqual(job.failed, action === "fetch" ? ["offline"] : []);
+    if (action === "retry_sources") assert.equal(job.count, 0);
+  }
+  assert.deepEqual(fetches, [null, "offline"]);
+  assert.equal(prompts.length, 2);
+  assert.equal(pushes.length, 1);
 });
 
 test("研判超时拆分重试，归并超时不丢已完成的分析", async () => {
@@ -166,13 +192,33 @@ test("研判超时拆分重试，归并超时不丢已完成的分析", async ()
     if (opt.step === "market_merge" || (opt.step === "market_scan" && ++scans === 1)) throw new Error("timeout");
     return JSON.stringify({ items: prompt.includes('"ref":1,') ? [{ ...finding, refs: [1], links: [] }] : [] });
   } };
+  const checkpoints = {};
   let count = 0;
   const draft = await draftMarketImpact(model, mats, 240000, {
-    onScan: (n) => { count = n; },
+    checkpoints, onScan: (n) => { count = n; },
     onIncomplete: (stage, n) => incomplete.push([stage, n]),
   });
   assert.equal(count, mats.length);
   assert.equal(seen.filter((s) => s === "market_scan").length, 4);
   assert.deepEqual(incomplete, [["market_merge", 0]]);
   assert.equal(publishMarketImpact(draft, mats).items[0].company, "示例云");
+  const resumed = modelFor({ items: [] });
+  await draftMarketImpact(resumed, mats, 240000, { checkpoints: JSON.parse(JSON.stringify(checkpoints)) });
+  assert.equal(resumed.prompts.length, 1);
+  assert.match(resumed.prompts[0], /跨批组合/);
+});
+
+test("跨轮比较按来源识别新增依据，编号变化和公司缺席不会生成推送", () => {
+  const old = { report: { items: [{ ...finding, refs: [1] }] }, materials: [article(1, "原报道")] };
+  const materials = [{ ...old.materials[0], ref: 2 }, article(3, "新公告")];
+  const report = { items: [{ ...finding, refs: [2] }] };
+  assert.deepEqual(marketChanges(report, materials, old), []);
+  assert.equal(marketPushMessage(report, "12:00", []), "");
+  report.items[0].refs.push(3);
+  const change = marketChanges(report, materials, old)[0];
+  assert.equal(change.kind, "evidence");
+  assert.deepEqual(change.evidence.map((x) => x.title), ["新公告"]);
+  report.items[0].direction = "利空";
+  assert.equal(marketChanges(report, materials, old)[0].kind, "direction");
+  assert.deepEqual(marketChanges({ items: [] }, [], old), []);
 });

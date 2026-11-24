@@ -7,7 +7,7 @@ import { setSourceState, sourceScores, thinCoverage } from "./sources.mjs";
 import { DEPTHS, usageToday } from "./runtime.mjs";
 import { answerNews, searchNews } from "./ask.mjs";
 import { latestDetail } from "./detail.mjs";
-import { marketKey } from "./market_impact.mjs";
+import { marketKey, publicMarketImpact } from "./market_impact.mjs";
 import { analysisBrief, latestAnalysis } from "./analysis.mjs";
 import { addTracker, listTrackers, removeTracker, suggestions as trackSuggestions, trackerDetail, unlinkStory } from "./tracking.mjs";
 import { PRIORITY } from "./queue.mjs";
@@ -30,7 +30,7 @@ export function registerRoutes(app) {
   const {
     afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
     guardedRun, handleReply, stopRun, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
-    pushHealth, pushNow, queue, readTaken, reflowWithFeedback, route, marketImpactView, startMarketImpact, startMarketAudit, stockResearch, runAnalysis, runDetail, runSynthesis, startDetail, syncSourceState,
+    pushHealth, pushNow, queue, readTaken, reflowWithFeedback, route, marketImpactView, startMarketImpact, startMarketAudit, startResearchFetch, researchFetchView, previousMarket, stockResearch, runAnalysis, runDetail, runSynthesis, startDetail, syncSourceState,
     syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
   } = app;
 
@@ -345,7 +345,9 @@ export function registerRoutes(app) {
         let diff = null;
         try { diff = db && edition ? editionDiff(db, edition) : null; } catch { diff = null; }
         const market = edition ? marketImpactView(db, edition) : null;
-        return { edition, since, analyses, diff, market };
+        const previous = body.research && edition && !market?.report ? previousMarket(db, edition) : null;
+        return { edition, since, analyses, diff, market, ...(body.research ? { researchFetch: researchFetchView(),
+          previous: previous ? { market: publicMarketImpact(previous), at: previous.issued } : null } : {}) };
       });
       return jsonResponse(Object.assign({ ok: true, model: modelView(), can_analyze: modeNow() === "llm" && llmReady() }, out), 200);
     },
@@ -563,10 +565,16 @@ export function registerRoutes(app) {
 
   route({
     path: "/api/newswire/stock-research",
-    methods: ["GET"],
+    methods: ["GET", "POST"],
     fetch: async (request) => {
       const query = new URL(request.url).searchParams;
       try {
+        if (request.method === "POST") {
+          const body = await bodyOf(request);
+          if (!["stock", "sentiment"].includes(body.part)) return jsonResponse({ error: "invalid_part" }, 400);
+          const data = await stockResearch.refresh(body.code, body.part);
+          return data ? jsonResponse({ [body.part]: data }, 200) : jsonResponse({ error: "invalid_a_share_code" }, 400);
+        }
         if (query.has("q")) return jsonResponse({ symbols: await stockResearch.search(query.get("q")) }, 200);
         if (query.has("sentiment")) {
           const data = await stockResearch.sentiment(query.get("sentiment"));
@@ -605,6 +613,10 @@ export function registerRoutes(app) {
     fetch: async (request) => {
       const body = await bodyOf(request);
       if (!llmReady()) return jsonResponse({ error: "no_model" }, 409);
+      if (["fetch", "retry_sources"].includes(body.action)) {
+        const job = startResearchFetch(body.action === "retry_sources");
+        return job ? jsonResponse({ ok: true, job }, 202) : jsonResponse({ error: "run_unavailable" }, 409);
+      }
       if (!Number.isSafeInteger(body.edition_id) || body.edition_id <= 0) return jsonResponse({ error: "edition_required" }, 400);
       const edition = withDb(p, (db) => db ? editionById(db, body.edition_id) : null);
       if (!marketKey(edition)) return jsonResponse({ error: "not_found" }, 404);

@@ -692,7 +692,16 @@ export function createStockResearch({ withDb, fetcher = fetch, now = Date.now, r
     if (data?.forecast?.status !== "ready") return null;
     return cached("explain:" + data.symbol.provider, 5 * 60000, () => explainStockScenarios(data, model, timeoutMs));
   }
-  return { search, overview, stock, sentiment, explain, verifyPending };
+  function refresh(value, part) {
+    const symbol = aShareSymbol(value);
+    if (!symbol) return null;
+    const code = symbol.provider;
+    const keys = part === "sentiment" ? ["snow:" + code, "heat:" + code]
+      : ["stock:" + code, "bars:" + code, "bars:" + benchmark, "explain:" + code];
+    for (const key of keys) if (inflight.get(key)?.until) inflight.delete(key);
+    return part === "sentiment" ? sentiment(value) : stock(value);
+  }
+  return { search, overview, stock, sentiment, refresh, explain, verifyPending };
 }
 
 export async function explainStockScenarios(data, model, timeoutMs) {

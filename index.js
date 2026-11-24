@@ -14,7 +14,7 @@ import { DEPTHS, depthOf, depthParams, makeGate, recordCall } from "./host/runti
 import { detailMaterials, latestDetail, saveDetail, writeDetail } from "./host/detail.mjs";
 import { createHithinkMarket } from "./host/hithink_market.mjs";
 import { createStockResearch } from "./host/stock_research.mjs";
-import { auditMarketImpact, draftMarketImpact, marketFollowup, marketKey, marketMaterials, marketPushMessage, marketReviewMaterials, publicMarketImpact, publishMarketImpact, readMarketImpact, writeMarketImpact } from "./host/market_impact.mjs";
+import { auditMarketImpact, draftMarketImpact, marketChanges, marketFollowup, marketKey, marketMaterials, marketPushMessage, marketReviewMaterials, publicMarketImpact, publishMarketImpact, readMarketImpact, writeMarketImpact } from "./host/market_impact.mjs";
 import { analysisMaterials, analyzeStory, autoAnalyzeTargets, saveAnalysis, searchQuery, webMaterials } from "./host/analysis.mjs";
 import { linkAll, repairAliasLinks, repairThemeLinks, synthTargets, synthesize } from "./host/tracking.mjs";
 import { PRIORITY, createQueue } from "./host/queue.mjs";
@@ -740,6 +740,60 @@ export function apply(ctx, config) {
   const MARKET_TRACK_MS = 7 * 86400000;
   let marketTickRunning = false;
 
+  let researchFetch = kvGet("research-fetch");
+  if (["fetching", "editing"].includes(researchFetch?.phase)) researchFetch.phase = "failed";
+  function previousMarket(db, edition) {
+    const prefix = "market-impact:" + edition.pack + ":";
+    const row = db?.prepare(`SELECT value FROM kv WHERE substr(key,1,length(?)) = ?
+      AND json_extract(value,'$.report.items') IS NOT NULL AND json_extract(value,'$.editionId') < ?
+      ORDER BY json_extract(value,'$.editionId') DESC LIMIT 1`).get(prefix, prefix, edition.id);
+    return row ? JSON.parse(row.value) : null;
+  }
+
+  function failedResearchSources(db, run) {
+    return db?.prepare("SELECT source_id FROM fetch_attempts WHERE run_id = ? GROUP BY source_id HAVING MAX(ok) = 0").all(run).map((row) => row.source_id) || [];
+  }
+
+  function startResearchFetch(retry) {
+    if (["fetching", "editing"].includes(researchFetch?.phase)) return researchFetch;
+    const sources = retry ? researchFetch?.failed : null;
+    if (busyWith() || (retry && !sources?.length)) return null;
+    const job = { run: newRunId("research"), phase: "fetching", at: nowIsoUtc(), failed: sources || [], count: null };
+    researchFetch = job;
+    kvSet("research-fetch", job);
+    void background((async () => {
+      try {
+        const result = await guardedRun({ sources: sources?.join(","), export: "none" }, job.run);
+        if (!result.ok) {
+          const failed = withDb(p, (db) => failedResearchSources(db, job.run));
+          if (failed.length) job.failed = failed;
+          throw new Error(result.stage);
+        }
+        const summary = withDb(p, (db) => ({
+          failed: failedResearchSources(db, job.run),
+          count: marketMaterials(db, { run_id: job.run, created_at: nowIsoUtc(), content: { since: sinceIso(loadLayout(p.layoutFile, p.layoutSeed).window_hours) } }).length,
+        }));
+        Object.assign(job, summary);
+        if (!job.count) {
+          job.phase = "checked";
+          pg.finish("done", "已检查新闻源");
+          return;
+        }
+        job.phase = "editing";
+        const ed = await makeEdition({ runId: job.run, pack: "all", wantLlm: modeNow() === "llm", noPush: "研判单独推送" });
+        if (!ed) throw new Error("edition_failed");
+        job.phase = "checked";
+        job.editionId = ed.id;
+      } catch (err) {
+        job.phase = "failed";
+        pg.finish("failed", errText(err));
+      } finally {
+        kvSet("research-fetch", job);
+      }
+    })(), "research fetch");
+    return job;
+  }
+
   function marketImpactView(db, edition) {
     const state = publicMarketImpact(readMarketImpact(db, edition));
     const key = marketKey(edition);
@@ -778,19 +832,27 @@ export function apply(ctx, config) {
       void background(queue.run({ kind: "analysis", label: "股票影响研判", priority: reader ? PRIORITY.reader : PRIORITY.background }, async () => {
         try {
           const materials = withDb(p, (db) => marketMaterials(db, edition));
+          const checkpoints = prior?.checkpoints || {};
           const incomplete = [];
           let scanned = 0;
           patchMarket(edition, { count: materials.length });
           const draft = await draftMarketImpact(model, materials, cfg.marketModelTimeoutMs, {
+            checkpoints, onCheckpoint: () => patchMarket(edition, { checkpoints }),
             onScan: (n) => { scanned = n; patchMarket(edition, { scanned }); },
             onIncomplete: (step, count) => incomplete.push({ step, count }),
           });
           const report = publishMarketImpact(draft, materials);
-          const message = marketPushMessage(report, bjHhmm(edition.created_at));
+          const baseline = withDb(p, (db) => previousMarket(db, edition));
+          report.compared = true;
+          report.changes = marketChanges(report, materials, baseline);
+          const deliveryBase = prior?.delivery?.status === "sent" ? prior : baseline;
+          const oldCoverage = new Set((deliveryBase?.report?.coverage || []).map((x) => x.title));
+          const pushReport = { ...report, coverage: report.coverage?.filter((x) => !oldCoverage.has(x.title)) };
+          const message = marketPushMessage(pushReport, bjHhmm(edition.created_at), deliveryBase === baseline ? report.changes : marketChanges(report, materials, deliveryBase));
           const previous = prior?.v === 2 ? prior : null;
-          const delivery = message ? (previous?.delivery?.text === message ? previous.delivery : { status: "pending", text: message }) : null;
+          const delivery = message ? (previous?.delivery?.text === message ? previous.delivery : { status: "pending", text: message }) : previous?.delivery?.status === "sent" ? previous.delivery : null;
           patchMarket(edition, { phase: "ready", count: materials.length, scanned, incomplete, materials: [...new Map(marketReviewMaterials(draft, materials).concat(materials.filter((m) => report.coverage.some((c) => c.ref === m.ref))).map((m) => [m.ref, m])).values()],
-            draft, report, issued: nowIsoUtc(), audit: null, reviewed: null, reviewError: false, delivery });
+            checkpoints: incomplete.length ? checkpoints : null, draft, report, issued: nowIsoUtc(), audit: null, reviewed: null, reviewError: false, delivery });
         } catch (err) {
           patchMarket(edition, { phase: "failed", error: /timeout|timed out|request was aborted/i.test(errText(err)) ? "timeout" : "failed" });
           throw err;
@@ -1573,7 +1635,7 @@ export function apply(ctx, config) {
     // 路由和工具各在一个文件里（host/routes.mjs、host/tools.mjs）：状态都在上面，经 app 传过去
     const app = {
       afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
-      guardedRun, handleReply, stopRun, llmReady, marketImpactView, startMarketImpact, startMarketAudit, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
+      guardedRun, handleReply, stopRun, llmReady, marketImpactView, startMarketImpact, startMarketAudit, startResearchFetch, researchFetchView: () => researchFetch, previousMarket, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
       pushHealth, pushNow, queue, readTaken, reflowWithFeedback, stockResearch, runAnalysis, runCycle, runDetail, runSynthesis, startDetail, syncSourceState,
       syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
       route, tool, disposers,

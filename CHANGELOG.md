@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.50 (2026-11-23)
+
+- Research supports on-demand news checks, retries for failed sources and incomplete model batches, and individual stock refreshes. Changes to company findings appear first and are included in mobile updates.
+
 ## 1.1.49 (2026-11-23)
 
 - Research has its own tab for A-share breadth, stock scenarios, company announcements and closing-range verification. Hithink is the preferred quote source. Xueqiu, Eastmoney and Hithink attention are shown separately. Stock-impact calls use smaller batches and an eight-minute default timeout.

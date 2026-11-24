@@ -1,6 +1,7 @@
 /**
  * 整轮股票研判、手机摘要与独立的后续验证。
  */
+import { createHash } from "node:crypto";
 import { bodiesFor, sample } from "./edition_base.mjs";
 import { checkText } from "./factcheck.mjs";
 import { parseJsonLoose } from "./model.mjs";
@@ -89,7 +90,7 @@ export function marketMaterials(db, ed) {
   rows.sort((a, b) => Number(priority.has(b.id)) - Number(priority.has(a.id)));
   const bodies = bodiesFor(db, rows.map((r) => r.id));
   return rows.map((r, i) => ({
-    ref: i + 1, priority: priority.get(r.id)?.title || null, priorityReason: priority.get(r.id)?.reason || null, title: text(r.title_zh || r.title, 160), source: r.source, at: r.published_at || r.first_seen_at, url: r.url,
+    ref: i + 1, priority: priority.get(r.id)?.title || null, priorityReason: priority.get(r.id)?.reason || null, title: text(r.title_zh || r.title, 160), source: r.source, published: r.published_at, fetched: r.first_seen_at, at: r.published_at || r.first_seen_at, url: r.url,
     text: [r.title_zh ? text(r.title, 160) : "", text(r.summary, 280), sample(r.origin_text || bodies.get(r.id) || r.content, 600, "head-middle-tail")].filter(Boolean).join(" "),
   }));
 }
@@ -127,16 +128,33 @@ export async function draftMarketImpact(model, materials, timeoutMs, progress = 
   let drafts = [];
   let scanned = 0;
   const signals = [];
+  const checkpoints = progress.checkpoints || {};
+  const fingerprint = (value) => createHash("sha256").update(value).digest("hex");
+  async function completed(prompt, step) {
+    const key = fingerprint(step + prompt);
+    if (checkpoints[key]) return checkpoints[key];
+    const result = await modelJson(model, prompt, timeoutMs, step);
+    checkpoints[key] = result;
+    progress.onCheckpoint?.();
+    return result;
+  }
   async function scan(batch, step, task, canSplit = true) {
+    const splitKey = fingerprint(step + task + JSON.stringify(batch.map((m) => promptMaterial(m))));
+    const halves = async () => {
+      const half = Math.ceil(batch.length / 2);
+      await scan(batch.slice(0, half), step, task, false);
+      await scan(batch.slice(half), step, task, false);
+    };
+    if (canSplit && checkpoints[splitKey]) return halves();
     let j;
     try {
-      j = await modelJson(model, analysisBrief + task + "\n仅输出 JSON：" + shape + "\n材料：" + JSON.stringify(batch.map((m) => promptMaterial(m))), timeoutMs, step);
+      j = await completed(analysisBrief + task + "\n仅输出 JSON：" + shape + "\n材料：" + JSON.stringify(batch.map((m) => promptMaterial(m))), step);
     } catch (err) {
       if (!retriable(err)) throw err;
       if (canSplit && batch.length > 4) {
-        const half = Math.ceil(batch.length / 2);
-        await scan(batch.slice(0, half), step, task, false);
-        await scan(batch.slice(half), step, task, false);
+        checkpoints[splitKey] = true;
+        progress.onCheckpoint?.();
+        await halves();
       } else progress.onIncomplete?.(step, batch.length);
       return;
     }
@@ -164,8 +182,8 @@ export async function draftMarketImpact(model, materials, timeoutMs, progress = 
     const evidence = materials.filter((m) => used.has(m.ref)).slice(0, 30).map((m) => promptMaterial(m, 200));
     const allowed = new Set(evidence.map((m) => m.ref).concat([...used]));
     try {
-      const j = await modelJson(model, analysisBrief + "\n跨批组合线索，寻找相反证据与共同约束；只写有新增洞见的公司，保留原草案。只引用提供的编号。JSON：" + shape +
-        "\n候选：" + JSON.stringify(compactDrafts) + "\n线索：" + JSON.stringify(compactSignals) + "\n摘录：" + JSON.stringify(evidence), timeoutMs, "market_merge");
+      const j = await completed(analysisBrief + "\n跨批组合线索，寻找相反证据与共同约束；只写有新增洞见的公司，保留原草案。只引用提供的编号。JSON：" + shape +
+        "\n候选：" + JSON.stringify(compactDrafts) + "\n线索：" + JSON.stringify(compactSignals) + "\n摘录：" + JSON.stringify(evidence), "market_merge");
       drafts = proposals(j.items, allowed).concat(drafts);
     } catch (err) {
       if (!retriable(err)) throw err;
@@ -325,11 +343,32 @@ export async function auditMarketImpact(model, items, followup, timeoutMs, feedb
   });
 }
 
-export function marketPushMessage(report, at) {
+// A missing company in a later news window is not a withdrawal.
+export function marketChanges(report, materials, previous) {
+  const sourceKeys = (item, rows) => new Set(rows.filter((m) => item.refs.includes(m.ref)).map((m) => m.url || m.title));
+  const changes = [];
+  for (const item of report.items) {
+    const old = previous?.report?.items.find((x) => x.market === item.market && x.ticker === item.ticker);
+    const known = old ? sourceKeys(old, previous.materials || []) : new Set();
+    const evidence = materials.filter((m) => item.refs.includes(m.ref) && !known.has(m.url || m.title));
+    if (old && !evidence.length && old.direction === item.direction) continue;
+    const kind = !old ? "new" : old.direction === item.direction ? "evidence" : "direction";
+    changes.push({ kind, company: item.company, ticker: item.ticker, market: item.market, before: old?.direction,
+      direction: item.direction, finding: item.finding || item.mechanism, evidence: evidence.map(({ title, url, published, fetched }) => ({ title, url, published, fetched })) });
+  }
+  return changes;
+}
+
+export function marketPushMessage(report, at, changes) {
   if (!report.items.length && !report.coverage?.length) return "";
   const lines = ["📊 **股票影响研判** · " + at + "（待后续验证）"];
+  if (changes) {
+    if (!changes.length && !report.coverage?.length) return "";
+    for (const c of changes) lines.push("", "**" + c.company + "** · " + ({ new: "本轮新增", evidence: "新增依据", direction: "方向调整" })[c.kind] + " · " + (c.kind === "direction" ? c.before + " → " : "") + c.direction, c.finding, ...c.evidence.map((e) => e.title));
+  }
   for (const x of report.items) {
-    lines.push("", "**" + x.company + (x.identified ? " " + x.ticker : "（代码待核实）") + "** · " + x.market + " · " + x.direction, x.finding || x.mechanism);
+    if (changes && !changes.some((c) => c.ticker === x.ticker && c.market === x.market)) continue;
+    if (!changes) lines.push("", "**" + x.company + (x.identified ? " " + x.ticker : "（代码待核实）") + "** · " + x.market + " · " + x.direction, x.finding || x.mechanism);
     if (x.watch) lines.push("验证信号：" + x.watch);
     if (x.links.length) lines.push("关联 A 股：" + x.links.map((a) => a.company + (a.supported ? " " + a.ticker : "（待核实）") + " · " + a.relation).join("、"));
   }
