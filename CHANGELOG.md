@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.53 (2026-11-24)
+
+- Use a two-column research layout in wide panels.
+
 ## 1.1.52 (2026-11-24)
 
 - Redesign the research dashboard and improve report readability on narrow screens.
