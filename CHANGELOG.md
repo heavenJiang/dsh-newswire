@@ -2,6 +2,11 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.46 (2026-11-23)
+
+- Pushes include an available summary or update for each selected story. Key stories retain more detail in the short format.
+- Today opens with new and developing stories. The full edition labels carried-over stories and shows the earliest and latest report times when available.
+
 ## 1.1.45 (2026-11-17)
 
 - **New: stop a running round.** Reader request: once a round started there was no way to stop it. The flow panel (Run tab, and the progress strip on Today) now has a Stop button while a round runs; it asks once, then stops everything that round started: the engine process is terminated (it releases the run lock on the way out, and the run is recorded as `stopped`), the round's running model call is cancelled and its queued calls leave the queue, no fallback edition is saved, half-written progress editions are removed, and the round pushes nothing (its pending "push when ready" record is dropped). Work the reader asked for (detailed reports, impact analyses, questions) is outside any round and keeps running. The step it stopped on shows as stopped, not done, and stays out of the timing estimates. The next scheduled round runs as usual. The same is available to the assistant as the `newswire_stop` tool and to scripts as `POST /api/newswire/stop`; the read-only viewer does not offer it. Checked on a copy of the live data with a fake host and a slow model: stopping during fetching ended the engine in about 0.1–0.4 s with the lock released; stopping during the edition cancelled the model call, saved no edition and triggered no push; a new round afterwards ran normally.
