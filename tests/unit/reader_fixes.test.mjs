@@ -73,6 +73,8 @@ test("最新快讯：按时间倒排，同一件事只列一次，分数低的�
   add("a6", "a", 30, 40, "e6"); // 甲的第 4 条
   add("b1", "b", 35, null, null);
   add("p1", "b", 1, null, null, "promo");
+  add("old", "b", 3, null, null);
+  db.prepare("UPDATE articles SET published_at = ? WHERE id = 'old'").run(iso(24 * 3600000));
   const out = latestWire(db, { hours: 6, limit: 10, editionAt: iso(12 * 60000) });
   assert.deepEqual(out.map((x) => x.id), ["a1", "a4", "a5", "b1"]);
   assert.equal(out[0].title, "标题a1", "去掉「2026.11.11 - 9分钟前」");

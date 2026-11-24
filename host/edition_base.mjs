@@ -223,7 +223,7 @@ export function storyFacts(items) {
   const origin = originOf(items);
   return {
     outlets, reposts, ...(community.length ? { community } : {}), ...(origin ? { origin } : {}), source_count: outlets.length, credibility, event_ids: eventIds, lead_event_id: leadEvent ? leadEvent[0] : null,
-    article_ids: items.map((it) => it.id), lead_article_id: lead.id, url: lead.url, first_seen_at: times[0] || null, published_at: pubs[0] || null,
+    article_ids: items.map((it) => it.id), lead_article_id: lead.id, url: lead.url, first_seen_at: times[0] || null, published_at: pubs[0] || null, latest_published_at: pubs.at(-1) || null,
     dispute: items.map((it) => parseJ(it.ev_dispute, null)).find(Boolean) || null,
   };
 }

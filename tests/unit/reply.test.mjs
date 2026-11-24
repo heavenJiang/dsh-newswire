@@ -29,7 +29,7 @@ test("解析回复：只有序号是展开；没用先于有用；后面跟一�
   assert.equal(parseReply("0"), null);
 });
 
-test("当天序号：按消息里的顺序接着今天已推的往下编，记进推送；短消息每条只有标题、一句话和来源，结尾教怎么回复", () => {
+test("当天序号：按消息里的顺序接着今天已推的往下编，记进推送；短消息保留重点细节和普通新闻摘要，结尾教怎么回复", () => {
   const db = tmp();
   const picks = [st("m", "markets", 40), st("p", "politics", 70), st("t", "tech", 45, { reason: "followup", update_text: "新增 2 篇：某公司回应。后面还有一句。" })];
   numberPicks(db, orderPicks(picks).flatMap((g) => g.items));
@@ -46,9 +46,9 @@ test("当天序号：按消息里的顺序接着今天已推的往下编，记�
   const brief = composeEditionMessage({ hhmm: "18:08", md: "11-10", warnings: [], title: "要闻", format: "brief", tracked: [{ name: "英伟达", stories: ["t"] }] }, picks, { headline: "总括", mode: "llm", model: "m", items_read: 9 }, {}).split("\n");
   assert.equal(brief[3], "🔭 你追踪的有动静：英伟达");
   const p = brief.indexOf("**1. 标题p**");
-  assert.equal(brief[p + 1], "p的导语第一句，写明时间和地点。", "短消息只留一句");
-  assert.match(brief[p + 2], /^\[财联社电报\]/, "重点也不带要点和影响");
-  assert.ok(!brief.some((l) => l.startsWith("· ") || l.startsWith("影响：")));
+  assert.match(brief[p + 1], /第二句补充细节/);
+  assert.deepEqual(brief.slice(p + 2, p + 4), ["· 要点一", "影响：影响一句。"]);
+  assert.match(brief[p + 4], /^\[财联社电报\]/);
   const t = brief.indexOf("**2. 【进展】标题t** 🔭英伟达");
   assert.ok(t > 0, brief.join("|"));
   assert.equal(brief[t + 1], "进展：新增 2 篇：某公司回应。");
@@ -90,29 +90,27 @@ test("展开与详细报道的消息；追踪对象命中；感兴趣算半票�
   db.close();
 });
 
-test("一条推送写多少有上限：隔夜上百条时，前 12 条一句话、再 18 条只列标题、其余只报个数；条数不多时照旧", async () => {
-  const { tierPicks, restGroups, worthSaying } = await import("../../host/edition.mjs");
-  const many = Array.from({ length: 56 }, (_, i) => st("s" + i, i % 3 === 0 ? "tech" : i % 3 === 1 ? "markets" : "politics", 20 + i, i === 3 ? { followed: [{ kind: "keyword" }] } : {}));
-  const t = tierPicks(many);
-  assert.deepEqual([t.detail.length, t.titles.length, t.rest.length], [12, 18, 26]);
-  assert.equal(t.detail[0].id, "s55", "按重要度排");
-  assert.ok(!t.detail.some((s) => s.id === "s3") && !t.titles.some((s) => s.id === "s3"), "关注的只加 10 分：重要度 23 的琐碎关注项挤不进前面");
-  assert.equal(tierPicks([st("a", "tech", 50), st("b", "tech", 45, { followed: [{}] })]).detail[0].id, "b", "分数接近时关注的在前");
-  assert.equal(tierPicks(many.slice(0, 16)).titles.length, 0, "只多出 4 条以内：全部写一句话");
-  assert.deepEqual(restGroups(t.rest).map((g) => g.n).reduce((a, b) => a + b, 0), 26);
-
+test("大量推送逐条列出摘要与来源，重点详写，摘要重复时补充要点", async () => {
+  const { rankPicks, worthSaying } = await import("../../host/edition.mjs");
+  const many = Array.from({ length: 56 }, (_, i) => st("s" + i, i % 3 === 0 ? "tech" : i % 3 === 1 ? "markets" : "politics", 20 + i));
+  many[0].lead = many[0].title;
+  const picks = rankPicks(many);
+  assert.equal(picks[0].id, "s55");
+  assert.equal(rankPicks([st("a", "tech", 50), st("b", "tech", 45, { followed: [{}] })])[0].id, "b", "关注项加 10 分");
   const db = tmp();
-  t.titles.forEach((s) => { s.title_only = true; });
-  const shown = t.detail.concat(t.titles);
-  numberPicks(db, orderPicks(t.detail).flatMap((g) => g.items).concat(t.titles));
-  const msg = composeEditionMessage({ hhmm: "07:16", md: "11-12", warnings: [], title: "要闻", format: "brief", rest: restGroups(t.rest), totals: { all: 56, fresh: 56 } }, shown, { mode: "llm", model: "m", items_read: 9 }, {});
+  const ordered = orderPicks(picks).flatMap((g) => g.items);
+  numberPicks(db, ordered);
+  const msg = composeEditionMessage({ hhmm: "07:16", md: "11-12", warnings: [], title: "要闻", format: "brief" }, picks, { mode: "llm", model: "m", items_read: 9 }, {});
   const L = msg.split("\n");
-  assert.equal(L[1], "新报道 56 件", "总数按全部算");
-  assert.ok(L.includes("**还有这些**"));
-  assert.ok(L.some((l) => /^13\. 标题s\d+$/.test(l)), "第二档一行一条、只有序号和标题");
-  assert.ok(L.some((l) => /^另有 26 条没有列出（.*），在面板「今日」里看。$/.test(l)));
-  assert.equal(L.filter((l) => /^\*\*\d+\. /.test(l)).length, 12);
-  assert.ok(msg.length < 3200, "上百条也只有两三千字：" + msg.length);
+  assert.equal(L[1], "新报道 56 件");
+  assert.equal(L.filter((l) => /^\*\*\d+\. /.test(l)).length, 56);
+  assert.equal(L.filter((l) => l.startsWith("[财联社电报]")).length, 56);
+  for (const [i, story] of ordered.entries()) {
+    const at = L.indexOf("**" + (i + 1) + ". " + story.title + "**");
+    assert.ok(at > 0, story.title);
+    assert.equal(L[at + 1], story.id === "s0" ? "· 要点一" : story.id + "的导语第一句，写明时间和地点。" + (story.importance >= 60 ? "第二句补充细节，用来确认短消息里只留一句。" : ""));
+  }
+  assert.equal(L.filter((l) => l.startsWith("影响：")).length, 16);
 
   assert.equal(worthSaying("俄罗斯称其在黑海击中一艘货船。", "俄罗斯称在黑海击中一艘货船"), false, "只是把标题再说一遍");
   assert.equal(worthSaying("Nvidia's Asian Cloud Partners Have a Debt Problem X.PIN 长文分析", "英伟达主权AI战略带动数据中心热"), false, "没译过的外文摘要");

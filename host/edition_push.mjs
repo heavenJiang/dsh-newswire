@@ -75,7 +75,7 @@ export function recordEditionPushes(db, picks, runId, nowIso, pack) {
 
 /**
  * 这一句值不值得放在标题下面：几乎就是把标题再说一遍的不放；大半是外文的（没译过的原文摘要）不放。
- * 短消息里每一行都占读者的时间，宁可只有标题。
+ * 导语没有可用信息时，拼消息时再用要点补充。
  */
 export function worthSaying(line, title) {
   const t = String(line || "").replace(/^进展：/, "");
@@ -96,28 +96,10 @@ export function oneSentence(text, n) {
   const m = /^[^。！？!?]{11,}?[。！？!?]/.exec(t);
   return m ? m[0] : t;
 }
-/**
- * 一条推送最多写多少：前 detail 条带一句话和来源，再 titles 条只列标题，其余只报个数（在面板里看）。
- * 隔夜或「全推」时一轮可能有上百条：全列出来是一万多字，手机上会变成文件附件，等于没法读。
- */
-export const PUSH_TIERS = { detail: 12, titles: 18 };
-
-/**
- * 把要推的报道分成三档：detail（一句话）、titles（只列标题）、rest（不列，只报个数）。
- * 排序：按重要度，读者关注的加 10 分。总数只比 detail 多一点（不超过 4 条）时全部写一句话，不留一条小尾巴。
- */
-export function tierPicks(picks, o) {
-  const T = Object.assign({}, PUSH_TIERS, o || {});
-  // 关注的加 10 分，不是无条件排最前：关注的词一多，琐碎的关注项会把真正的大事挤到后面
+/** 按重要度排序，关注项加 10 分。 */
+export function rankPicks(picks) {
   const rank = (s) => (s.importance || 0) + (s.followed && s.followed.length ? 10 : 0);
-  const ranked = picks.slice().sort((a, b) => rank(b) - rank(a));
-  if (ranked.length <= T.detail + 4) return { detail: ranked, titles: [], rest: [] };
-  return { detail: ranked.slice(0, T.detail), titles: ranked.slice(T.detail, T.detail + T.titles), rest: ranked.slice(T.detail + T.titles) };
-}
-
-/** 没列出来的那些按领域数一数：[{ title, n }]。 */
-export function restGroups(rest) {
-  return orderPicks(rest.map((s) => Object.assign({}, s, { importance: 0 }))).map((g) => ({ title: g.title.replace(/^\S+\s/, ""), n: g.items.length }));
+  return picks.slice().sort((a, b) => rank(b) - rank(a));
 }
 
 /** 推送消息里的顺序：重点在前，其余按领域分组。编序号和拼消息都按它。 */
@@ -182,11 +164,9 @@ export function composeEditionMessage(parts, picks, ed, names) {
   if (!picks.length) return [parts.hhmm + " " + head + "：暂无新的重点"].concat(warn ? [warn] : []).join("\n");
   const md = String(parts.md || "").split("-").map(Number);
   const L = ["📰 **" + head + "** · " + (md.length === 2 && md[0] ? md[0] + "月" + md[1] + "日 " : "") + parts.hhmm];
-  // 总数按这一轮全部要推的算（含没列出来的）
-  const tot = parts.totals || { all: picks.length, fresh: picks.filter((x) => x.reason === "new").length };
-  const nNew = tot.fresh;
+  const nNew = picks.filter((x) => x.reason === "new").length;
   const span = parts.from ? "汇总 " + parts.from + "–" + parts.hhmm + " · " : "";
-  L.push(span + "新报道 " + nNew + " 件" + (tot.all > nNew ? " · 有进展 " + (tot.all - nNew) + " 件" : ""));
+  L.push(span + "新报道 " + nNew + " 件" + (picks.length > nNew ? " · 有进展 " + (picks.length - nNew) + " 件" : ""));
   if (ed.headline) L.push("> " + mdText(ed.headline));
   // 读者追踪的对象里哪些有动静：放在最前面说
   const tracked = (parts.tracked || []).filter((t) => t && t.name && (t.stories || []).length);
@@ -194,7 +174,7 @@ export function composeEditionMessage(parts, picks, ed, names) {
   // 每条后面标追踪对象：只标命中不多的（一个大主线命中十来条时，条条都标等于没标）
   for (const t of tracked) if (t.stories.length <= 3) for (const sid of t.stories) if (!trackOf.has(sid)) trackOf.set(sid, t.name);
   if (tracked.length) L.push("🔭 你追踪的有动静：" + tracked.slice(0, 4).map((t) => mdText(t.name) + (t.stories.length > 1 ? "（" + t.stories.length + " 条）" : "")).join("、"));
-  // 短消息（parts.format = "brief"）：每条只有标题、一句话和来源，想看哪条回复序号展开
+  // 短格式压缩普通新闻和来源行，重点仍带要点与影响。
   const brief = parts.format === "brief";
   let markets = false;
   let i = 0;
@@ -203,20 +183,23 @@ export function composeEditionMessage(parts, picks, ed, names) {
     const again = s.reason !== "new";
     const tag = s.reason === "followup" ? "【进展】" : s.reason === "upgraded" || s.reason === "jumped" ? "【升级】" : "";
     L.push("", "**" + (Number.isInteger(s.n) ? s.n : i) + ". " + tag + mdText(s.title) + "**" + (s.followed && s.followed.length ? " ★" : "") + (trackOf.has(s.id) ? " 🔭" + mdText(trackOf.get(s.id)) : ""));
-    const lead = s.push_lead || s.lead;
-    if (brief) {
-      const one = again && s.update_text ? "进展：" + oneSentence(s.update_text, 70) : lead && same(lead) !== same(s.title) ? oneSentence(lead, 70) : "";
-      if (one && worthSaying(one, s.title)) L.push(mdText(one));
-    } else if (again && s.update_text) {
-      L.push("进展：" + mdText(sentences(s.update_text, detailed ? 160 : 90)));
-      if (detailed && lead && same(lead) !== same(s.title)) L.push("背景：" + mdText(sentences(lead, 100)));
-    } else if (lead && same(lead) !== same(s.title)) L.push(mdText(sentences(lead, detailed ? 200 : 90)));
-    if (detailed) {
-      const leadKey = same(lead);
-      const pts = (s.points || []).map((p) => (typeof p === "string" ? p : p && p.text) || "").filter((t) => t && !leadKey.includes(same(t))).slice(0, 2);
-      for (const t of pts) L.push("· " + mdText(sentences(t, 70)));
-      if (s.impact) L.push("影响：" + mdText(sentences(s.impact, 80)));
+    const lead = s.push_lead || (!s.lead_missing ? s.lead : "");
+    const update = again && s.update_text;
+    const leadKey = same(lead);
+    const points = (s.points || []).map((p) => (typeof p === "string" ? p : p && p.text) || "")
+      .filter((t) => worthSaying(t, s.title) && !leadKey.includes(same(t)) && !same(update).includes(same(t)));
+    const leadSummary = brief && !detailed ? oneSentence(lead, 100) : sentences(lead, detailed ? 240 : 120);
+    const progress = update ? (brief && !detailed ? oneSentence(update, 100) : sentences(update, detailed ? 200 : 120)) : "";
+    const hasProgress = worthSaying(progress, s.title);
+    const hasLead = worthSaying(leadSummary, s.title);
+    if (hasProgress) L.push("进展：" + mdText(progress));
+    if (hasLead && !hasProgress) L.push(mdText(leadSummary));
+    if (hasProgress && detailed && hasLead && !same(update).includes(leadKey)) {
+      L.push("背景：" + mdText(sentences(lead, 140)));
     }
+    const pointCount = detailed ? 3 : hasProgress || hasLead ? 0 : 1;
+    for (const t of points.slice(0, pointCount)) L.push("· " + mdText(sentences(t, detailed ? 120 : 100)));
+    if (detailed && s.impact) L.push("影响：" + mdText(sentences(s.impact, 120)));
     // 来源：媒体名就是链接（手机上点名字跳原文），最多列 3 家
     const links = (s.links && s.links.length ? s.links : [{ name: (s.outlets[0] || {}).name || (s.outlets[0] || {}).source_id, url: s.url }]).filter((x) => x && x.name);
     const shown = links.slice(0, brief ? 1 : 3).map((x) => { const n = mdText(String(x.name).replace(/·.*$/, "")); return x.url ? "[" + n + "](" + x.url + ")" : n; });
@@ -226,16 +209,7 @@ export function composeEditionMessage(parts, picks, ed, names) {
       s.credibility === "confirmed" ? "权威确认" : s.credibility === "disputed" ? "说法有分歧" : "", !brief && h.views != null ? "阅读 " + fmtN(h.views) : ""].filter(Boolean).join(" · "));
     if (/^markets|^macro/.test(s.section || "")) markets = true;
   };
-  for (const g of orderPicks(picks.filter((s) => !s.title_only))) { L.push("", "**" + g.title + "**"); for (const s of g.items) item(s, g.key && !brief); }
-  // 第二档：只列标题（一行一条）
-  const titled = picks.filter((s) => s.title_only);
-  if (titled.length) {
-    L.push("", "**还有这些**");
-    for (const s of titled) { i++; const tag = s.reason === "followup" ? "【进展】" : s.reason === "upgraded" || s.reason === "jumped" ? "【升级】" : ""; L.push((Number.isInteger(s.n) ? s.n : i) + ". " + tag + mdText(s.title) + (s.followed && s.followed.length ? " ★" : "")); if (/^markets|^macro/.test(s.section || "")) markets = true; }
-  }
-  // 第三档：不列，只报个数
-  const restN = (parts.rest || []).reduce((n, g) => n + g.n, 0);
-  if (restN) L.push("", "另有 " + restN + " 条没有列出（" + parts.rest.map((g) => g.title + " " + g.n).join("、") + "），在面板「今日」里看。");
+  for (const g of orderPicks(picks)) { L.push("", "**" + g.title + "**"); for (const s of g.items) item(s, g.key); }
   L.push("");
   if (warn) L.push(warn);
   // 编了当天序号的（记了推送的）才能回复

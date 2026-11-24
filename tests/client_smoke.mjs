@@ -171,6 +171,16 @@ const CHECK = { installed: "0.9.0", source: { kind: "github", owner: "someone", 
 const NOTES = { summary: "沙特首都金融区遇袭，阿美大楼受损，各家伤亡数字不一", why: "牵动油价与地区安全", watch: "沙特官方通报与油价走势", model: "local/m", at: "2026-11-08T08:00:00Z" };
 cases.push(
   ["EditionView", () => { const n = withStates([EDITION_STATE], () => T.EditionView({ pack: "all", stamp: 1, names: { politics: "时政与地缘", "politics.conflict": "冲突与安全" }, onOpen: () => {} })); const j = JSON.stringify(n); for (const k of ["中东局势升级", "nw-mast", "nw-front", "nw-rail", "沙特官方后续通报", "教育部预警", T.t("rd.about")]) if (!j.includes(k)) throw new Error("版面缺 " + k); for (const k of ["nw-chip", T.t("ck.hint")]) if (j.includes(k)) throw new Error("正文不该再有 " + k); return n; }],
+  ["EditionView(changes)", () => {
+    const st = Object.assign({}, EDITION_STATE, { diff: { base_at: "2026-11-08 06:00:00", stories: { s1: "dev", s2: "same" } } });
+    const n = withStates([st], () => T.EditionView({ pack: "all", stamp: 1, names: {}, onOpen: () => {} }));
+    const j = JSON.stringify(n);
+    for (const k of [T.t("df.only"), T.t("df.all"), T.t("df.same", { n: 1 }), T.t("rd.developing")]) if (!j.includes(k)) throw new Error("版面缺 " + k);
+    const read = n.children.find((x) => x?.props?.className === "nw-read");
+    const main = read?.children.find((x) => x?.props?.className === "nw-read-main");
+    if (!main || JSON.stringify(main).includes("教育部发布留学预警")) throw new Error("默认变化视图混入沿用报道");
+    return n;
+  }],
   ["EditionView(fellback)", () => { const st = Object.assign({}, EDITION_STATE, { ed: Object.assign({}, EDITION_STATE.ed, { mode: "rules", error: "budget_exceeded" }) }); const n = withStates([st], () => T.EditionView({ pack: "all", stamp: 1, names: {}, onOpen: () => {} })); if (!JSON.stringify(n).includes("budget_exceeded")) throw new Error("没提示退回"); return n; }],
   ["EditionView(none)", () => withStates([{ phase: "ready", ed: null, model: null, error: null, busy: false }], () => T.EditionView({ pack: "all", stamp: 1, onOpen: () => {} }))],
   ["ReadStory(more)", () => { const n = withStates([true, null], () => T.ReadStory({ story: Object.assign({}, STORY, { by: "rules" }), mode: "llm", names: {}, onOpen: () => {} })); const j = JSON.stringify(n); if (!j.includes("导弹被拦截") || !j.includes(T.t("rd.less"))) throw new Error("展开后缺各方说法"); return n; }],

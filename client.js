@@ -92,14 +92,14 @@ window.__ModuleLoader__.load({
         'wl.start': '开始：抓第一轮', 'wl.busy': '已经有一轮在抓了，稍等片刻再试', 'wl.fetchingH': '正在准备第一份版面', 'wl.fetching': '正在抓取各个源，第一次约 3–5 分钟（已用 {s}）…', 'wl.s1': '抓取各源的最新新闻，去重、识别广告与合集', 'wl.s2': '抓完先出一份程序排的版面，马上能看', 'wl.s3': '模型随后逐篇读、归并、写稿，写好一篇替换一篇',
         'ask.ph': '搜索或提问，如：伊朗局势最近怎么样', 'ask.for': '「{q}」', 'ask.found': '近 {h} 小时找到 {n} 篇相关报道', 'ask.close': '× 回到版面', 'ask.answer': '回答', 'ask.reading': '模型正在读 {n} 篇相关报道作答（约 1 分钟）…', 'ask.notEnough': '找到的报道不足以回答这个问题。',
         'ask.by': '由 {m} 依据下列报道作答，每句标了出处', 'ask.dropped': '{n} 句与原文核对不上，已删去', 'ask.partial': '材料不全，回答可能不完整', 'ask.stories': '相关故事线', 'ask.reports': '{n} 篇', 'ask.items': '相关报道', 'ask.none': '没找到和「{t}」相关的报道。',
-        'ps.title': '推送', 'ps.hint': '推到手机的每一条都会打扰你：先定好什么时候推、推多少。节奏会直接改定时任务的时间；每一轮里过了门槛的才推。', 'ps.cadence': '节奏', 'ps.level': '门槛', 'ps.fewer': '少而精', 'ps.normal': '适中', 'ps.more': '多一些', 'ps.limits': '上限', 'ps.perRound': '每轮最多', 'ps.daily': '每天最多', 'ps.timing': '时机', 'ps.onTime': '到点推送', 'ps.whenReady': '写完再推', 'ps.timingHint': '写完再推：到点只抓取，本轮版面写完（通常晚 10～20 分钟）再推一条，内容都是本轮的。到点推送：模型没写完时先推已编好的版面。', 'ps.delivery': '方式', 'ps.deliveryAuto': '直接发到手机', 'ps.deliveryTask': '经定时任务', 'ps.deliveryHint': '直接发：插件按定时任务的时间自己抓取、写版面，写完直接发到手机，不经过定时任务里的模型（模型转发长消息会改写、漏发）；这期间定时任务显示为暂停。', 'ps.deliveryNoSvc': '没装掌上指挥台（或它关了「允许其他插件发消息到手机」），现在经定时任务推送。', 'ps.direct': '由插件直接推送到手机，下一次 {n}', 'ps.scope': '内容', 'ps.picked': '挑重点', 'ps.full': '本轮新内容全推', 'ps.scopeHint': '全推：本轮所有新报道和有进展的报道都算进来，不看门槛和上限。一条消息最多写 12 条带一句话的、18 条只列标题的，其余只报个数（都在面板里），所以隔夜积了上百条也只有两三千字。',
-        'ps.format': '长短', 'ps.brief': '短：标题加一句', 'ps.fullFmt': '长：重点带要点', 'ps.formatHint': '短消息每条只有标题、一句话和来源，前面有当天的序号。在手机上回复序号看要点（如「3」），「3 详」要详细报道，「3 有用 / 没用」调整以后推什么，「3 追踪」关注进展。', 'ps.fb': '近 14 天推了 {p} 条：你标了有用 {u}、没用 {d}，展开或点开看过 {i} 次。', 'ps.fbNone': '还没有反馈。在手机上回复「序号 有用 / 没用」，或在下面的推送记录里点一下，以后推什么会跟着调。',
+        'ps.title': '推送', 'ps.hint': '推到手机的每一条都会打扰你：先定好什么时候推、推多少。节奏会直接改定时任务的时间；每一轮里过了门槛的才推。', 'ps.cadence': '节奏', 'ps.level': '门槛', 'ps.fewer': '少而精', 'ps.normal': '适中', 'ps.more': '多一些', 'ps.limits': '上限', 'ps.perRound': '每轮最多', 'ps.daily': '每天最多', 'ps.timing': '时机', 'ps.onTime': '到点推送', 'ps.whenReady': '写完再推', 'ps.timingHint': '写完再推：到点只抓取，本轮版面写完（通常晚 10～20 分钟）再推一条，内容都是本轮的。到点推送：模型没写完时先推已编好的版面。', 'ps.delivery': '方式', 'ps.deliveryAuto': '直接发到手机', 'ps.deliveryTask': '经定时任务', 'ps.deliveryHint': '直接发：插件按定时任务的时间自己抓取、写版面，写完直接发到手机，不经过定时任务里的模型（模型转发长消息会改写、漏发）；这期间定时任务显示为暂停。', 'ps.deliveryNoSvc': '没装掌上指挥台（或它关了「允许其他插件发消息到手机」），现在经定时任务推送。', 'ps.direct': '由插件直接推送到手机，下一次 {n}', 'ps.scope': '内容', 'ps.picked': '挑重点', 'ps.full': '本轮新内容全推', 'ps.scopeHint': '全推：逐条推送本轮的新报道和有进展的报道，不受门槛和条数上限限制。',
+        'ps.format': '长短', 'ps.brief': '短：普通新闻一句话', 'ps.fullFmt': '长：更完整的摘要', 'ps.formatHint': '普通新闻附摘要或进展及来源，重点还会附上可用的要点和影响。在手机上回复序号看要点（如「3」），「3 详」要详细报道，「3 有用 / 没用」调整以后推什么，「3 追踪」关注进展。', 'ps.fb': '近 14 天推了 {p} 条：你标了有用 {u}、没用 {d}，展开或点开看过 {i} 次。', 'ps.fbNone': '还没有反馈。在手机上回复「序号 有用 / 没用」，或在下面的推送记录里点一下，以后推什么会跟着调。',
         'fw.title': '本轮流程', 'fw.last': '上一轮', 'fw.started': '{t} 开始', 'fw.spent': '已用 {d}', 'fw.took': '用时 {d}', 'fw.eta': '预计还要 {d}', 'fw.etaNone': '第一次跑，还估不出剩余时间', 'fw.show': '看流程', 'fw.hide': '收起', 'fw.none': '还没有跑过一轮。抓一轮后这里会显示从抓取到推送的每一步。',
         'fw.ph.fetch': '抓取', 'fw.ph.edition': '编版面', 'fw.ph.push': '推送', 'fw.done': '已完成', 'fw.failed': '失败', 'fw.stalled': '中断', 'fw.replaced': '被新一轮取代', 'fw.stopped': '已停止', 'fw.stop': '停止', 'fw.stopQ': '停下这一轮？已抓到的保留，不再编版面、不推送', 'fw.stopping': '正在停止…', 'fw.stopFail': '没停成：{e}', 'fw.skipped': '跳过', 'fw.about': '约 {d}', 'fw.now': '进行中',
         'fw.k.cycle': '定时一轮', 'fw.k.manual': '手动抓取', 'fw.k.prewarm': '推送前预编排', 'fw.k.refresh': '重新编排', 'fw.k.deliver': '推送',
         'fw.s.prep': '准备通道', 'fw.s.sources': '抓取各源', 'fw.s.clean': '清洗与拆条', 'fw.s.events': '分类与聚类', 'fw.s.bodies': '补正文', 'fw.s.translate': '译外文标题', 'fw.s.group': '归并故事线', 'fw.s.plan': '统筹头版', 'fw.s.write': '写稿', 'fw.s.check': '逐句核对', 'fw.s.save': '组版存档', 'fw.s.push': '发到手机',
         'fw.partial': '已完成，{n} 步没做全', 'fw.instant': '不到 1 秒', 'fw.sec': '{n} 秒', 'fw.min': '{n} 分钟', 'fw.minsec': '{m} 分 {s} 秒', 'fw.hour': '{h} 小时 {m} 分',
-        'lw.title': '最新快讯', 'lw.at': '{t} 抓取', 'lw.new': '新', 'lw.newHint': '版面还没写到，刚抓到的', 'lw.outlets': '{n} 家', 'lw.none': '近 6 小时没有新的快讯', 'ts.title': '追踪动态', 'ts.fresh': '+{n}', 'ts.all': '全部追踪 ›', 'dt.since': '比上一篇（{t}）新增 {n} 条，已标「新」', 'dt.new': '新', 'sb.thin': '「{s}」近 24 小时的 {n} 条故事线里有 {k} 条只有一家在报（多为 {top}）：多家印证、各方说法用不上，可以给这个版块再开一两个来源。',
+        'lw.title': '最新快讯', 'lw.at': '{t} 抓取', 'lw.new': '新抓取', 'lw.newHint': '在当前版面发布后抓到', 'lw.outlets': '{n} 家', 'lw.none': '近 6 小时没有新的快讯', 'ts.title': '追踪动态', 'ts.fresh': '+{n}', 'ts.all': '全部追踪 ›', 'dt.since': '比上一篇（{t}）新增 {n} 条，已标「新」', 'dt.new': '新', 'sb.thin': '「{s}」近 24 小时的 {n} 条故事线里有 {k} 条只有一家在报（多为 {top}）：多家印证、各方说法用不上，可以给这个版块再开一两个来源。',
         'rd.retitled': '事情有了变化，标题已更新。原标题：{t}', 'sb.cooling': '「{s}」连续 {n} 轮抓取失败（{r}），已降频：平时跳过，下次 {t} 再试一次，抓到了就恢复。一直抓不到可以把它关掉。', 'ph.title': '推送链路', 'ph.fix': '怎么修：', 'mq.running': '模型正在跑：', 'mq.waiting': '排队：', 'mq.secs': '{n} 秒', 'mq.hint': '读者点的（详细报道、影响分析、问答）排在版面和后台任务前面',
         'ps.save': '保存', 'ps.saved': '已保存。', 'ps.noSvc': '当前宿主没有定时任务服务，只能保存偏好。', 'ps.noTask': '还没有安排定时推送：在对话里说「每 2 小时推送要闻」即可。', 'ps.task': '定时任务：{s}，下一次 {n}', 'ps.learned': '根据你对推送的反馈，这些版块的门槛已自动提高：{s}',
         'ps.log': '推送记录', 'ps.up': '有用', 'ps.down': '没用', 'ps.none': '还没有推送过。',
@@ -122,7 +122,7 @@ window.__ModuleLoader__.load({
         'st.updated': '{t} 更新', 'st.failed': '{n} 个源失败', 'st.gaps': '{n} 处缺口', 'st.stale': '超过一天未更新',
         'rd.outlets': '{w}等 {n} 家', 'rd.developing': '进展', 'rd.more': '更多：各方说法、影响与来源', 'rd.less': '收起', 'rd.reportHint': '点出有误的那一句，它会立即撤下，下次重写时避开。',
         'rd.asof': '截至 {t}', 'rd.pack': '内容范围', 'rd.allPacks': '全部内容', 'rd.dek': '过去 {h} 小时 · {n} 件事 · 来自 {o} 家媒体',
-        'rd.keysH': '本版重点', 'rd.key': '重点', 'rd.fold': '收起', 'rd.unfold': '展开 {n} 条', 'df.vs': '比上一版（{t}）：', 'df.new': '新 {n}', 'df.dev': '有进展 {n}', 'df.same': '沿用 {n}', 'df.gone': '撤下 {n}', 'df.only': '只看变化', 'df.all': '看全部', 'ed.newer': '有新版面（{t}）', 'ed.newerGo': '换上', 'rd.sinceH': '自你上次查看（{t}）', 'rd.sinceNew': '{n} 件新事', 'rd.sinceDev': '{n} 件有进展',
+        'rd.keysH': '本版重点', 'rd.key': '重点', 'rd.fold': '收起', 'rd.unfold': '展开 {n} 条', 'df.vs': '比上一版（{t}）：', 'df.new': '新增 {n}', 'df.dev': '有进展 {n}', 'df.same': '沿用 {n}', 'df.gone': '撤下 {n}', 'df.only': '新增与进展', 'df.all': '全部报道', 'df.noChanges': '本版暂无新增或进展，以下为沿用报道。', 'df.tagNew': '本版新增', 'df.tagSame': '沿用', 'rd.firstReport': '最早报道 {t}', 'rd.latestReport': '最新报道 {t}', 'rd.firstSeen': '首次抓取 {t}', 'ed.newer': '有新版面（{t}）', 'ed.newerGo': '换上', 'rd.sinceH': '自你上次查看（{t}）', 'rd.sinceNew': '{n} 件新事', 'rd.sinceDev': '{n} 件有进展',
         'rd.about': '关于本期', 'rd.byModel': '由 {m} 阅读并编写', 'rd.byRules': '由程序按规则编排（节省 token 模式）', 'rd.read': '读入近 {h} 小时最重要的 {n} 条报道。', 'rd.checked': '模型写下的 {n} 句含数字或专名的话，{p} 句已与原文逐一核对。',
         'rd.past': '往期版面', 'rd.skim': '本期速览', 'rd.aboutDay': '关于这份回顾', 'rd.dayDek': '今天值得记住的 {n} 件事',
         'nav.panel': '见微知著', 'nav.logo': '见', 'rd.top': '头条', 'rd.stStories': ' 件事', 'rd.stOutlets': ' 家媒体', 'rd.stHours': ' 小时内', 'rd.stAi': '模型读完并核对', 'tab.news': '要闻', 'tab.timeline': '时间线', 'tab.items': '条目', 'tab.sources': '数据源', 'tab.runs': '运行',
@@ -214,14 +214,14 @@ window.__ModuleLoader__.load({
         'wl.start': 'Start: fetch the first round', 'wl.busy': 'A round is already running; try again shortly', 'wl.fetchingH': 'Preparing your first edition', 'wl.fetching': 'Fetching every source; about 3–5 minutes the first time ({s} so far)…', 'wl.s1': 'Fetch the latest from each source, dedupe, spot ads and roundups', 'wl.s2': 'A program-made edition appears as soon as fetching ends', 'wl.s3': 'The model then reads, groups and writes, replacing stories one by one',
         'ask.ph': 'Search or ask, e.g. what is happening with Iran', 'ask.for': '“{q}”', 'ask.found': '{n} related reports in the last {h} hours', 'ask.close': '× Back to edition', 'ask.answer': 'Answer', 'ask.reading': 'The model is reading {n} related reports (about a minute)…', 'ask.notEnough': 'The reports found are not enough to answer this.',
         'ask.by': 'Answered by {m} from the reports below; every sentence is cited', 'ask.dropped': '{n} sentences did not match the sources and were removed', 'ask.partial': 'the material is incomplete', 'ask.stories': 'Related storylines', 'ask.reports': '{n} reports', 'ask.items': 'Related reports', 'ask.none': 'Nothing found for “{t}”.',
-        'ps.title': 'Push', 'ps.hint': 'Every push interrupts you, so decide when and how much. Cadence changes the scheduled task itself; within each round only stories over the bar are pushed.', 'ps.cadence': 'Cadence', 'ps.level': 'Bar', 'ps.fewer': 'Fewer', 'ps.normal': 'Normal', 'ps.more': 'More', 'ps.limits': 'Limits', 'ps.perRound': 'Per round', 'ps.daily': 'Per day', 'ps.timing': 'Timing', 'ps.onTime': 'At the scheduled time', 'ps.whenReady': 'When the edition is ready', 'ps.timingHint': 'When ready: fetch at the scheduled time and push once this round\'s edition is written (usually 10–20 minutes later), so everything in it is from this round. At the scheduled time: if the model has not finished, push the latest written edition.', 'ps.delivery': 'Delivery', 'ps.deliveryAuto': 'Straight to the phone', 'ps.deliveryTask': 'Through the scheduled task', 'ps.deliveryHint': 'Straight to the phone: the plugin fetches and writes the edition on the scheduled task\'s timetable and posts it to the phone itself, with no model relaying it (a model relaying a long message may rewrite or drop it). The scheduled task shows as paused meanwhile.', 'ps.deliveryNoSvc': 'The Switchboard plugin is not installed (or its "Let other plugins post to the phone" is off), so pushes go through the scheduled task.', 'ps.direct': 'Posted straight to the phone by the plugin, next {n}', 'ps.scope': 'Content', 'ps.picked': 'Top stories', 'ps.full': 'Everything new this round', 'ps.scopeHint': 'Everything new: every new story and every story with new reports this round counts, ignoring the bar and limits. One message spells out at most 12 items with a sentence and 18 as headlines only, and gives a count for the rest (all in the panel), so even a hundred overnight items stay within two or three thousand characters.',
-        'ps.format': 'Length', 'ps.brief': 'Short: headline and one line', 'ps.fullFmt': 'Long: key stories with points', 'ps.formatHint': 'Short pushes carry a headline, one sentence and sources per item, each with a number for the day. On the phone, reply with the number to expand it ("3"), "3 详" for the detailed report, "3 有用 / 没用" to tune what is pushed, "3 追踪" to follow it.', 'ps.fb': 'Last 14 days, {p} pushed: you marked {u} useful and {d} not useful, and expanded or opened {i}.', 'ps.fbNone': 'No feedback yet. Reply "number 有用 / 没用" on the phone, or vote in the push log below, and pushes will adapt.',
+        'ps.title': 'Push', 'ps.hint': 'Every push interrupts you, so decide when and how much. Cadence changes the scheduled task itself; within each round only stories over the bar are pushed.', 'ps.cadence': 'Cadence', 'ps.level': 'Bar', 'ps.fewer': 'Fewer', 'ps.normal': 'Normal', 'ps.more': 'More', 'ps.limits': 'Limits', 'ps.perRound': 'Per round', 'ps.daily': 'Per day', 'ps.timing': 'Timing', 'ps.onTime': 'At the scheduled time', 'ps.whenReady': 'When the edition is ready', 'ps.timingHint': 'When ready: fetch at the scheduled time and push once this round\'s edition is written (usually 10–20 minutes later), so everything in it is from this round. At the scheduled time: if the model has not finished, push the latest written edition.', 'ps.delivery': 'Delivery', 'ps.deliveryAuto': 'Straight to the phone', 'ps.deliveryTask': 'Through the scheduled task', 'ps.deliveryHint': 'Straight to the phone: the plugin fetches and writes the edition on the scheduled task\'s timetable and posts it to the phone itself, with no model relaying it (a model relaying a long message may rewrite or drop it). The scheduled task shows as paused meanwhile.', 'ps.deliveryNoSvc': 'The Switchboard plugin is not installed (or its "Let other plugins post to the phone" is off), so pushes go through the scheduled task.', 'ps.direct': 'Posted straight to the phone by the plugin, next {n}', 'ps.scope': 'Content', 'ps.picked': 'Top stories', 'ps.full': 'Everything new this round', 'ps.scopeHint': 'Everything new: includes every new or updated story this round, regardless of the threshold or story limits.',
+        'ps.format': 'Length', 'ps.brief': 'Short: one line for regular stories', 'ps.fullFmt': 'Long: fuller summaries', 'ps.formatHint': 'Each story includes an available summary or update and its sources. Key stories also include available takeaways and impact. On the phone, reply with the number to expand it ("3"), "3 详" for the detailed report, "3 有用 / 没用" to tune what is pushed, "3 追踪" to follow it.', 'ps.fb': 'Last 14 days, {p} pushed: you marked {u} useful and {d} not useful, and expanded or opened {i}.', 'ps.fbNone': 'No feedback yet. Reply "number 有用 / 没用" on the phone, or vote in the push log below, and pushes will adapt.',
         'fw.title': 'This round', 'fw.last': 'Last round', 'fw.started': 'started {t}', 'fw.spent': '{d} so far', 'fw.took': 'took {d}', 'fw.eta': 'about {d} left', 'fw.etaNone': 'first run, no estimate yet', 'fw.show': 'Show flow', 'fw.hide': 'Hide', 'fw.none': 'No round has run yet. After the first fetch, every step from fetching to pushing shows here.',
         'fw.ph.fetch': 'Fetch', 'fw.ph.edition': 'Edition', 'fw.ph.push': 'Push', 'fw.done': 'Done', 'fw.failed': 'Failed', 'fw.stalled': 'Interrupted', 'fw.replaced': 'Superseded', 'fw.stopped': 'Stopped', 'fw.stop': 'Stop', 'fw.stopQ': 'Stop this round? What was fetched stays; no edition, no push', 'fw.stopping': 'Stopping…', 'fw.stopFail': 'Could not stop: {e}', 'fw.skipped': 'skipped', 'fw.about': '~{d}', 'fw.now': 'running',
         'fw.k.cycle': 'Scheduled round', 'fw.k.manual': 'Manual fetch', 'fw.k.prewarm': 'Pre-push warm-up', 'fw.k.refresh': 'Re-layout', 'fw.k.deliver': 'Push',
         'fw.s.prep': 'Prepare', 'fw.s.sources': 'Fetch sources', 'fw.s.clean': 'Clean & split', 'fw.s.events': 'Classify & cluster', 'fw.s.bodies': 'Fill bodies', 'fw.s.translate': 'Translate titles', 'fw.s.group': 'Group storylines', 'fw.s.plan': 'Front page', 'fw.s.write': 'Write', 'fw.s.check': 'Fact check', 'fw.s.save': 'Lay out & save', 'fw.s.push': 'Send to phone',
         'fw.partial': 'Done, {n} step(s) incomplete', 'fw.instant': '<1s', 'fw.sec': '{n}s', 'fw.min': '{n} min', 'fw.minsec': '{m}m {s}s', 'fw.hour': '{h}h {m}m',
-        'lw.title': 'Latest', 'lw.at': 'fetched {t}', 'lw.new': 'new', 'lw.newHint': 'just fetched, not in the edition yet', 'lw.outlets': '{n} outlets', 'lw.none': 'Nothing new in the last 6 hours', 'ts.title': 'Tracking', 'ts.fresh': '+{n}', 'ts.all': 'All trackers ›', 'dt.since': '{n} new since the previous report ({t}), marked "new"', 'dt.new': 'new', 'sb.thin': '{k} of the {n} storylines in "{s}" over the last 24 hours have a single outlet (mostly {top}): corroboration and differing views cannot work there. Consider turning on one or two more sources for this section.',
+        'lw.title': 'Latest', 'lw.at': 'fetched {t}', 'lw.new': 'Just fetched', 'lw.newHint': 'Fetched after the current edition was published', 'lw.outlets': '{n} outlets', 'lw.none': 'Nothing new in the last 6 hours', 'ts.title': 'Tracking', 'ts.fresh': '+{n}', 'ts.all': 'All trackers ›', 'dt.since': '{n} new since the previous report ({t}), marked "new"', 'dt.new': 'new', 'sb.thin': '{k} of the {n} storylines in "{s}" over the last 24 hours have a single outlet (mostly {top}): corroboration and differing views cannot work there. Consider turning on one or two more sources for this section.',
         'rd.retitled': 'The story moved on, so the headline was updated. It was: {t}', 'sb.cooling': '"{s}" failed {n} rounds in a row ({r}) and is now throttled: skipped in normal rounds, retried at {t}, and back to normal once a fetch works. Turn it off if it never recovers.', 'ph.title': 'Push path', 'ph.fix': 'Fix: ', 'mq.running': 'Model is running: ', 'mq.waiting': 'Waiting: ', 'mq.secs': '{n}s', 'mq.hint': 'What you ask for (detailed report, impact analysis, Q&A) goes ahead of editions and background work',
         'ps.save': 'Save', 'ps.saved': 'Saved.', 'ps.noSvc': 'This host has no schedule service; only the preferences are saved.', 'ps.noTask': 'No scheduled push yet: say "push the news every 2 hours" in the chat.', 'ps.task': 'Scheduled task: {s}, next {n}', 'ps.learned': 'From your feedback, these sections now have a higher bar: {s}',
         'ps.log': 'Push history', 'ps.up': 'Useful', 'ps.down': 'Not useful', 'ps.none': 'Nothing pushed yet.',
@@ -244,7 +244,7 @@ window.__ModuleLoader__.load({
         'st.updated': 'updated {t}', 'st.failed': '{n} sources failed', 'st.gaps': '{n} gaps', 'st.stale': 'not updated for over a day',
         'rd.outlets': '{w} and {n} outlets', 'rd.developing': 'Developing', 'rd.more': 'More: views, impact and sources', 'rd.less': 'Less', 'rd.reportHint': 'Pick the wrong sentence: it is removed now and avoided in the next rewrite.',
         'rd.asof': 'as of {t}', 'rd.pack': 'Scope', 'rd.allPacks': 'Everything', 'rd.dek': 'Last {h} hours · {n} stories · {o} outlets',
-        'rd.keysH': 'Key stories', 'rd.key': 'Key', 'rd.fold': 'Collapse', 'rd.unfold': 'Show {n}', 'df.vs': 'Since the last edition ({t}):', 'df.new': '{n} new', 'df.dev': '{n} developing', 'df.same': '{n} unchanged', 'df.gone': '{n} dropped', 'df.only': 'Changes only', 'df.all': 'Show all', 'ed.newer': 'A newer edition is ready ({t})', 'ed.newerGo': 'Show it', 'rd.sinceH': 'Since you last looked ({t})', 'rd.sinceNew': '{n} new', 'rd.sinceDev': '{n} developing',
+        'rd.keysH': 'Key stories', 'rd.key': 'Key', 'rd.fold': 'Collapse', 'rd.unfold': 'Show {n}', 'df.vs': 'Since the last edition ({t}):', 'df.new': '{n} new', 'df.dev': '{n} developing', 'df.same': '{n} unchanged', 'df.gone': '{n} dropped', 'df.only': 'New and developing', 'df.all': 'All stories', 'df.noChanges': 'No new or developing stories in this edition. Earlier coverage is shown below.', 'df.tagNew': 'New to this edition', 'df.tagSame': 'Carried over', 'rd.firstReport': 'First reported {t}', 'rd.latestReport': 'Latest report {t}', 'rd.firstSeen': 'First fetched {t}', 'ed.newer': 'A newer edition is ready ({t})', 'ed.newerGo': 'Show it', 'rd.sinceH': 'Since you last looked ({t})', 'rd.sinceNew': '{n} new', 'rd.sinceDev': '{n} developing',
         'rd.about': 'About this edition', 'rd.byModel': 'Read and written by {m}', 'rd.byRules': 'Laid out by rules (save-tokens mode)', 'rd.read': 'Read the {n} most important reports of the last {h} hours. ', 'rd.checked': '{p} of {n} model sentences with numbers or names were checked against the sources.',
         'rd.past': 'Past editions', 'rd.skim': 'In this edition', 'rd.aboutDay': 'About this recap', 'rd.dayDek': '{n} things worth remembering today',
         'nav.panel': 'Newswire', 'nav.logo': '见', 'rd.top': 'Top story', 'rd.stStories': ' stories', 'rd.stOutlets': ' outlets', 'rd.stHours': ' hours', 'rd.stAi': 'Read and checked by the model', 'tab.news': 'Top', 'tab.timeline': 'Timeline', 'tab.items': 'Items', 'tab.sources': 'Sources', 'tab.runs': 'Runs',
@@ -619,7 +619,9 @@ window.__ModuleLoader__.load({
       var parts = []
       if (who.length) parts.push(n > 1 ? t('rd.outlets', { w: who[0], n: n }) : who[0])
       var tm = when(s.published_at || s.first_seen_at)
-      if (tm) parts.push(tm)
+      if (tm) parts.push(t(s.published_at ? 'rd.firstReport' : 'rd.firstSeen', { t: tm }))
+      var latest = when(s.latest_published_at)
+      if (latest && latest !== tm && toMs(s.latest_published_at) > toMs(s.published_at)) parts.push(t('rd.latestReport', { t: latest }))
       if ((s.reposts || []).length) parts.push(t('rd.reposts', { n: s.reposts.length }))
       // 社区讨论（Hacker News 等）：不算媒体报道，单列「社区讨论：…」
       if ((s.community || []).length) parts.push(t('rd.community', { w: s.community.map(function (x) { return shortName(x) }).join('、') }))
@@ -792,6 +794,13 @@ window.__ModuleLoader__.load({
         a.newer ? h('p', { className: 'nw-note' }, t('ia.newer', { n: a.newer })) : null)
     }
 
+    function editionTag(kind) {
+      return t(kind === 'new' ? 'df.tagNew' : kind === 'dev' ? 'rd.developing' : 'df.tagSame')
+    }
+    function editionTagClass(kind) {
+      return 'nw-rs-tag' + (kind === 'dev' ? ' nw-rs-dev' : kind === 'same' ? ' nw-rs-same' : '')
+    }
+
     function ReadStory(props) {
       var s = props.story
       var xPair = useState(false)
@@ -807,8 +816,7 @@ window.__ModuleLoader__.load({
       var points = (s.points || []).map(pt)
       var since = props.since
       var dk = props.diff
-      var tag = dk ? (dk === 'new' ? t('ed.new') : dk === 'dev' ? t('rd.developing') : null)
-        : since ? (since.new ? t('sn.new') : since.added ? t('rd.developing') : null)
+      var tag = dk ? editionTag(dk) : since ? (since.new ? t('sn.new') : since.added ? t('rd.developing') : null)
         : props.hasSeen ? null : s.is_new ? t('ed.new') : s.updated ? t('rd.developing') : null
       var showUpdate = s.update_text && (dk ? dk === 'dev' : (s.updated || (since && since.added)))
       function report(text) {
@@ -852,7 +860,7 @@ window.__ModuleLoader__.load({
       return h('article', { id: 'nw-s-' + s.id, className: 'nw-rs nw-v-' + v + (s.importance >= 70 ? ' nw-imp-hi' : '') + (dk === 'same' ? ' nw-same' : '') },
         v === 'lead' ? h('div', { className: 'nw-kicker' }, h('span', { className: 'nw-kick' }, t('rd.top')), s.section && props.names && props.names[s.section] ? h('span', { className: 'nw-kick-sec' }, props.names[s.section]) : null) : null,
         h('div', { className: 'nw-rs-head' },
-          tag ? h('span', { className: 'nw-rs-tag' + (tag === t('rd.developing') ? ' nw-rs-dev' : '') }, tag) : null,
+          tag ? h('span', { className: editionTagClass(dk || (tag === t('rd.developing') ? 'dev' : 'new')) }, tag) : null,
           s.importance >= 70 && v !== 'lead' ? h('span', { className: 'nw-rs-key' }, t('rd.key')) : null,
           s.badge ? h('span', { className: 'nw-rs-badge' }, s.badge) : null,
           (s.followed || []).length ? h('span', { className: 'nw-rs-star', title: s.followed.join('、') }, '★') : null,
@@ -1043,7 +1051,7 @@ window.__ModuleLoader__.load({
         }, 60000)
         return function () { clearInterval(timer) }
       }, [curId, curTemp, hist.id, pack, load])
-      var chPair = useState(false)
+      var chPair = useState(true)
       var onlyCh = chPair[0]
       var setOnlyCh = chPair[1]
       // 模型编排在后台进行：忙时每 5 秒看一次，完成即刷新
@@ -1078,30 +1086,34 @@ window.__ModuleLoader__.load({
       var st = c.stories || {}
       var df = e.diff && e.diff.stories ? e.diff : null
       var dmap = df ? df.stories : {}
-      var changed = function (id) { return !df || dmap[id] === 'new' || dmap[id] === 'dev' }
-      var nChanged = df ? (df.counts.new || 0) + (df.counts.dev || 0) : 0
-      var showCh = Boolean(onlyCh && df && nChanged)
+      var kind = function (id) { return df ? dmap[id] || 'same' : st[id].is_new ? 'new' : st[id].updated ? 'dev' : 'same' }
+      var inEdition = function (id) { return Boolean(st[id]) }
+      var allIds = Array.from(new Set((c.front || []).concat((c.sections || []).flatMap(function (sec) { return sec.stories })).filter(inEdition)))
+      var counts = { new: 0, dev: 0, same: 0 }
+      allIds.forEach(function (id) { counts[kind(id)]++ })
+      var nChanged = counts.new + counts.dev
+      var showCh = Boolean(onlyCh && !hist.id && nChanged)
+      var visible = function (id) { return inEdition(id) && (!showCh || kind(id) !== 'same') }
       var open = props.onOpen
-      var sn = (since && since.stories) || {}
-      var hasSeen = Boolean(since && since.at)
-      // 我的关注放在最上面（有才显示）；关注的不在头版和各版块重复
+      var sn = (!hist.id && since && since.stories) || {}
+      var hasSeen = Boolean(!hist.id && since && since.at)
       var folSec = (c.sections || []).find(function (sec) { return sec.id === 'following' })
-      var folIds = folSec ? folSec.stories.filter(function (id) { return st[id] && (!showCh || changed(id)) }) : []
+      var folIds = folSec ? folSec.stories.filter(visible) : []
       var inFol = {}
       folIds.forEach(function (id) { inFol[id] = true })
-      var front = (c.front || []).filter(function (id) { return st[id] && !inFol[id] && (!showCh || changed(id)) })
+      var front = (c.front || []).filter(function (id) { return visible(id) && !inFol[id] })
       var inFront = {}
       front.forEach(function (id) { inFront[id] = true })
       // 头版已经登过的不在下面各版再出现
-      var sections = (c.sections || []).filter(function (sec) { return sec.id !== 'following' }).map(function (sec) { return Object.assign({}, sec, { stories: sec.stories.filter(function (id) { return st[id] && !inFront[id] && !inFol[id] && (!showCh || changed(id)) }) }) }).filter(function (sec) { return sec.stories.length })
+      var sections = (c.sections || []).filter(function (sec) { return sec.id !== 'following' }).map(function (sec) { return Object.assign({}, sec, { stories: sec.stories.filter(function (id) { return visible(id) && !inFront[id] && !inFol[id] }) }) }).filter(function (sec) { return sec.stories.length })
       var outlets = {}
       Object.keys(st).forEach(function (id) { (st[id].outlets || []).forEach(function (o) { outlets[shortName(o)] = 1 }) })
       // 刊头的「件事」按版面上实际登出的算（没登出的只在「事件」「条目」里）
       var shownIds = {}
       folIds.concat(front).forEach(function (id) { shownIds[id] = 1 })
       sections.forEach(function (sec) { sec.stories.forEach(function (id) { shownIds[id] = 1 }) })
-      var nStories = Object.keys(shownIds).length || Object.keys(st).length
-      var snIds = Object.keys(sn).filter(function (id) { return st[id] })
+      var nStories = Object.keys(shownIds).length
+      var snIds = Object.keys(sn).filter(function (id) { return shownIds[id] })
       var snNew = snIds.filter(function (id) { return sn[id].new })
       var snDev = snIds.filter(function (id) { return !sn[id].new && sn[id].added })
       // 跳到某条：它所在的版块收着就先展开，等渲染出来再滚过去
@@ -1118,7 +1130,7 @@ window.__ModuleLoader__.load({
         return h('ul', { className: 'nw-fold-list' }, ids.map(function (id) {
           var x = st[id]
           return h('li', { key: id }, h('button', { className: 'nw-brief-link', onClick: function () { goTo(id) } },
-            (x.importance || 0) >= 60 ? h('span', { className: 'nw-rs-tag' }, t('rd.key')) : null, x.title))
+            h('span', { className: editionTagClass(kind(id)) }, editionTag(kind(id))), x.title))
         }))
       }
       function analyze(id) {
@@ -1127,7 +1139,7 @@ window.__ModuleLoader__.load({
           .catch(function (err) { setAna(function (m) { var n = Object.assign({}, m); n[id] = { error: err.status === 409 ? t('ia.noModel') : err.message }; return n }) })
       }
       var common = { names: props.names, mode: ed.mode, editionId: ed.id, onChanged: function () { load() }, onOpen: open, onFollow: onFollow, hasSeen: hasSeen, canAnalyze: Boolean(e.canAnalyze), onAnalyze: analyze }
-      var story = function (id, variant) { var x = ana[id] || {}; return h(ReadStory, Object.assign({ key: id, story: st[id], variant: variant, since: sn[id], diff: df ? dmap[id] || 'same' : null, followed: followedStory(id), analysis: x.a || (e.analyses || {})[id], analyzing: x.busy, analyzeError: x.error }, common)) }
+      var story = function (id, variant) { var x = ana[id] || {}; return h(ReadStory, Object.assign({ key: id, story: st[id], variant: variant, since: sn[id], diff: kind(id), followed: followedStory(id), analysis: x.a || (e.analyses || {})[id], analyzing: x.busy, analyzeError: x.error }, common)) }
       var packs = props.packs || {}
       var packKeys = Object.keys(packs)
 
@@ -1143,12 +1155,16 @@ window.__ModuleLoader__.load({
           h('span', { className: 'nw-stat' }, h('b', null, Object.keys(outlets).length), t('rd.stOutlets')),
           h('span', { className: 'nw-stat' }, h('b', null, Math.round(c.hours || 12)), t('rd.stHours')),
           ed.mode === 'llm' ? h('span', { className: 'nw-stat nw-stat-ai' }, '✦ ' + t('rd.stAi')) : null),
-        df ? h('div', { className: 'nw-diff' },
-          h('span', { className: 'nw-muted' }, t('df.vs', { t: when(df.base_at) })),
-          h('span', { className: 'nw-df nw-df-new' }, t('df.new', { n: df.counts.new || 0 })),
-          h('span', { className: 'nw-df nw-df-dev' }, t('df.dev', { n: df.counts.dev || 0 })),
-          h('span', { className: 'nw-df' }, t('df.same', { n: df.counts.same || 0 })),
-          nChanged ? h('button', { className: 'nw-mini' + (onlyCh ? ' nw-on' : ''), onClick: function () { setOnlyCh(!onlyCh) } }, onlyCh ? t('df.all') : t('df.only')) : null) : null)
+        allIds.length ? h('div', { className: 'nw-diff' },
+          df ? h('span', { className: 'nw-muted' }, t('df.vs', { t: when(df.base_at) })) : null,
+          h('span', { className: 'nw-df nw-df-new' }, t('df.new', { n: counts.new })),
+          h('span', { className: 'nw-df nw-df-dev' }, t('df.dev', { n: counts.dev })),
+          h('span', { className: 'nw-df' }, t('df.same', { n: counts.same })),
+          nChanged && !hist.id ? [
+            h('button', { key: 'changes', className: 'nw-mini' + (showCh ? ' nw-on' : ''), 'aria-pressed': showCh, onClick: function () { setOnlyCh(true) } }, t('df.only')),
+            h('button', { key: 'all', className: 'nw-mini' + (!showCh ? ' nw-on' : ''), 'aria-pressed': !showCh, onClick: function () { setOnlyCh(false) } }, t('df.all'))
+          ] : null) : null,
+        allIds.length && !hist.id && !nChanged ? h('p', { className: 'nw-muted nw-xs' }, t('df.noChanges')) : null)
 
       var sinceBox = !snIds.length ? null : h('section', { className: 'nw-since' },
         h('div', { className: 'nw-since-h' }, t('rd.sinceH', { t: when(since.at) }), h('span', { className: 'nw-muted' }, ' ' + [snNew.length ? t('rd.sinceNew', { n: snNew.length }) : '', snDev.length ? t('rd.sinceDev', { n: snDev.length }) : ''].filter(Boolean).join('，'))),
@@ -1160,19 +1176,19 @@ window.__ModuleLoader__.load({
         })))
 
       // 本版重点：按重要度排的前几件，一行一件（标题 + 一句话），先看这几条就知道今天的大事
-      var keyIds = Object.keys(st).filter(function (id) { return shownIds[id] && (!showCh || changed(id)) }).sort(function (a, b) { return (st[b].importance || 0) - (st[a].importance || 0) })
+      var keyIds = Object.keys(st).filter(function (id) { return shownIds[id] }).sort(function (a, b) { return (st[b].importance || 0) - (st[a].importance || 0) })
       keyIds = keyIds.filter(function (id, i) { return i < 3 || (st[id].importance || 0) >= 60 }).slice(0, 6)
-      var keyBox = keyIds.length < 3 ? null : h('section', { className: 'nw-keys' },
+      var keyBox = !keyIds.length ? null : h('section', { className: 'nw-keys' },
         h('div', { className: 'nw-keys-h' }, t('rd.keysH')),
         h('ul', null, keyIds.map(function (id) {
           var x = st[id]
-          var k = df ? dmap[id] : null
-          var one = String(x.lead || '').replace(/\s+/g, ' ')
+          var k = kind(id)
+          var one = String((k === 'dev' && x.update_text) || x.lead || '').replace(/\s+/g, ' ')
           if (one.length > 56) one = one.slice(0, 54) + '…'
           return h('li', { key: id }, h('button', { className: 'nw-key-link', onClick: function () { goTo(id) } },
             h('span', { className: 'nw-key-n' }, String(keyIds.indexOf(id) + 1)),
             h('span', { className: 'nw-key-txt' },
-              h('span', { className: 'nw-key-t' }, k === 'new' ? h('span', { className: 'nw-rs-tag' }, t('ed.new')) : k === 'dev' ? h('span', { className: 'nw-rs-tag nw-rs-dev' }, t('rd.developing')) : null, h('b', null, x.title)),
+              h('span', { className: 'nw-key-t' }, h('span', { className: editionTagClass(k) }, editionTag(k)), h('b', null, x.title)),
               one ? h('span', { className: 'nw-key-one' }, one) : null)))
         })))
 
@@ -1216,7 +1232,7 @@ window.__ModuleLoader__.load({
       // 「自上次查看」只在跨了不止一轮时有用；上次查看就在上一版之后，刊头的对比已经说明了
       if (df && since && since.at && since.at >= df.base_at) sinceBox = null
       return h('div', { className: 'nw-edition' }, notes, masthead, sinceBox,
-        !front.length && !sections.length ? Empty({ children: t('ed.noStories') }) : null,
+        !front.length && !sections.length && !folIds.length ? Empty({ children: t('ed.noStories') }) : null,
         h('div', { className: 'nw-read' },
           h('div', { className: 'nw-read-main' }, keyBox, folEl, frontEl, body),
           h('aside', { className: 'nw-rail' },
@@ -1663,7 +1679,7 @@ window.__ModuleLoader__.load({
             ? h('button', { className: 'nw-lw-title', onClick: function () { props.onOpen(x.story_id) } }, x.title)
             : h('a', { className: 'nw-lw-title', href: x.url, target: '_blank', rel: 'noopener noreferrer' }, x.title)
           return h('li', { key: x.id, className: 'nw-lw-item' },
-            h('span', { className: 'nw-lw-t' }, (x.approx ? '~' : '') + hhmm(x.at)),
+            h('span', { className: 'nw-lw-t' }, whenC(x.at, x.approx ? 'fetched' : x.time_confidence)),
             h('div', { className: 'nw-lw-body' },
               h('div', { className: 'nw-lw-line' }, x.fresh ? h('span', { className: 'nw-lw-new', title: t('lw.newHint') }, t('lw.new')) : null, title),
               h('div', { className: 'nw-lw-meta' }, x.source + (x.outlets > 1 ? ' · ' + t('lw.outlets', { n: x.outlets }) : ''))))
@@ -2915,7 +2931,7 @@ window.__ModuleLoader__.load({
       '.nw-working{display:flex;align-items:center;gap:8px;font-size:12px;color:' + C.l2 + '} .nw-queue{flex-wrap:wrap}',
       '.nw-lw h4{display:flex;align-items:baseline;gap:8px} .nw-lw-at{margin-left:auto;font-size:11px;font-weight:400;color:' + C.l3 + '}',
       '.nw-lw-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}',
-      '.nw-lw-item{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px;padding:7px 0;border-top:1px solid ' + C.line1 + '} .nw-lw-item:first-child{border-top:0}',
+      '.nw-lw-item{display:grid;grid-template-columns:5.5em minmax(0,1fr);gap:8px;padding:7px 0;border-top:1px solid ' + C.line1 + '} .nw-lw-item:first-child{border-top:0}',
       '.nw-lw-t{font-size:12px;color:' + C.l3 + ';font-variant-numeric:tabular-nums;padding-top:1px} .nw-lw-body{min-width:0;display:flex;flex-direction:column;gap:2px}',
       '.nw-lw-title{border:0;background:none;padding:0;font:inherit;font-size:13px;line-height:1.5;color:' + C.l1 + ';text-align:left;cursor:pointer;text-decoration:none;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden} .nw-lw-title:hover{color:' + C.accent + '}',
       '.nw-lw-new{display:inline-block;font-size:10px;line-height:15px;padding:0 4px;margin-right:5px;border-radius:3px;background:' + C.accent + ';color:#fff;vertical-align:1px}',
@@ -2987,7 +3003,7 @@ window.__ModuleLoader__.load({
       '.nw-v-lead .nw-rs-title{font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif;font-size:clamp(20px,3.4cqi,26px);font-weight:700;line-height:1.35}',
       '.nw-v-lead > .nw-rs-lead{font-size:15px;line-height:1.85}',
       '.nw-rs-badge{flex:none;font-size:11px;color:' + C.accent + ';border:1px solid ' + C.accent + ';border-radius:4px;padding:0 4px;line-height:16px;transform:translateY(-1px)}',
-      '.nw-rs-tag{flex:none;font-size:11px;font-weight:700;color:' + C.err + ';letter-spacing:.04em;transform:translateY(-1px)} .nw-rs-tag.nw-rs-dev{color:' + C.accent + '}',
+      '.nw-rs-tag{flex:none;font-size:11px;font-weight:700;color:' + C.err + ';letter-spacing:.04em;transform:translateY(-1px)} .nw-rs-tag.nw-rs-dev{color:' + C.accent + '} .nw-rs-tag.nw-rs-same{color:' + C.l2 + '}',
       '.nw-rs-star{flex:none;color:' + C.accent + ';font-size:12px}',
       '.nw-rs-meta{display:flex;align-items:center;gap:8px;min-height:20px;font-size:12px;color:' + C.l3 + ';font-variant-numeric:tabular-nums}',
       '.nw-byline{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .nw-cred-ok{color:' + C.ok + '}',

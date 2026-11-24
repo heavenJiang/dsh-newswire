@@ -150,6 +150,24 @@ export function editionRow(r) {
   return { id: r.id, pack: r.pack, run_id: r.run_id, created_at: r.created_at, mode: r.mode, model: r.model, hours: r.hours, items_read: r.items_read, headline: r.headline, error: r.error, ms: r.ms, calls: r.calls, content: parseJ(r.content, null) };
 }
 
+/** 给升级前存下的版面补上最新报道时间，只查当时版面收录的文章。 */
+export function fillEditionReportTimes(db, row) {
+  const stories = Object.values(row?.content?.stories || {}).filter((s) => s.latest_published_at === undefined);
+  const ids = [...new Set(stories.flatMap((s) => s.article_ids || []))];
+  const times = new Map();
+  for (let i = 0; i < ids.length; i += 400) {
+    const chunk = ids.slice(i, i + 400);
+    const articles = db.prepare(`SELECT a.id, ${PUB} published_at FROM articles a WHERE a.id IN (${chunk.map(() => "?").join(",")})`).all(...chunk);
+    for (const a of articles) if (a.published_at) times.set(a.id, a.published_at);
+  }
+  for (const s of stories) {
+    s.latest_published_at = (s.article_ids || []).reduce((latest, id) => {
+      const at = times.get(id);
+      return at && (!latest || at > latest) ? at : latest;
+    }, s.published_at || null);
+  }
+}
+
 /**
  * 这一版和上一轮抓取的版面比：哪些故事线是新的、哪些有新报道、哪些原样沿用，上一版有、这一版没了的有几条。
  * 「上一轮」按抓取轮次算：同一轮的程序预览、边写边出的进度版、改关注后的重排（run_id 为空）都算同一版，
@@ -168,10 +186,17 @@ export function editionDiff(db, row) {
   const stories = {};
   const counts = { new: 0, dev: 0, same: 0, gone: 0 };
   const cur = row.content.stories || {};
+  const provisional = row.content.stats?.preview || row.content.stats?.partial;
+  const existed = db.prepare("SELECT 1 FROM stories WHERE story_id = ? AND created_edition <= ?");
+  const joined = db.prepare("SELECT 1 FROM story_items WHERE story_id = ? AND joined_edition > ? AND joined_edition <= ? LIMIT 1");
   for (const [id, s] of Object.entries(cur)) {
     const o = old[id];
     let k = "same";
-    if (!o) k = "new";
+    if (!o) {
+      // 上一版没刊过的旧故事线仍是旧事；有新报道归入才算进展。
+      if (!existed.get(id, b.id)) k = "new";
+      else if ((provisional && s.updated) || joined.get(id, b.id, row.id)) k = "dev";
+    }
     else {
       const had = new Set(o.article_ids || []);
       if ((s.article_ids || []).some((a) => !had.has(a))) k = "dev";
@@ -231,8 +256,8 @@ export function latestWire(db, o) {
       COALESCE(s.name, a.source_id) source, m.event_id, si.story_id, e.importance, e.source_count
     FROM articles a LEFT JOIN sources s ON s.id = a.source_id LEFT JOIN event_members m ON m.article_id = a.id LEFT JOIN events e ON e.event_id = m.event_id
       LEFT JOIN story_items si ON si.article_id = a.id
-    WHERE a.first_seen_at >= ? AND COALESCE(a.kind, 'news') IN ('news', 'digest_item')
-    ORDER BY COALESCE(${PUB}, a.first_seen_at) DESC LIMIT 400`).all(since);
+    WHERE a.first_seen_at >= ? AND COALESCE(${PUB}, a.first_seen_at) >= ? AND COALESCE(a.kind, 'news') IN ('news', 'digest_item')
+    ORDER BY COALESCE(${PUB}, a.first_seen_at) DESC LIMIT 400`).all(since, since);
   const seen = new Set();
   const perSource = new Map();
   const out = [];
@@ -249,7 +274,7 @@ export function latestWire(db, o) {
     // 有的源把摘要拼在标题后面：截到第一个句号或 60 字
     const tt = cleanTitle(r.title) || r.title;
     const short = tt.length > 60 ? (tt.slice(0, 60).match(/^.{12,}?[。！？]/) || [tt.slice(0, 58) + "…"])[0] : tt;
-    out.push({ id: r.id, title: short, url: r.url, at: r.published_at || r.first_seen_at, approx: r.time_confidence === "fetched", source: r.source, story_id: r.story_id || null,
+    out.push({ id: r.id, title: short, url: r.url, at: r.published_at || r.first_seen_at, approx: !r.published_at || r.time_confidence === "fetched", time_confidence: r.time_confidence, source: r.source, story_id: r.story_id || null,
       importance: r.importance == null ? null : Math.round(r.importance), outlets: r.source_count || 1, fresh: Boolean(o && o.editionAt && r.first_seen_at > o.editionAt) });
     if (out.length >= ((o && o.limit) || 12)) break;
   }

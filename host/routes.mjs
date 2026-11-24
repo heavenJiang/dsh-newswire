@@ -19,7 +19,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { attemptRows, continuityRows, dayRange, eventDetail, eventRows, itemRows, labelCounts, openIfExists, recentGaps, recentPushes, recentRuns, signalTrail, sinceIso, timelineDay, timelineRun } from "../engine/query.mjs";
 import { analyzeEvents } from "./model.mjs";
 import { judgeRecipe, learnRecipe } from "./recipe.mjs";
-import { latestWire, bodiesFor, editionById, editionDiff, editionList, latestAllId, latestEdition, loadLayout, qualityRows, reassemble, saveEdition, sinceSeen, storyDetail } from "./edition.mjs";
+import { latestWire, bodiesFor, editionById, editionDiff, editionList, fillEditionReportTimes, latestAllId, latestEdition, loadLayout, qualityRows, reassemble, saveEdition, sinceSeen, storyDetail } from "./edition.mjs";
 import { composeDailyMessage, dailyDates, latestDaily, todayBj } from "./daily.mjs";
 import { KINDS as FOLLOW_KINDS, loadFollows, updateFollows } from "./follows.mjs";
 import { installedPackage } from "./update.mjs";
@@ -329,6 +329,7 @@ export function registerRoutes(app) {
       // 自上次查看以来：mark_seen 时返回上次查看时间与各故事线的变化，并把查看时间记为现在
       const out = withDb(p, (db) => {
         const edition = body.id ? (db ? editionById(db, Number(body.id)) : null) : latestEdition(db, pack);
+        if (edition) fillEditionReportTimes(db, edition);
         let since = null;
         if (db && body.mark_seen === true && !body.id) {
           const key = "seen:" + pack;
