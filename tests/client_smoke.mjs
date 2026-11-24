@@ -183,12 +183,12 @@ cases.push(
   }],
   ["MarketImpact(reviewed)", () => {
     const node = T.MarketImpact({ canRun: true, market: {
-      phase: "ready", count: 20, reviewed: "2026-11-08T10:00:00Z", canReview: true, reviewError: true,
+      phase: "ready", count: 20, reviewed: "2026-11-08T10:00:00Z", canReview: true, reviewError: true, audit: { at: "2026-11-08T10:00:00Z", results: [{ company: "示例公司", ticker: "TEST", verdict: "需修正", note: "修正兑现时点", sources: [] }] },
       sources: [{ ref: 1, source: "原始报道", title: "采购披露", url: "https://example.test/report" }],
       report: { rejected: 1, changes: ["修正兑现时点"], items: [{ market: "美股", ticker: "TEST", company: "示例公司", finding: "约束在并网", business: "机房", mechanism: "项目延后", countercase: "委托代建", watch: "核对验收", direction: "双向", refs: [1], links: [{ ticker: "600123", company: "示例电气", relation: "竞争替代", why: "待查采购", supported: false, refs: [1] }] }] },
     } });
     const rendered = JSON.stringify(node);
-    for (const k of [T.t("mi.review"), T.t("mi.reviewFailed"), T.t("mi.countercase"), T.t("mi.unverified"), "600123", "https://example.test/report", "修正兑现时点"]) if (!rendered.includes(k)) throw new Error("研判卡缺 " + k);
+    for (const k of [T.t("mi.review"), T.t("mi.reviewFailed"), T.t("mi.countercase"), T.t("mi.unverified"), T.t("mi.audit"), "https://example.test/report", "修正兑现时点"]) if (!rendered.includes(k)) throw new Error("研判卡缺 " + k);
     return node;
   }],
   ["EditionView(fellback)", () => { const st = Object.assign({}, EDITION_STATE, { ed: Object.assign({}, EDITION_STATE.ed, { mode: "rules", error: "budget_exceeded" }) }); const n = withStates([st], () => T.EditionView({ pack: "all", stamp: 1, names: {}, onOpen: () => {} })); if (!JSON.stringify(n).includes("budget_exceeded")) throw new Error("没提示退回"); return n; }],

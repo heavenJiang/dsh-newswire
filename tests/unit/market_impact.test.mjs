@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { apply } from "../../index.js";
 import { openDb } from "../../engine/store/schema.mjs";
-import { draftMarketImpact, marketMaterials, marketReviewMaterials, publicMarketImpact, readMarketImpact, reviewMarketImpact, writeMarketImpact } from "../../host/market_impact.mjs";
+import { auditMarketImpact, draftMarketImpact, marketMaterials, marketPushMessage, marketReviewMaterials, publicMarketImpact, publishMarketImpact, readMarketImpact, writeMarketImpact } from "../../host/market_impact.mjs";
 
 const article = (ref, title, text = "") => ({ ref, title, text, source: "测试来源", url: "https://example.test/" + ref });
 const finding = {
@@ -32,20 +32,31 @@ test("整轮分批取材，汇总跨批依据，独立审查过滤无出处的�
   const supporting = marketReviewMaterials(draft, materials);
   assert.deepEqual(supporting.map((x) => x.ref), [1, 2, 46]);
 
-  const checked = { ...finding, based_on: [1], links: [{ ...finding.links[0], supported: true }] };
-  const reviewer = modelFor({ items: [
-    { ...checked, ticker: "FAKE", finding: "采购增长99%" }, checked, checked,
-    { ...checked, ticker: "NONE", refs: [999] },
-  ], changes: ["补入并网约束"] });
-  const report = await reviewMarketImpact(reviewer, draft, supporting, 5000, null, "复核供货身份");
-  assert.match(reviewer.prompts[0], /复核供货身份/);
+  const unsupported = { ...finding, id: 2, ticker: "FAKE", finding: "采购增长99%", mechanism: "" };
+  const report = publishMarketImpact([unsupported, ...draft, ...draft], supporting);
   assert.equal(report.items.length, 1);
   assert.equal(report.items[0].identified, true);
-  assert.equal(report.items[0].links[0].supported, false, "材料没有明确股票代码及双方关系，即使审查模型判定支持也降级");
-  assert.deepEqual(report.changes, ["补入并网约束"]);
+  assert.equal(report.items[0].links[0].supported, false);
   const state = publicMarketImpact({ phase: "ready", report, materials: supporting, draft });
   assert.deepEqual(state.sources.map((x) => x.ref), [1, 46]);
   assert.ok(!("text" in state.sources[0]) && !("draft" in state));
+  assert.match(marketPushMessage(report, "12:00"), /示例云 TEST/);
+  const reviewer = modelFor({ items: [{ id: 1, verdict: "需修正", note: "项目重新安排并网", refs: [1] }] });
+  const result = await auditMarketImpact(reviewer, report.items, [article(1, "项目重新安排并网")], 5000, "复核供货身份", supporting);
+  assert.match(reviewer.prompts[0], /复核供货身份/);
+  assert.equal(result[0].verdict, "需修正");
+  assert.equal(report.items[0].direction, "双向");
+
+});
+
+test("头版英伟达被批次遗漏后重新送审，缺少结论的重点可见", async () => {
+  const priority = { ...article(1, "英伟达 NVDA CEO 变动"), priority: "英伟达 CEO 变动" };
+  const other = { ...article(2, "其他重点"), priority: "其他重点" };
+  const llm = modelFor({ items: [{ ...finding, company: "英伟达", ticker: "NVDA", refs: [1], finding: "采购增加99%", mechanism: "", links: [] }] }, { items: [{ ...finding, company: "英伟达", ticker: "NVDA", refs: [1], links: [] }] });
+  const report = publishMarketImpact(await draftMarketImpact(llm, [priority, other], 5000), [priority, other]);
+  assert.match(llm.prompts[1], /英伟达 NVDA CEO 变动/);
+  assert.deepEqual(report.items.map((x) => x.ticker), ["NVDA"]);
+  assert.deepEqual(report.coverage, [{ title: "其他重点", ref: 2, reason: null }]);
 });
 
 test("正式抓取轮次覆盖未上版报道与合集拆条，排除已知旧闻和推广；研判记录按轮次读取", () => {
@@ -68,6 +79,22 @@ test("正式抓取轮次覆盖未上版报道与合集拆条，排除已知旧�
   db.close();
 });
 
+test("低分政策与治理消息按业务触发规则送审", () => {
+  const db = openDb(":memory:");
+  const insert = db.prepare("INSERT INTO articles (id, title, first_seen_at, published_at, kind) VALUES (?, ?, '2026-11-23 10:02:00','2026-11-23 10:01:00','news')");
+  insert.run("p", "新规限制先进芯片出口");
+  insert.run("g", "公司首席执行官将出席听证会");
+  insert.run("r", "日常社区分享");
+  const ed = { id: 1, pack: "core", created_at: "2026-11-23 10:05:00", content: { since: "2026-11-23 09:00:00", stories: {
+    a: { title: "新规限制先进芯片出口", importance: 45, article_ids: ["p"] },
+    b: { title: "公司首席执行官将出席听证会", importance: 55, updated: true, article_ids: ["g"] },
+    c: { title: "日常社区分享", importance: 50, is_new: true, article_ids: ["r"] },
+  } } };
+  const byTitle = Object.fromEntries(marketMaterials(db, ed).map((m) => [m.title, m.priorityReason]));
+  assert.deepEqual(byTitle, { "新规限制先进芯片出口": "policy", "公司首席执行官将出席听证会": "governance", "日常社区分享": null });
+  db.close();
+});
+
 test("看板接口提供已审核的研判，重审失败保留已发布结论", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "nw-market-"));
   writeFileSync(join(dir, "model.json"), JSON.stringify({ mode: "llm", provider: "fixture", model: "reviewer" }));
@@ -78,12 +105,14 @@ test("看板接口提供已审核的研判，重审失败保留已发布结论",
   db.close();
 
   const candidate = { ...finding, refs: [1], links: [] };
-  const answers = [{ items: [candidate] }, { items: [{ ...candidate, based_on: [1] }], changes: [] }, { invalid: true }];
+  const answers = [{ items: [candidate] }, { invalid: true }];
+  const pushes = [];
   const prompts = [];
   const routes = new Map();
   const disposers = [];
   apply({
     inject(deps, fn) {
+      if (deps[0] === "phonePush") fn({ effect() {}, phonePush: { available: () => true, send: async (text) => { pushes.push(text); return { delivered: 1 }; } } });
       if (deps[0] === "llm") fn({ effect() {}, llm: { async *stream(opts) {
         prompts.push(opts.messages[0].content[0].text);
         yield { type: "text-delta", text: JSON.stringify(answers.shift()) };
@@ -103,7 +132,7 @@ test("看板接口提供已审核的研判，重审失败保留已发布结论",
   const waitForReport = async () => {
     for (let i = 0; i < 100; i++) {
       const res = await (await call("/api/newswire/edition", { id: 1 })).json();
-      if (res.market && !res.market.running) return res.market;
+      if (res.market && !res.market.running && !res.market.auditing && res.market.delivery === "sent") return res.market;
       await delay(10);
     }
     assert.fail("后台股票研判未结束");
@@ -113,12 +142,15 @@ test("看板接口提供已审核的研判，重审失败保留已发布结论",
   const first = await waitForReport();
   assert.equal(first.report.items[0].ticker, "TEST");
   assert.equal(first.sources.length, 1);
-  const retry = await call("/api/newswire/market-impact", { edition_id: 1, feedback: "核对并网日期" });
+  assert.equal(prompts.length, 1, "初稿推出时不等待模型审查");
+  assert.match(pushes[0], /股票影响研判/);
+  const retry = await call("/api/newswire/market-impact", { edition_id: 1, action: "audit", feedback: "核对并网日期" });
   assert.equal(retry.status, 202);
   assert.deepEqual((await retry.json()).market.report, first.report);
   const after = await waitForReport();
   assert.equal(after.reviewError, true);
-  assert.equal(after.reviewed, first.reviewed);
+  assert.equal(after.audit, null);
   assert.deepEqual(after.report, first.report);
-  assert.match(prompts[2], /核对并网日期/);
+  assert.match(prompts[1], /核对并网日期/);
+  assert.equal(pushes.length, 1);
 });

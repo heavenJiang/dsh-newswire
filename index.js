@@ -12,7 +12,7 @@ import { makeDeepRead, modelSplitDigests } from "./host/deepread.mjs";
 import { translateTitles } from "./host/translate.mjs";
 import { DEPTHS, depthOf, depthParams, makeGate, recordCall } from "./host/runtime.mjs";
 import { detailMaterials, latestDetail, saveDetail, writeDetail } from "./host/detail.mjs";
-import { draftMarketImpact, marketKey, marketMaterials, marketReviewMaterials, publicMarketImpact, readMarketImpact, reviewMarketImpact, writeMarketImpact } from "./host/market_impact.mjs";
+import { auditMarketImpact, draftMarketImpact, marketFollowup, marketKey, marketMaterials, marketPushMessage, marketReviewMaterials, publicMarketImpact, publishMarketImpact, readMarketImpact, writeMarketImpact } from "./host/market_impact.mjs";
 import { analysisMaterials, analyzeStory, autoAnalyzeTargets, saveAnalysis, searchQuery, webMaterials } from "./host/analysis.mjs";
 import { linkAll, repairAliasLinks, repairThemeLinks, synthTargets, synthesize } from "./host/tracking.mjs";
 import { PRIORITY, createQueue } from "./host/queue.mjs";
@@ -462,11 +462,11 @@ export function apply(ctx, config) {
         ed = ruleEdition(db, base);
       } else pg.start("save", { detail: "按版式组版、存档" });
       try { ed.tickers = tickerBoard(db, { since: base.since, pack }); } catch { ed.tickers = []; }
-      if (useLlm) ed.market_round = o.runId || base.since;
+      if (llmReady()) ed.market_round = o.runId || base.since;
       const saved = saveEdition(db, ed, { runId: o.runId, error, ms: Date.now() - t0 });
       progressCleanup();
       if (ed.market_round) {
-        const round = { id: saved.id, pack, run_id: o.runId || null, created_at: saved.created_at, content: { market_round: ed.market_round, since: ed.since, stories: ed.stories } };
+        const round = { id: saved.id, pack, run_id: o.runId || null, created_at: saved.created_at, content: { market_round: ed.market_round, since: ed.since, stories: ed.stories, front: ed.front } };
         try { startMarketImpact(round, false); } catch (err) { ctx.logger.warn("newswire: market impact: " + errText(err)); }
       }
       autoAnalyze(ed);
@@ -721,48 +721,145 @@ export function apply(ctx, config) {
   }
 
   const marketJobs = new Set();
+  const marketAudits = new Set();
+  const marketRelay = new Set();
+  const MARKET_OBSERVE_MS = 6 * 3600000;
+  const MARKET_TRACK_MS = 7 * 86400000;
+  let marketTickRunning = false;
 
   function marketImpactView(db, edition) {
     const state = publicMarketImpact(readMarketImpact(db, edition));
-    return state && Object.assign(state, { running: marketJobs.has(marketKey(edition)) });
+    const key = marketKey(edition);
+    if (!state) return null;
+    const recentAudits = db.prepare(`SELECT json_extract(value, '$.audit') AS audit FROM kv
+      WHERE substr(key, 1, length(?)) = ? AND key != ? AND json_extract(value, '$.audit.at') IS NOT NULL
+      ORDER BY json_extract(value, '$.audit.at') DESC LIMIT 4`).all("market-impact:" + edition.pack + ":", "market-impact:" + edition.pack + ":", key)
+      .map(({ audit }) => { const { history, ...entry } = JSON.parse(audit); return entry; });
+    return { ...state, running: marketJobs.has(key), auditing: marketAudits.has(key), recentAudits };
   }
 
-  function startMarketImpact(edition, reader, feedback) {
+  function patchMarket(edition, patch) {
+    return withDb(p, (db) => {
+      const state = { ...(readMarketImpact(db, edition) || {}), ...patch };
+      writeMarketImpact(db, edition, state);
+      return state;
+    });
+  }
+
+  function startMarketImpact(edition, reader) {
     const key = marketKey(edition);
     const prior = withDb(p, (db) => readMarketImpact(db, edition));
-    if (marketJobs.has(key) || (!reader && prior)) return;
+    if (!key || marketJobs.has(key) || marketAudits.has(key) || (!reader && prior?.v === 2
+      && (prior.phase === "ready" || Date.now() - Date.parse(prior.attempted) < 20 * 60000))) return;
     marketJobs.add(key);
     try {
-      withDb(p, (db) => writeMarketImpact(db, edition, {
-        ...(prior || { count: 0, materials: [] }), phase: prior?.draft ? "reviewing" : "analyzing", reviewError: false,
-      }));
+      patchMarket(edition, {
+        v: 2, phase: "analyzing", editionId: edition.id, attempted: new Date().toISOString(),
+        editionInfo: { id: edition.id, pack: edition.pack, run_id: edition.run_id, created_at: edition.created_at, content: { market_round: edition.content.market_round } },
+      });
     } catch (err) {
       marketJobs.delete(key);
       throw err;
     }
     setTimeout(() => {
       void background(queue.run({ kind: "analysis", label: "股票影响研判", priority: reader ? PRIORITY.reader : PRIORITY.background }, async () => {
-        let state = prior || { count: 0, materials: [] };
-        const save = (patch) => {
-          state = { ...state, ...patch };
-          withDb(p, (db) => writeMarketImpact(db, edition, state));
-        };
         try {
-          if (!state.draft) {
-            const materials = withDb(p, (db) => marketMaterials(db, edition));
-            const draft = await draftMarketImpact(model, materials, cfg.modelTimeoutMs);
-            save({ phase: "reviewing", count: materials.length, materials: marketReviewMaterials(draft, materials), draft });
-          }
-          const report = await reviewMarketImpact(model, state.draft, state.materials, cfg.modelTimeoutMs, state.report, feedback);
-          save({ phase: "ready", reviewed: new Date().toISOString(), report, reviewError: false });
+          const materials = withDb(p, (db) => marketMaterials(db, edition));
+          const draft = await draftMarketImpact(model, materials, cfg.modelTimeoutMs);
+          const report = publishMarketImpact(draft, materials);
+          const message = marketPushMessage(report, bjHhmm(edition.created_at));
+          const previous = prior?.v === 2 ? prior : null;
+          const delivery = message ? (previous?.delivery?.text === message ? previous.delivery : { status: "pending", text: message }) : null;
+          patchMarket(edition, { phase: "ready", count: materials.length, materials: [...new Map(marketReviewMaterials(draft, materials).concat(materials.filter((m) => report.coverage.some((c) => c.ref === m.ref))).map((m) => [m.ref, m])).values()],
+            draft, report, issued: nowIsoUtc(), audit: null, reviewed: null, reviewError: false, delivery });
         } catch (err) {
-          save({ phase: state.report ? "ready" : "failed", reviewError: Boolean(state.draft) });
+          patchMarket(edition, { phase: "failed" });
           throw err;
         } finally {
           marketJobs.delete(key);
         }
+        void background(marketTick(), "market delivery");
       }), "market impact");
     }, 0);
+  }
+
+  function startMarketAudit(edition, reader, feedback) {
+    const key = marketKey(edition);
+    const state = withDb(p, (db) => readMarketImpact(db, edition));
+    if (!state?.report?.items.length || marketAudits.has(key) || marketJobs.has(key)) return false;
+    marketAudits.add(key);
+    setTimeout(() => {
+      void background(queue.run({ kind: "analysis", label: "股票研判后续验证", priority: reader ? PRIORITY.reader : PRIORITY.background }, async () => {
+        try {
+          const followup = withDb(p, (db) => marketFollowup(db, state.report.items, state.issued || edition.created_at));
+          const results = await auditMarketImpact(model, state.report.items, followup, cfg.modelTimeoutMs, feedback, state.materials);
+          patchMarket(edition, { reviewError: false, audit: { at: new Date().toISOString(), results, history: [state.audit, ...(state.audit?.history || [])].filter(Boolean).slice(0, 5).map(({ history, ...entry }) => entry) } });
+        } catch (err) {
+          patchMarket(edition, { reviewError: true, auditFailedAt: new Date().toISOString() });
+          throw err;
+        } finally {
+          marketAudits.delete(key);
+        }
+      }), "market audit");
+    }, 0);
+    return true;
+  }
+
+  function marketRows(db) {
+    if (!db) return [];
+    return db.prepare(`SELECT value FROM kv WHERE key GLOB 'market-impact:*' AND json_extract(value, '$.v') = 2
+      AND (json_extract(value, '$.delivery.status') = 'pending' OR json_extract(value, '$.issued') >= datetime('now', '-7 days'))
+      ORDER BY updated_at DESC`).all().flatMap((r) => {
+      const state = JSON.parse(r.value);
+      const edition = state.editionInfo || editionById(db, state.editionId);
+      return edition ? [{ edition, state }] : [];
+    });
+  }
+
+  async function marketTick() {
+    if (marketTickRunning) return;
+    marketTickRunning = true;
+    try {
+      if (llmReady() && !modelState.busy) {
+        const latest = withDb(p, (db) => latestEdition(db, "all"));
+        if (marketKey(latest) && Date.now() - Date.parse(latest.created_at.replace(" ", "T") + "Z") < MARKET_TRACK_MS) startMarketImpact(latest, false);
+      }
+      const rows = withDb(p, marketRows);
+      const pending = rows.find(({ state }) => state.delivery?.status === "pending");
+      if (pending) {
+        const { edition, state } = pending;
+        if (direct()) {
+          if (await sendDirect(state.delivery.text)) patchMarket(edition, { delivery: { ...state.delivery, status: "sent" } });
+        } else {
+          const pack = edition.pack === "all" ? "core" : edition.pack;
+          if (!marketRelay.has(pack) && !readPending(pack) && await pushTask(pack)) {
+            marketRelay.add(pack);
+            void background(triggerDelivery(pack).then((ok) => {
+              if (!ok) marketRelay.delete(pack);
+              else setTimeout(() => marketRelay.delete(pack), 120000).unref();
+            }, (err) => { marketRelay.delete(pack); throw err; }), "market relay");
+          }
+        }
+      }
+      if (!llmReady()) return;
+      const due = rows.find(({ edition, state }) => {
+        if (!state.issued || state.phase !== "ready" || !state.report?.items.length || marketAudits.has(marketKey(edition))) return false;
+        const age = Date.now() - Date.parse(state.issued.replace(" ", "T") + "Z");
+        const last = Math.max(Date.parse(state.audit?.at || "") || 0, Date.parse(state.auditFailedAt || "") || 0);
+        return age >= MARKET_OBSERVE_MS && age <= MARKET_TRACK_MS && Date.now() - last >= MARKET_OBSERVE_MS;
+      });
+      if (due) startMarketAudit(due.edition, false);
+    } finally { marketTickRunning = false; }
+  }
+
+  function takeMarketDelivery(pack) {
+    return withDb(p, (db) => {
+      const pending = marketRows(db).find(({ edition, state }) => (edition.pack === pack || (edition.pack === "all" && pack === "core")) && state.delivery?.status === "pending");
+      if (!pending) return null;
+      const { edition, state } = pending;
+      writeMarketImpact(db, edition, { ...state, delivery: { ...state.delivery, status: "relayed" } });
+      return { ok: true, pack, message: state.delivery.text };
+    });
   }
 
   /** 版面出来后的后台工作（不挡推送）：头版里重要的报道分析影响；追踪对象挂上新的故事线，新动态够多的重写综述。 */
@@ -874,6 +971,10 @@ export function apply(ctx, config) {
       // 待推送的（写完再推、手动抓取写完、面板上点「推送」）已备好：这一次只推送
       const pend = readPending(packKey);
       if (pend && pend.ready) return deliverPending(pend);
+      if (!(args && args._direct) && marketRelay.delete(packKey)) {
+        const market = takeMarketDelivery(packKey);
+        if (market) return market;
+      }
       if (deferring && pend && pend.source === "cycle" && Date.now() - Date.parse(pend.at) < PENDING_MAX_MS) return { ok: true, deferred: true, run_id: pend.run_id, message: "", note: "本轮版面还在写，写完自动推送" };
     }
     // 两个主题包的定时任务可能撞上，或预编排还在抓：等它结束，但给版面和发送留出时间
@@ -1445,14 +1546,14 @@ export function apply(ctx, config) {
     const tool = (def) => disposers.push(ctx.tools.register(Object.assign({}, def, { execute: async (...a) => losslessJson(await def.execute(...a)) })));
     disposers.push(() => { hooks.dailyRun = null; });
     // 预编排：每分钟看一眼下一次定时推送还有多久
-    { const t = setInterval(() => { void background(prewarmTick(), "prewarm"); void background(checkPending(), "pending push"); try { maintenanceTick(); } catch { /* 明天再清 */ } }, 60000); disposers.push(() => clearInterval(t)); }
+    { const t = setInterval(() => { void background(prewarmTick(), "prewarm"); void background(checkPending(), "pending push"); void background(marketTick(), "market tick"); try { maintenanceTick(); } catch { /* 明天再清 */ } }, 60000); disposers.push(() => clearInterval(t)); }
     // 30 秒看一次时钟（同一分钟只触发一次），保证不漏掉整点
     { const t = setInterval(() => { void background(clockTick(), "direct clock"); }, 30000); disposers.push(() => clearInterval(t)); }
 
     // 路由和工具各在一个文件里（host/routes.mjs、host/tools.mjs）：状态都在上面，经 app 传过去
     const app = {
       afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
-      guardedRun, handleReply, stopRun, llmReady, marketImpactView, startMarketImpact, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
+      guardedRun, handleReply, stopRun, llmReady, marketImpactView, startMarketImpact, startMarketAudit, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
       pushHealth, pushNow, queue, readTaken, reflowWithFeedback, runAnalysis, runCycle, runDetail, runSynthesis, startDetail, syncSourceState,
       syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
       route, tool, disposers,

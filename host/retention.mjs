@@ -35,6 +35,7 @@ export function prune(db, o) {
     out.editions = run("DELETE FROM editions WHERE id NOT IN (SELECT id FROM _keep_editions)");
     db.exec("DROP TABLE _keep_editions");
     if (has(db, "kv")) db.exec(`DELETE FROM kv WHERE key GLOB 'market-impact:*'
+      AND (json_extract(value, '$.issued') IS NULL OR json_extract(value, '$.issued') < datetime('now', '-7 days'))
       AND key NOT IN (SELECT 'market-impact:' || pack || ':' || COALESCE(json_extract(content, '$.market_round'), run_id, id)
         FROM editions)`);
   }

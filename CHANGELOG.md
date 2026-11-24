@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.48 (2026-11-23)
+
+- Stock impact analysis runs automatically after an edition and sends a separate mobile summary. A separate follow-up verifies findings against later reporting. Business events can trigger priority review, and coverage is checked against validated findings.
+
 ## 1.1.47 (2026-11-23)
 
 - The Today board can analyze US and mainland Chinese stock exposure across a round of news. A separate review revises findings against reporting, flags unsupported links, and can be rerun with reader feedback.

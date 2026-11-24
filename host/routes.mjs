@@ -20,7 +20,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { attemptRows, continuityRows, dayRange, eventDetail, eventRows, itemRows, labelCounts, openIfExists, recentGaps, recentPushes, recentRuns, signalTrail, sinceIso, timelineDay, timelineRun } from "../engine/query.mjs";
 import { analyzeEvents } from "./model.mjs";
 import { judgeRecipe, learnRecipe } from "./recipe.mjs";
-import { latestWire, bodiesFor, editionById, editionDiff, editionList, fillEditionReportTimes, latestAllId, latestEdition, loadLayout, qualityRows, reassemble, saveEdition, sinceSeen, storyDetail } from "./edition.mjs";
+import { latestWire, bodiesFor, editionById, editionDiff, editionList, fillEditionReportTimes, latestEdition, loadLayout, qualityRows, reassemble, saveEdition, sinceSeen, storyDetail } from "./edition.mjs";
 import { composeDailyMessage, dailyDates, latestDaily, todayBj } from "./daily.mjs";
 import { KINDS as FOLLOW_KINDS, loadFollows, updateFollows } from "./follows.mjs";
 import { installedPackage } from "./update.mjs";
@@ -30,7 +30,7 @@ export function registerRoutes(app) {
   const {
     afterManualFetch, background, busyWith, cfg, clock, clockNext, clockSync, ctx, detailJobs, direct, dropTrackerFollows, editFollows, errText,
     guardedRun, handleReply, stopRun, llmReady, makeDaily, makeEdition, modeNow, model, modelCatalog, modelState, modelView, newRunId, optional, p, prefs,
-    pushHealth, pushNow, queue, readTaken, reflowWithFeedback, route, marketImpactView, startMarketImpact, runAnalysis, runDetail, runSynthesis, startDetail, syncSourceState,
+    pushHealth, pushNow, queue, readTaken, reflowWithFeedback, route, marketImpactView, startMarketImpact, startMarketAudit, runAnalysis, runDetail, runSynthesis, startDetail, syncSourceState,
     syncTrackerFollows, taxonomyLabels, taxonomyNames, updates, writeTaken, pg,
   } = app;
 
@@ -312,9 +312,8 @@ export function registerRoutes(app) {
       // 面板开着时每分钟问一次：有没有更新的版面（定时任务、后台编排写完都会出新版面），只回 id 与时间
       if (body.head === true) {
         const head = withDb(p, (db) => {
-          if (!db) return null;
-          if (pack === "all") { const id = latestAllId(db); return id == null ? null : db.prepare("SELECT id, created_at, mode FROM editions WHERE id = ?").get(id) || null; }
-          return db.prepare("SELECT id, created_at, mode FROM editions WHERE pack = ? ORDER BY id DESC LIMIT 1").get(pack) || null;
+          const edition = latestEdition(db, pack);
+          return edition ? { id: edition.id, created_at: edition.created_at, mode: edition.mode, market: marketImpactView(db, edition) } : null;
         });
         return jsonResponse({ ok: true, head, model: modelView(), run: busyWith() || null }, 200);
       }
@@ -571,7 +570,9 @@ export function registerRoutes(app) {
       if (!Number.isSafeInteger(body.edition_id) || body.edition_id <= 0) return jsonResponse({ error: "edition_required" }, 400);
       const edition = withDb(p, (db) => db ? editionById(db, body.edition_id) : null);
       if (!marketKey(edition)) return jsonResponse({ error: "not_found" }, 404);
-      startMarketImpact(edition, true, strOrNull(body.feedback)?.slice(0, 400));
+      if (body.action === "audit") {
+        if (!startMarketAudit(edition, true, strOrNull(body.feedback)?.slice(0, 400))) return jsonResponse({ error: "market_audit_unavailable" }, 409);
+      } else startMarketImpact(edition, true);
       const market = withDb(p, (db) => marketImpactView(db, edition));
       return jsonResponse({ ok: true, market }, 202);
     },
