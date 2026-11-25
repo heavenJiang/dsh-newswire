@@ -2,6 +2,10 @@
 
 English | [中文](CHANGELOG.zh.md)
 
+## 1.1.54 (2026-11-24)
+
+- Omit `temperature` for all models on the `openai-codex` provider so it accepts Newswire requests.
+
 ## 1.1.53 (2026-11-24)
 
 - Use a two-column research layout in wide panels.

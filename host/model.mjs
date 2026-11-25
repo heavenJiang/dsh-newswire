@@ -101,7 +101,8 @@ export function createModel(o) {
           provider: sel.provider, model: sel.model, ...(sel.reasoningEffort ? { reasoningEffort: sel.reasoningEffort } : {}),
           system: SYSTEM,
           messages: [{ role: "user", content: [{ type: "text", text: user }] }],
-          temperature: 0.2, maxTokens: (opt && opt.maxTokens) || 1200, signal: ctl.signal,
+          ...(sel.provider === "openai-codex" ? {} : { temperature: 0.2 }),
+          maxTokens: (opt && opt.maxTokens) || 1200, signal: ctl.signal,
         })) {
           if (chunk.type === "text-delta") text += chunk.text;
           else if (chunk.type === "usage") usage = chunk.usage;

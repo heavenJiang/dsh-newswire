@@ -67,6 +67,15 @@ test("createModel：留空用 dsh 默认模型；插件指定时用指定的；�
   await assert.rejects(bad.complete("问"), /boom/);
 });
 
+test("createModel：openai-codex 的所有模型都省略 temperature", async () => {
+  for (const model of ["gpt-5.6-sol", "gpt-6-astra"]) {
+    const llm = fakeLlm(["你好"]);
+    const client = createModel({ getLlm: () => llm, provider: "openai-codex", model });
+    await client.complete("问");
+    assert.equal(Object.hasOwn(llm.calls[0], "temperature"), false);
+  }
+});
+
 test("analyzeEvents：写入解读；坏 JSON 记失败；已有解读且家数没变就跳过", async () => {
   const db = tmpDb();
   // e1 一次成功；e2 第一次不是 JSON、重试成功；e3 两次都坏
